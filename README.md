@@ -37,6 +37,19 @@ make install
 open "$HOME/Applications/Select to Speak.app"
 ```
 
+For a stable macOS Accessibility identity across local rebuilds, sign with an
+Apple Development or Developer ID certificate and keep one canonical install:
+
+```sh
+SELECT_TO_SPEAK_SIGNING_IDENTITY="Apple Development: Your Name (TEAMID)" \
+SELECT_TO_SPEAK_INSTALL_DIR=/Applications \
+make install
+```
+
+Ad-hoc signing remains the default for development, but macOS ties its
+Accessibility grant to that exact build. Rebuilding an ad-hoc-signed app
+therefore requires granting permission again.
+
 Open the installed app once. macOS asks for Accessibility permission so the
 global shortcut can read selections from applications with custom context
 menus. Enable **Select to Speak** in **System Settings → Privacy & Security →
