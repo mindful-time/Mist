@@ -7,15 +7,17 @@ user-selected text aloud with the local Hexgrad Kokoro-82M text-to-speech model.
 
 ## Platforms and interaction
 
-- macOS: selected text is accepted through a native AppKit Service so the user
-  can choose **Speak Selection with Kokoro** from the text context menu.
-- Windows and Linux X11: selected text is captured when the user presses the
-  global shortcut **Ctrl+Alt+S**.
-- Linux Wayland: because compositors restrict universal selection and global
-  key hooks, copied text can be spoken from the pet's context menu when the
-  compositor exposes clipboard data-control. Compositors without data-control
-  are outside the selected/copied-text workflow supported by this MVP; the pet
-  still offers manual text entry as a degraded mode.
+- macOS, Windows, and Linux: the primary interaction is **select text anywhere,
+  then press Ctrl+Alt+S**.
+- macOS reads the focused accessibility element. The user is prompted once for
+  Accessibility permission. The native AppKit Service remains available as an
+  additional action in applications that expose macOS Services.
+- Windows reads the focused control through Microsoft UI Automation.
+- Linux X11 reads PRIMARY selection and registers the shortcut through X11.
+- Linux Wayland asks the compositor for a shortcut through the XDG
+  GlobalShortcuts portal and reads the compositor's primary selection through
+  ext-data-control or wlr-data-control. If either protocol is unavailable, the
+  pet reports the limitation and retains copied-text/manual-entry fallbacks.
 - The draggable, always-on-top pet shows setup, loading, speaking, ready, and
   error states without opening a conventional application window.
 
@@ -36,7 +38,8 @@ user-selected text aloud with the local Hexgrad Kokoro-82M text-to-speech model.
   ONNX, or audio-device libraries.
 - OS selection, Kokoro inference, model download, and audio playback are
   adapters behind the application boundary.
-- Selection capture must not modify or reconstruct the user's clipboard.
+- Primary selection capture must not modify or reconstruct the user's regular
+  clipboard.
 - Slow model loading, synthesis, download, and playback must not block the pet's
   UI event loop.
 
@@ -46,6 +49,8 @@ user-selected text aloud with the local Hexgrad Kokoro-82M text-to-speech model.
 - The native target passes `cargo check`, `cargo test`, and clippy with warnings
   denied.
 - A macOS `.app` bundle advertises the text Service through `Info.plist`.
+- The same **Ctrl+Alt+S** activation is documented on macOS, Windows, Linux X11,
+  and Linux Wayland; unsupported Wayland portal capabilities fail visibly.
 - The repository documents build and usage instructions for macOS, Windows, and
   Linux, including the Wayland limitation.
 

@@ -2,89 +2,113 @@ use std::sync::mpsc::SyncSender;
 
 use crate::{domain::SelectedText, worker::WorkerCommand};
 
+const SHORTCUT_HINT: &str = "Select text anywhere, then press Ctrl+Alt+S";
+type CaptureMessage = (u64, Result<SelectedText, String>);
+
 pub enum PlatformEvent {
     Speak(SelectedText),
     Error(String),
 }
 
-#[cfg(target_os = "macos")]
 pub struct PlatformBridge {
+    #[cfg(target_os = "macos")]
     _service_provider: objc2::rc::Retained<crate::adapters::macos_service::ServiceProvider>,
-}
-
-#[cfg(target_os = "macos")]
-impl PlatformBridge {
-    pub fn new(commands: SyncSender<WorkerCommand>) -> Self {
-        Self {
-            _service_provider: crate::adapters::macos_service::register(commands),
-        }
-    }
-
-    pub fn poll(&mut self) -> Option<PlatformEvent> {
-        None
-    }
-
-    pub fn usage_hint(&self) -> &'static str {
-        "Select text, then right-click"
-    }
-
-    pub fn registration_error(&self) -> Option<&str> {
-        None
-    }
-}
-
-#[cfg(any(target_os = "windows", target_os = "linux"))]
-type CaptureMessage = (u64, Result<SelectedText, String>);
-
-#[cfg(any(target_os = "windows", target_os = "linux"))]
-pub struct PlatformBridge {
     manager: Option<global_hotkey::GlobalHotKeyManager>,
     hotkey: global_hotkey::hotkey::HotKey,
     registration_error: Option<String>,
+    #[cfg(target_os = "macos")]
+    shortcut_error: Option<String>,
+    #[cfg(target_os = "macos")]
+    accessibility_pending: bool,
     capture_sender: std::sync::mpsc::Sender<CaptureMessage>,
     capture_receiver: std::sync::mpsc::Receiver<CaptureMessage>,
     capture_generation: u64,
     capture_in_flight: Option<(u64, std::time::Instant)>,
+    #[cfg(target_os = "linux")]
+    wayland_shortcuts: Option<std::sync::mpsc::Receiver<WaylandShortcutMessage>>,
 }
 
-#[cfg(any(target_os = "windows", target_os = "linux"))]
 impl PlatformBridge {
-    pub fn new(_commands: SyncSender<WorkerCommand>) -> Self {
+    pub fn new(commands: SyncSender<WorkerCommand>) -> Self {
         use global_hotkey::hotkey::{Code, HotKey, Modifiers};
 
         let hotkey = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyS);
         let (manager, registration_error) = if is_wayland_session() {
-            (
-                None,
-                Some("Wayland blocks the global shortcut; use the pet menu".to_owned()),
-            )
+            (None, None)
         } else {
-            match global_hotkey::GlobalHotKeyManager::new() {
-                Ok(manager) => match manager.register(hotkey) {
-                    Ok(()) => (Some(manager), None),
-                    Err(error) => (
-                        None,
-                        Some(format!("Could not register Ctrl+Alt+S: {error}")),
-                    ),
-                },
-                Err(error) => (None, Some(format!("Global shortcut unavailable: {error}"))),
-            }
+            register_hotkey(hotkey)
         };
         let (capture_sender, capture_receiver) = std::sync::mpsc::channel();
 
+        #[cfg(target_os = "macos")]
+        let shortcut_error = registration_error.clone();
+        #[cfg(target_os = "macos")]
+        let accessibility_pending =
+            !crate::adapters::macos_selection::request_accessibility_permission();
+        #[cfg(target_os = "macos")]
+        let registration_error = if accessibility_pending {
+            let permission_error =
+                "Allow Accessibility access to read selections outside native Services";
+            Some(match registration_error {
+                Some(shortcut_error) => format!("{shortcut_error}; {permission_error}"),
+                None => permission_error.to_owned(),
+            })
+        } else {
+            registration_error
+        };
+
+        #[cfg(not(target_os = "macos"))]
+        let _ = commands;
+
         Self {
+            #[cfg(target_os = "macos")]
+            _service_provider: crate::adapters::macos_service::register(commands),
             manager,
             hotkey,
             registration_error,
+            #[cfg(target_os = "macos")]
+            shortcut_error,
+            #[cfg(target_os = "macos")]
+            accessibility_pending,
             capture_sender,
             capture_receiver,
             capture_generation: 0,
             capture_in_flight: None,
+            #[cfg(target_os = "linux")]
+            wayland_shortcuts: is_wayland_session().then(spawn_wayland_shortcut_listener),
         }
     }
 
     pub fn poll(&mut self) -> Option<PlatformEvent> {
         use global_hotkey::{GlobalHotKeyEvent, HotKeyState};
+
+        #[cfg(target_os = "macos")]
+        if self.accessibility_pending
+            && crate::adapters::macos_selection::is_accessibility_trusted()
+        {
+            self.accessibility_pending = false;
+            self.registration_error.clone_from(&self.shortcut_error);
+        }
+
+        #[cfg(target_os = "linux")]
+        if let Some(message) = self
+            .wayland_shortcuts
+            .as_ref()
+            .and_then(|messages| messages.try_recv().ok())
+        {
+            match message {
+                WaylandShortcutMessage::Registered => self.registration_error = None,
+                WaylandShortcutMessage::Activated => {
+                    if let Err(error) = self.start_capture(capture_selected_text) {
+                        return Some(PlatformEvent::Error(error));
+                    }
+                }
+                WaylandShortcutMessage::Error(error) => {
+                    self.registration_error = Some(error.clone());
+                    return Some(PlatformEvent::Error(error));
+                }
+            }
+        }
 
         while let Ok((generation, message)) = self.capture_receiver.try_recv() {
             if self
@@ -125,17 +149,14 @@ impl PlatformBridge {
     }
 
     pub fn usage_hint(&self) -> &'static str {
-        if self.manager.is_some() {
-            "Select text, then press Ctrl+Alt+S"
-        } else {
-            "Right-click to paste or type text"
-        }
+        SHORTCUT_HINT
     }
 
     pub fn registration_error(&self) -> Option<&str> {
         self.registration_error.as_deref()
     }
 
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
     pub fn request_clipboard_text(&mut self) -> Result<(), String> {
         self.start_capture(capture_clipboard_text)
     }
@@ -166,7 +187,22 @@ impl PlatformBridge {
     }
 }
 
-#[cfg(target_os = "windows")]
+fn register_hotkey(
+    hotkey: global_hotkey::hotkey::HotKey,
+) -> (Option<global_hotkey::GlobalHotKeyManager>, Option<String>) {
+    match global_hotkey::GlobalHotKeyManager::new() {
+        Ok(manager) => match manager.register(hotkey) {
+            Ok(()) => (Some(manager), None),
+            Err(error) => (
+                None,
+                Some(format!("Could not register Ctrl+Alt+S: {error}")),
+            ),
+        },
+        Err(error) => (None, Some(format!("Global shortcut unavailable: {error}"))),
+    }
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 fn is_wayland_session() -> bool {
     false
 }
@@ -174,6 +210,89 @@ fn is_wayland_session() -> bool {
 #[cfg(target_os = "linux")]
 fn is_wayland_session() -> bool {
     std::env::var("XDG_SESSION_TYPE").is_ok_and(|value| value == "wayland")
+}
+
+#[cfg(target_os = "linux")]
+enum WaylandShortcutMessage {
+    Registered,
+    Activated,
+    Error(String),
+}
+
+#[cfg(target_os = "linux")]
+fn spawn_wayland_shortcut_listener() -> std::sync::mpsc::Receiver<WaylandShortcutMessage> {
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let thread_sender = sender.clone();
+    let spawn_result = std::thread::Builder::new()
+        .name("wayland-global-shortcut".to_owned())
+        .spawn(move || {
+            let result = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(anyhow::Error::from)
+                .and_then(|runtime| runtime.block_on(run_wayland_shortcut(thread_sender.clone())));
+            if let Err(error) = result {
+                let _ = thread_sender.send(WaylandShortcutMessage::Error(format!(
+                    "Wayland shortcut unavailable: {error:#}"
+                )));
+            }
+        });
+    if let Err(error) = spawn_result {
+        let _ = sender.send(WaylandShortcutMessage::Error(format!(
+            "Could not start the Wayland shortcut listener: {error}"
+        )));
+    }
+    receiver
+}
+
+#[cfg(target_os = "linux")]
+async fn run_wayland_shortcut(
+    sender: std::sync::mpsc::Sender<WaylandShortcutMessage>,
+) -> anyhow::Result<()> {
+    use anyhow::{Context, bail};
+    use ashpd::desktop::global_shortcuts::{BindShortcutsOptions, GlobalShortcuts, NewShortcut};
+    use futures_util::StreamExt;
+
+    const SHORTCUT_ID: &str = "speak-selection";
+
+    let shortcuts = GlobalShortcuts::new()
+        .await
+        .context("the desktop does not provide the GlobalShortcuts portal")?;
+    let session = shortcuts
+        .create_session(Default::default())
+        .await
+        .context("could not create a global-shortcut session")?;
+    let requested = [
+        NewShortcut::new(SHORTCUT_ID, "Speak selected text with Kokoro")
+            .preferred_trigger("CTRL+ALT+S"),
+    ];
+    let bound = shortcuts
+        .bind_shortcuts(&session, &requested, None, BindShortcutsOptions::default())
+        .await?
+        .response()?;
+    if !bound
+        .shortcuts()
+        .iter()
+        .any(|shortcut| shortcut.id() == SHORTCUT_ID)
+    {
+        bail!("the desktop did not grant the Speak Selection shortcut");
+    }
+
+    let mut activations = shortcuts.receive_activated().await?;
+    let _ = sender.send(WaylandShortcutMessage::Registered);
+    while let Some(event) = activations.next().await {
+        if event.shortcut_id() == SHORTCUT_ID
+            && sender.send(WaylandShortcutMessage::Activated).is_err()
+        {
+            break;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn capture_selected_text() -> anyhow::Result<SelectedText> {
+    crate::adapters::macos_selection::capture_selected_text()
 }
 
 /// Reads the focused control's selection without synthesizing Copy, so the
@@ -209,12 +328,20 @@ fn capture_selected_text() -> anyhow::Result<SelectedText> {
 /// contents.
 #[cfg(target_os = "linux")]
 fn capture_selected_text() -> anyhow::Result<SelectedText> {
-    use std::time::Duration;
+    use std::{io::Read, time::Duration};
 
-    use anyhow::{Context, bail};
+    use anyhow::Context;
 
     if is_wayland_session() {
-        bail!("Wayland blocks global selection capture; copy the text and use the pet menu");
+        use wl_clipboard_rs::paste::{ClipboardType, MimeType, Seat, get_contents};
+
+        let (mut pipe, _) = get_contents(ClipboardType::Primary, Seat::Unspecified, MimeType::Text)
+            .context("the Wayland compositor does not expose the primary text selection")?;
+        let mut bytes = Vec::new();
+        pipe.read_to_end(&mut bytes)
+            .context("could not read the Wayland text selection")?;
+        let text = String::from_utf8(bytes).context("the selected text is not valid UTF-8")?;
+        return SelectedText::new(text.trim_matches('\0')).map_err(Into::into);
     }
 
     let clipboard =
@@ -266,4 +393,15 @@ fn clipboard_text_from(clipboard: &mut arboard::Clipboard) -> anyhow::Result<Str
         bail!("the clipboard does not contain text");
     }
     Ok(text)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn shortcut_hint_explains_the_system_wide_activation() {
+        assert_eq!(
+            super::SHORTCUT_HINT,
+            "Select text anywhere, then press Ctrl+Alt+S"
+        );
+    }
 }

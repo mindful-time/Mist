@@ -2,12 +2,11 @@
 
 A tiny cross-platform desktop pet that reads selected text with Kokoro:
 
-- **macOS:** select text, right-click, then choose **Services → Speak
-  Selection with Kokoro**.
-- **Windows / Linux X11:** select text and press **Ctrl+Alt+S**.
-- **Linux Wayland fallback:** copy selected text, right-click the pet, and choose
-  **Speak copied text**. If the compositor blocks clipboard reads, type text in
-  that same menu.
+- **macOS / Windows / Linux:** select text anywhere and press **Ctrl+Alt+S**.
+- **macOS native-app alternative:** choose **Services → Speak Selection with
+  Kokoro** from the application or text context menu.
+- **Windows/Linux fallback:** copy text, right-click the pet, and choose **Speak
+  copied text**. Manual text entry is available in that same menu.
 
 Speech is generated locally with
 [Kokoro-82M](https://huggingface.co/spaces/hexgrad/Kokoro-TTS); selected text is
@@ -38,12 +37,16 @@ make install
 open "$HOME/Applications/Select to Speak.app"
 ```
 
-Highlight text in Safari, Notes, Mail, or another native macOS app and choose
-the Service.
+Open the installed app once. macOS asks for Accessibility permission so the
+global shortcut can read selections from applications with custom context
+menus. Enable **Select to Speak** in **System Settings → Privacy & Security →
+Accessibility**, select text in any application, and press **Ctrl+Alt+S**
+(Control+Option+S on a Mac keyboard).
 
-If the Service is hidden, enable it in **System Settings → Keyboard →
-Keyboard Shortcuts → Services → Text**. This is a macOS setting; the app does
-not require Accessibility or screen-recording permission.
+The native Service remains available for applications that support it. If it is
+hidden, enable it in **System Settings → Keyboard → Keyboard Shortcuts →
+Services → Text**. The app never requests screen-recording permission and does
+not change your clipboard to capture a selection.
 
 ### Windows
 
@@ -66,12 +69,13 @@ cargo build --release
 ./target/release/select-to-speak
 ```
 
-The global shortcut reads Windows selections through Microsoft UI Automation
-and Linux X11 selections through PRIMARY; it never rewrites your clipboard.
-Wayland intentionally restricts global input hooks, so use the pet context menu
-there. Clipboard access needs the compositor's data-control protocol; if that
-is unavailable, automatic copied-text reading is unsupported and only the
-menu's manual type-text mode remains usable.
+The shortcut reads Windows selections through Microsoft UI Automation and Linux
+X11 selections through PRIMARY; it never rewrites your clipboard. On Wayland,
+the app requests **Ctrl+Alt+S** through the XDG GlobalShortcuts portal. The
+desktop may show a one-time confirmation dialog. Reading the selected text also
+requires the compositor's ext-data-control or wlr-data-control primary-selection
+support. If either capability is unavailable, copy the text and use **Speak
+copied text** from the pet menu, or use manual text entry.
 
 For a terminal smoke test:
 
@@ -87,7 +91,9 @@ Set `SELECT_TO_SPEAK_MODEL_DIR` to use a different model directory.
 The code uses a small hexagonal architecture:
 
 ```text
-macOS Service / Windows-Linux hotkey / pet UI
+macOS Accessibility + Service / Windows UIA / Linux selection
+                              |
+                 global shortcut / pet UI
                        |
              SpeakSelection use-case
                 /                \
@@ -99,8 +105,9 @@ macOS Service / Windows-Linux hotkey / pet UI
 - `domain.rs`: selected text, voice settings, and audio values.
 - `application.rs`: the `SpeakSelection` use-case.
 - `ports.rs`: speech synthesis, model provisioning, and playback interfaces.
-- `adapters/macos_service.rs`: incoming macOS Services adapter.
-- `platform.rs`: macOS Service or Windows/Linux global-shortcut bridge.
+- `adapters/macos_selection.rs`: macOS Accessibility selection adapter.
+- `adapters/macos_service.rs`: optional incoming macOS Services adapter.
+- `platform.rs`: native/portal global-shortcut and selection bridge.
 - `adapters/kokoro.rs`: outgoing Kokoro/ONNX adapter.
 - `adapters/system_audio.rs`: outgoing macOS/Windows/Linux audio adapter.
 - `ui.rs` and `worker.rs`: the floating pet and background command boundary.

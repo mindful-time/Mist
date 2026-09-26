@@ -18,6 +18,8 @@ tokio = { version = "1.49", features = ["rt-multi-thread"] }
 ureq = "3.4"
 
 [target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10.1"
+global-hotkey = "0.8"
 objc2 = "0.6.4"
 objc2-app-kit = "0.3.2"
 objc2-foundation = "0.3.2"
@@ -29,7 +31,10 @@ uiautomation = "0.25.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 arboard = { version = "3.6", features = ["wayland-data-control"] }
+ashpd = { version = "0.13.13", default-features = false, features = ["global_shortcuts", "tokio"] }
+futures-util = "0.3"
 global-hotkey = "0.8"
+wl-clipboard-rs = "0.9.3"
 x11-clipboard = "0.9.3"
 
 [dev-dependencies]

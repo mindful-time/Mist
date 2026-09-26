@@ -11,5 +11,4 @@ mkdir -p "$install_directory"
   -f "$install_directory/Select to Speak.app"
 
 echo "Installed Select to Speak in $install_directory"
-echo "Open it once, then right-click selected text and choose Services > Speak Selection with Kokoro."
-
+echo "Open it once, allow Accessibility access, then select text and press Ctrl+Alt+S."
