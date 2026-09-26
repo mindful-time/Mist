@@ -14,7 +14,8 @@ never sent to a server.
 
 The first launch shows **Download voice**. That fetches the quantized Kokoro v1.0
 ONNX model (~92 MB) and the `af_heart` voice (~0.5 MB) from the Apache-2.0
-Hugging Face release into your user Application Support directory.
+Hugging Face release into your user application-data directory. Downloads are
+pinned to a model revision and SHA-256 verified before use.
 
 ## Build and run
 
@@ -62,6 +63,8 @@ cargo build --release
 
 The global shortcut library currently works on X11. Wayland intentionally
 restricts global input hooks, so use the copy + pet context-menu fallback there.
+Clipboard access needs the compositor's standard data-control protocol; the pet
+shows an error if that protocol is unavailable.
 
 For a terminal smoke test:
 
@@ -76,9 +79,19 @@ Set `SELECT_TO_SPEAK_MODEL_DIR` to use a different model directory.
 
 The code uses a small hexagonal architecture:
 
+```text
+macOS Service / Windows-Linux hotkey / pet UI
+                       |
+             SpeakSelection use-case
+                /                \
+    SpeechSynthesizer port    AudioPlayer port
+              |                     |
+         Kokoro ONNX        macOS / Windows / Linux
+```
+
 - `domain.rs`: selected text, voice settings, and audio values.
 - `application.rs`: the `SpeakSelection` use-case.
-- `ports.rs`: speech synthesis and playback interfaces.
+- `ports.rs`: speech synthesis, model provisioning, and playback interfaces.
 - `adapters/macos_service.rs`: incoming macOS Services adapter.
 - `platform.rs`: macOS Service or Windows/Linux global-shortcut bridge.
 - `adapters/kokoro.rs`: outgoing Kokoro/ONNX adapter.

@@ -1,13 +1,34 @@
 use crate::{
     domain::{SelectedText, VoiceSettings},
-    ports::{AudioPlayer, SpeechSynthesizer},
+    ports::{AudioPlayer, ModelProvisioner, SpeechSynthesizer},
 };
 
-/// Application use-case. It knows nothing about AppKit, Kokoro, or `afplay`.
+/// Application use-case. It knows nothing about AppKit, Kokoro, or system audio.
 pub struct SpeakSelection<S, P> {
     synthesizer: S,
     player: P,
     voice: VoiceSettings,
+}
+
+/// Application use-case for the explicit first-run model installation.
+pub struct InstallModel<M> {
+    models: M,
+}
+
+impl<M> InstallModel<M>
+where
+    M: ModelProvisioner,
+{
+    pub fn new(models: M) -> Self {
+        Self { models }
+    }
+
+    pub fn execute(&self) -> anyhow::Result<()> {
+        if !self.models.is_ready() {
+            self.models.install()?;
+        }
+        Ok(())
+    }
 }
 
 impl<S, P> SpeakSelection<S, P>

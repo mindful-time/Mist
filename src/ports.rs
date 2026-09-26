@@ -9,3 +9,9 @@ pub trait SpeechSynthesizer {
 pub trait AudioPlayer {
     fn play(&mut self, audio: &Audio) -> anyhow::Result<()>;
 }
+
+/// Outbound port for the downloadable speech-model artifacts.
+pub trait ModelProvisioner {
+    fn is_ready(&self) -> bool;
+    fn install(&self) -> anyhow::Result<()>;
+}

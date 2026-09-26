@@ -1,8 +1,9 @@
-use std::{sync::mpsc, time::Duration};
-
-use eframe::egui::{
-    self, Align2, Color32, FontId, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Vec2,
+use std::{
+    sync::mpsc::{self, TrySendError},
+    time::Duration,
 };
+
+use eframe::egui::{self, Color32, FontId, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Vec2};
 use select_to_speak::{
     platform::{PlatformBridge, PlatformEvent},
     worker::{AppStatus, WorkerCommand},
@@ -34,6 +35,16 @@ impl PetApp {
     fn drain_statuses(&mut self) {
         while let Ok(status) = self.statuses.try_recv() {
             self.status = status;
+        }
+    }
+
+    fn enqueue(&mut self, command: WorkerCommand) {
+        if let Err(error) = self.commands.try_send(command) {
+            let message = match error {
+                TrySendError::Full(_) => "The speech queue is full; try again in a moment",
+                TrySendError::Disconnected(_) => "The speech worker stopped unexpectedly",
+            };
+            self.status = AppStatus::Error(message.to_owned());
         }
     }
 
@@ -125,13 +136,17 @@ impl PetApp {
             );
         }
 
-        painter.text(
-            Pos2::new(rect.center().x, rect.bottom() - 35.0),
-            Align2::CENTER_CENTER,
-            self.status_text(),
+        let galley = painter.layout(
+            self.status_text().to_owned(),
             FontId::proportional(12.0),
             Color32::WHITE,
+            rect.width() - 18.0,
         );
+        let galley_position = Pos2::new(
+            rect.center().x - galley.size().x / 2.0,
+            rect.bottom() - 35.0 - galley.size().y / 2.0,
+        );
+        painter.galley(galley_position, galley, Color32::WHITE);
     }
 }
 
@@ -141,7 +156,7 @@ impl eframe::App for PetApp {
         if let Some(event) = self.platform.poll() {
             match event {
                 PlatformEvent::Speak(text) => {
-                    let _ = self.commands.try_send(WorkerCommand::Speak(text));
+                    self.enqueue(WorkerCommand::Speak(text));
                 }
                 PlatformEvent::Error(message) => self.status = AppStatus::Error(message),
             }
@@ -163,9 +178,7 @@ impl eframe::App for PetApp {
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             if ui.button("Speak copied text").clicked() {
                 match self.platform.clipboard_text() {
-                    Ok(text) => {
-                        let _ = self.commands.try_send(WorkerCommand::Speak(text));
-                    }
+                    Ok(text) => self.enqueue(WorkerCommand::Speak(text)),
                     Err(error) => self.status = AppStatus::Error(format!("{error:#}")),
                 }
                 ui.close();
@@ -173,13 +186,13 @@ impl eframe::App for PetApp {
             if matches!(self.status, AppStatus::MissingModel | AppStatus::Error(_))
                 && ui.button("Download Kokoro voice (~93 MB)").clicked()
             {
-                let _ = self.commands.try_send(WorkerCommand::InstallModel);
+                self.enqueue(WorkerCommand::InstallModel);
                 ui.close();
             }
-            #[cfg(target_os = "macos")]
-            ui.label("Use: select text → right-click → Services");
-            #[cfg(any(target_os = "windows", target_os = "linux"))]
-            ui.label("Use: select text → Ctrl+Alt+S");
+            ui.label(self.platform.usage_hint());
+            if let Some(error) = self.platform.registration_error() {
+                ui.colored_label(Color32::from_rgb(247, 190, 84), error);
+            }
             ui.separator();
             if ui.button("Quit Select to Speak").clicked() {
                 context.send_viewport_cmd(egui::ViewportCommand::Close);
@@ -193,7 +206,7 @@ impl eframe::App for PetApp {
             );
             let button = ui.put(button_rect, egui::Button::new("Download voice"));
             if button.clicked() {
-                let _ = self.commands.try_send(WorkerCommand::InstallModel);
+                self.enqueue(WorkerCommand::InstallModel);
             }
         }
 

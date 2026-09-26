@@ -1,10 +1,10 @@
-use std::sync::mpsc::SyncSender;
+use std::sync::mpsc::{SyncSender, TrySendError};
 
 use objc2::{DefinedClass, MainThreadOnly, define_class, msg_send, rc::Retained};
 use objc2_app_kit::{NSApplication, NSPasteboard, NSPasteboardTypeString};
 use objc2_foundation::{MainThreadMarker, NSObject, NSObjectProtocol, NSString};
 
-use crate::worker::WorkerCommand;
+use crate::{domain::SelectedText, worker::WorkerCommand};
 
 #[derive(Debug)]
 pub struct ServiceProviderIvars {
@@ -28,20 +28,42 @@ define_class!(
             &self,
             pasteboard: &NSPasteboard,
             _user_data: Option<&NSString>,
-            _error: *mut *mut NSString,
+            error: *mut *mut NSString,
         ) {
             // SAFETY: NSPasteboardTypeString is an immutable AppKit global.
             let pasteboard_type = unsafe { NSPasteboardTypeString };
             let Some(value) = pasteboard.stringForType(pasteboard_type) else {
+                set_service_error(error, "The selected item is not text");
                 return;
             };
-            let _ = self
-                .ivars()
-                .commands
-                .try_send(WorkerCommand::Speak(value.to_string()));
+            let text = match SelectedText::new(value.to_string()) {
+                Ok(text) => text,
+                Err(selection_error) => {
+                    set_service_error(error, &selection_error.to_string());
+                    return;
+                }
+            };
+            if let Err(queue_error) = self.ivars().commands.try_send(WorkerCommand::Speak(text)) {
+                let message = match queue_error {
+                    TrySendError::Full(_) => "Select to Speak is busy; try again in a moment",
+                    TrySendError::Disconnected(_) => "The speech worker is not running",
+                };
+                set_service_error(error, message);
+            }
         }
     }
 );
+
+fn set_service_error(error: *mut *mut NSString, message: &str) {
+    if error.is_null() {
+        return;
+    }
+    // SAFETY: AppKit supplies a valid nullable NSString out-parameter for this
+    // callback and expects an autoreleased object.
+    unsafe {
+        *error = Retained::autorelease_ptr(NSString::from_str(message));
+    }
+}
 
 impl ServiceProvider {
     fn new(mtm: MainThreadMarker, commands: SyncSender<WorkerCommand>) -> Retained<Self> {

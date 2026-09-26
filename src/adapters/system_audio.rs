@@ -80,6 +80,7 @@ impl SystemAudioPlayer {
             ("ffplay", &["-nodisp", "-autoexit", "-loglevel", "quiet"]),
         ];
 
+        let mut playback_failures = Vec::new();
         for (program, arguments) in candidates {
             match Command::new(program)
                 .args(*arguments)
@@ -87,12 +88,18 @@ impl SystemAudioPlayer {
                 .status()
             {
                 Ok(status) if status.success() => return Ok(status),
-                Ok(_) => continue,
+                Ok(status) => playback_failures.push(format!("{program} exited with {status}")),
                 Err(error) if error.kind() == ErrorKind::NotFound => continue,
                 Err(error) => return Err(error).context("could not start Linux audio playback"),
             }
         }
 
+        if !playback_failures.is_empty() {
+            bail!(
+                "Linux audio playback failed: {}",
+                playback_failures.join("; ")
+            );
+        }
         bail!("no audio player found; install PipeWire (pw-play), PulseAudio, ALSA, or ffplay")
     }
 }

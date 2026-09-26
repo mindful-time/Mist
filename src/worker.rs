@@ -6,7 +6,7 @@ use std::{
 use anyhow::{Context, Result};
 
 use crate::{
-    SpeakSelection, VoiceSettings,
+    InstallModel, SpeakSelection, VoiceSettings,
     adapters::{kokoro::KokoroSynthesizer, system_audio::SystemAudioPlayer},
     domain::SelectedText,
     model_store::ModelStore,
@@ -14,7 +14,7 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub enum WorkerCommand {
-    Speak(String),
+    Speak(SelectedText),
     InstallModel,
 }
 
@@ -62,7 +62,7 @@ fn run(commands: Receiver<WorkerCommand>, statuses: Sender<AppStatus>, store: Mo
     while let Ok(command) = commands.recv() {
         let result = match command {
             WorkerCommand::InstallModel => install_model(&store, &statuses),
-            WorkerCommand::Speak(raw_text) => speak(raw_text, &store, &statuses, &mut speaker),
+            WorkerCommand::Speak(text) => speak(text, &store, &statuses, &mut speaker),
         };
 
         match result {
@@ -74,16 +74,17 @@ fn run(commands: Receiver<WorkerCommand>, statuses: Sender<AppStatus>, store: Mo
 
 fn install_model(store: &ModelStore, statuses: &Sender<AppStatus>) -> Result<()> {
     send_status(statuses, AppStatus::Downloading);
-    store.install().context("Kokoro setup failed")
+    InstallModel::new(store.clone())
+        .execute()
+        .context("Kokoro setup failed")
 }
 
 fn speak(
-    raw_text: String,
+    text: SelectedText,
     store: &ModelStore,
     statuses: &Sender<AppStatus>,
     speaker: &mut Option<SpeakSelection<KokoroSynthesizer, SystemAudioPlayer>>,
 ) -> Result<()> {
-    let text = SelectedText::new(raw_text)?;
     if !store.is_ready() {
         send_status(statuses, AppStatus::MissingModel);
         anyhow::bail!("Download Kokoro from the pet first");
