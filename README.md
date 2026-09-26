@@ -112,8 +112,9 @@ Set `SELECT_TO_SPEAK_MODEL_DIR` to use a different model directory.
 The Rust Kokoro adapter selects a native ONNX Runtime backend automatically:
 
 - macOS: CoreML, with automatic CPU fallback.
-- Windows/Linux with an NVIDIA GPU: CUDA, with automatic CPU fallback.
-- Windows without CUDA: DirectML, with automatic CPU fallback.
+- Windows with an NVIDIA GPU: CUDA, then DirectML, then CPU.
+- Linux with an NVIDIA GPU: CUDA, with automatic CPU fallback.
+- Windows without an NVIDIA GPU: DirectML, with automatic CPU fallback.
 - Other Linux systems: CPU.
 
 The pet displays the automatic backend policy while preparing and playing

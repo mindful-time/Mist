@@ -23,6 +23,7 @@ pub struct KokoroSynthesizer {
 pub enum InferencePolicy {
     CoreMlAuto,
     CudaAuto,
+    CudaThenDirectMlAuto,
     DirectMlAuto,
     Cpu,
     CoreMlRequested,
@@ -35,6 +36,7 @@ impl InferencePolicy {
         match self {
             Self::CoreMlAuto => "CoreML → CPU",
             Self::CudaAuto => "CUDA → CPU",
+            Self::CudaThenDirectMlAuto => "CUDA → DirectML → CPU",
             Self::DirectMlAuto => "DirectML → CPU",
             Self::Cpu => "CPU",
             Self::CoreMlRequested => "CoreML requested",
@@ -151,7 +153,7 @@ fn policy_for(
 
     match operating_system {
         "macos" => InferencePolicy::CoreMlAuto,
-        "windows" if nvidia_gpu_present => InferencePolicy::CudaAuto,
+        "windows" if nvidia_gpu_present => InferencePolicy::CudaThenDirectMlAuto,
         "windows" => InferencePolicy::DirectMlAuto,
         "linux" if nvidia_gpu_present => InferencePolicy::CudaAuto,
         _ => InferencePolicy::Cpu,
@@ -182,6 +184,10 @@ mod tests {
             InferencePolicy::CoreMlAuto
         );
         assert_eq!(policy_for("linux", None, true), InferencePolicy::CudaAuto);
+        assert_eq!(
+            policy_for("windows", None, true),
+            InferencePolicy::CudaThenDirectMlAuto
+        );
         assert_eq!(
             policy_for("windows", None, false),
             InferencePolicy::DirectMlAuto
