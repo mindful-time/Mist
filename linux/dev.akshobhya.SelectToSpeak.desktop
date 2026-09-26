@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Select to Speak
+Comment=Speak selected text locally with Kokoro
+Exec=select-to-speak
+Terminal=false
+Categories=Accessibility;Utility;

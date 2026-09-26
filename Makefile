@@ -1,4 +1,4 @@
-.PHONY: test check app install run
+.PHONY: test check app install install-linux run
 
 test:
 	cargo test
@@ -15,3 +15,5 @@ app:
 install:
 	./scripts/install.sh
 
+install-linux:
+	./scripts/install-linux.sh

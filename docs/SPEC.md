@@ -15,9 +15,11 @@ user-selected text aloud with the local Hexgrad Kokoro-82M text-to-speech model.
 - Windows reads the focused control through Microsoft UI Automation.
 - Linux X11 reads PRIMARY selection and registers the shortcut through X11.
 - Linux Wayland asks the compositor for a shortcut through the XDG
-  GlobalShortcuts portal and reads the compositor's primary selection through
-  ext-data-control or wlr-data-control. If either protocol is unavailable, the
-  pet reports the limitation and retains copied-text/manual-entry fallbacks.
+  GlobalShortcuts portal, displays the gesture actually granted, and reads the
+  compositor's primary selection through ext-data-control or wlr-data-control.
+  The installed desktop entry provides the stable host identity required by the
+  portal. If either protocol is unavailable, the pet reports the limitation and
+  retains copied-text/manual-entry fallbacks.
 - The draggable, always-on-top pet shows setup, loading, speaking, ready, and
   error states without opening a conventional application window.
 
@@ -49,8 +51,8 @@ user-selected text aloud with the local Hexgrad Kokoro-82M text-to-speech model.
 - The native target passes `cargo check`, `cargo test`, and clippy with warnings
   denied.
 - A macOS `.app` bundle advertises the text Service through `Info.plist`.
-- The same **Ctrl+Alt+S** activation is documented on macOS, Windows, Linux X11,
-  and Linux Wayland; unsupported Wayland portal capabilities fail visibly.
+- **Ctrl+Alt+S** is requested on every OS. Wayland displays the gesture actually
+  granted by the compositor, and unsupported portal capabilities fail visibly.
 - The repository documents build and usage instructions for macOS, Windows, and
   Linux, including the Wayland limitation.
 

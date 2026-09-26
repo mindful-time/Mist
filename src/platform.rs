@@ -1,5 +1,14 @@
 use std::sync::mpsc::SyncSender;
 
+#[cfg(target_os = "macos")]
+use crate::adapters::macos_selection::capture_selected_text;
+#[cfg(target_os = "windows")]
+use crate::adapters::windows_selection::{capture_clipboard_text, capture_selected_text};
+#[cfg(target_os = "linux")]
+use crate::adapters::{
+    linux_selection::{capture_clipboard_text, capture_selected_text, is_wayland_session},
+    wayland_shortcut::{self, WaylandShortcutMessage},
+};
 use crate::{domain::SelectedText, worker::WorkerCommand};
 
 const SHORTCUT_HINT: &str = "Select text anywhere, then press Ctrl+Alt+S";
@@ -15,6 +24,7 @@ pub struct PlatformBridge {
     _service_provider: objc2::rc::Retained<crate::adapters::macos_service::ServiceProvider>,
     manager: Option<global_hotkey::GlobalHotKeyManager>,
     hotkey: global_hotkey::hotkey::HotKey,
+    usage_hint: String,
     registration_error: Option<String>,
     #[cfg(target_os = "macos")]
     shortcut_error: Option<String>,
@@ -33,7 +43,7 @@ impl PlatformBridge {
         use global_hotkey::hotkey::{Code, HotKey, Modifiers};
 
         let hotkey = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyS);
-        let (manager, registration_error) = if is_wayland_session() {
+        let (manager, registration_error) = if is_wayland() {
             (None, None)
         } else {
             register_hotkey(hotkey)
@@ -65,6 +75,7 @@ impl PlatformBridge {
             _service_provider: crate::adapters::macos_service::register(commands),
             manager,
             hotkey,
+            usage_hint: SHORTCUT_HINT.to_owned(),
             registration_error,
             #[cfg(target_os = "macos")]
             shortcut_error,
@@ -75,7 +86,7 @@ impl PlatformBridge {
             capture_generation: 0,
             capture_in_flight: None,
             #[cfg(target_os = "linux")]
-            wayland_shortcuts: is_wayland_session().then(spawn_wayland_shortcut_listener),
+            wayland_shortcuts: is_wayland_session().then(wayland_shortcut::spawn),
         }
     }
 
@@ -97,7 +108,10 @@ impl PlatformBridge {
             .and_then(|messages| messages.try_recv().ok())
         {
             match message {
-                WaylandShortcutMessage::Registered => self.registration_error = None,
+                WaylandShortcutMessage::Registered(trigger) => {
+                    self.usage_hint = format!("Select text anywhere, then press {trigger}");
+                    self.registration_error = None;
+                }
                 WaylandShortcutMessage::Activated => {
                     if let Err(error) = self.start_capture(capture_selected_text) {
                         return Some(PlatformEvent::Error(error));
@@ -148,8 +162,8 @@ impl PlatformBridge {
         None
     }
 
-    pub fn usage_hint(&self) -> &'static str {
-        SHORTCUT_HINT
+    pub fn usage_hint(&self) -> &str {
+        &self.usage_hint
     }
 
     pub fn registration_error(&self) -> Option<&str> {
@@ -203,196 +217,13 @@ fn register_hotkey(
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
-fn is_wayland_session() -> bool {
+fn is_wayland() -> bool {
     false
 }
 
 #[cfg(target_os = "linux")]
-fn is_wayland_session() -> bool {
-    std::env::var("XDG_SESSION_TYPE").is_ok_and(|value| value == "wayland")
-}
-
-#[cfg(target_os = "linux")]
-enum WaylandShortcutMessage {
-    Registered,
-    Activated,
-    Error(String),
-}
-
-#[cfg(target_os = "linux")]
-fn spawn_wayland_shortcut_listener() -> std::sync::mpsc::Receiver<WaylandShortcutMessage> {
-    let (sender, receiver) = std::sync::mpsc::channel();
-    let thread_sender = sender.clone();
-    let spawn_result = std::thread::Builder::new()
-        .name("wayland-global-shortcut".to_owned())
-        .spawn(move || {
-            let result = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .map_err(anyhow::Error::from)
-                .and_then(|runtime| runtime.block_on(run_wayland_shortcut(thread_sender.clone())));
-            if let Err(error) = result {
-                let _ = thread_sender.send(WaylandShortcutMessage::Error(format!(
-                    "Wayland shortcut unavailable: {error:#}"
-                )));
-            }
-        });
-    if let Err(error) = spawn_result {
-        let _ = sender.send(WaylandShortcutMessage::Error(format!(
-            "Could not start the Wayland shortcut listener: {error}"
-        )));
-    }
-    receiver
-}
-
-#[cfg(target_os = "linux")]
-async fn run_wayland_shortcut(
-    sender: std::sync::mpsc::Sender<WaylandShortcutMessage>,
-) -> anyhow::Result<()> {
-    use anyhow::{Context, bail};
-    use ashpd::desktop::global_shortcuts::{BindShortcutsOptions, GlobalShortcuts, NewShortcut};
-    use futures_util::StreamExt;
-
-    const SHORTCUT_ID: &str = "speak-selection";
-
-    let shortcuts = GlobalShortcuts::new()
-        .await
-        .context("the desktop does not provide the GlobalShortcuts portal")?;
-    let session = shortcuts
-        .create_session(Default::default())
-        .await
-        .context("could not create a global-shortcut session")?;
-    let requested = [
-        NewShortcut::new(SHORTCUT_ID, "Speak selected text with Kokoro")
-            .preferred_trigger("CTRL+ALT+S"),
-    ];
-    let bound = shortcuts
-        .bind_shortcuts(&session, &requested, None, BindShortcutsOptions::default())
-        .await?
-        .response()?;
-    if !bound
-        .shortcuts()
-        .iter()
-        .any(|shortcut| shortcut.id() == SHORTCUT_ID)
-    {
-        bail!("the desktop did not grant the Speak Selection shortcut");
-    }
-
-    let mut activations = shortcuts.receive_activated().await?;
-    let _ = sender.send(WaylandShortcutMessage::Registered);
-    while let Some(event) = activations.next().await {
-        if event.shortcut_id() == SHORTCUT_ID
-            && sender.send(WaylandShortcutMessage::Activated).is_err()
-        {
-            break;
-        }
-    }
-    Ok(())
-}
-
-#[cfg(target_os = "macos")]
-fn capture_selected_text() -> anyhow::Result<SelectedText> {
-    crate::adapters::macos_selection::capture_selected_text()
-}
-
-/// Reads the focused control's selection without synthesizing Copy, so the
-/// user's clipboard remains completely untouched.
-#[cfg(target_os = "windows")]
-fn capture_selected_text() -> anyhow::Result<SelectedText> {
-    use anyhow::Context;
-    use uiautomation::{UIAutomation, patterns::UITextPattern};
-
-    let automation = UIAutomation::new().context("could not start Windows UI Automation")?;
-    let focused = automation
-        .get_focused_element()
-        .context("could not inspect the focused control")?;
-    let pattern: UITextPattern = focused
-        .get_pattern()
-        .context("the focused control does not expose selected text")?;
-    let ranges = pattern
-        .get_selection()
-        .context("could not read the selected text")?;
-    let mut text = String::new();
-    for range in ranges {
-        text.push_str(
-            &range
-                .get_text(-1)
-                .context("could not read a selected text range")?,
-        );
-    }
-    SelectedText::new(text).map_err(Into::into)
-}
-
-/// X11 publishes highlighted text through PRIMARY, independently of the normal
-/// clipboard. Reading it is both faster and lossless for existing clipboard
-/// contents.
-#[cfg(target_os = "linux")]
-fn capture_selected_text() -> anyhow::Result<SelectedText> {
-    use std::{io::Read, time::Duration};
-
-    use anyhow::Context;
-
-    if is_wayland_session() {
-        use wl_clipboard_rs::paste::{ClipboardType, MimeType, Seat, get_contents};
-
-        let (mut pipe, _) = get_contents(ClipboardType::Primary, Seat::Unspecified, MimeType::Text)
-            .context("the Wayland compositor does not expose the primary text selection")?;
-        let mut bytes = Vec::new();
-        pipe.read_to_end(&mut bytes)
-            .context("could not read the Wayland text selection")?;
-        let text = String::from_utf8(bytes).context("the selected text is not valid UTF-8")?;
-        return SelectedText::new(text.trim_matches('\0')).map_err(Into::into);
-    }
-
-    let clipboard =
-        x11_clipboard::Clipboard::new().context("could not connect to the X11 selection")?;
-    let utf8 = clipboard.load(
-        clipboard.getter.atoms.primary,
-        clipboard.getter.atoms.utf8_string,
-        clipboard.getter.atoms.property,
-        Duration::from_millis(500),
-    );
-    let text = match utf8 {
-        Ok(bytes) => String::from_utf8(bytes).context("the selected text is not valid UTF-8")?,
-        Err(_) => {
-            let bytes = clipboard
-                .load(
-                    clipboard.getter.atoms.primary,
-                    clipboard.getter.atoms.string,
-                    clipboard.getter.atoms.property,
-                    Duration::from_millis(500),
-                )
-                .context("the X11 primary selection does not contain text")?;
-            bytes.into_iter().map(char::from).collect()
-        }
-    };
-    SelectedText::new(text.trim_matches('\0')).map_err(Into::into)
-}
-
-#[cfg(any(target_os = "windows", target_os = "linux"))]
-fn capture_clipboard_text() -> anyhow::Result<SelectedText> {
-    let text = clipboard_text()?;
-    SelectedText::new(text).map_err(Into::into)
-}
-
-#[cfg(any(target_os = "windows", target_os = "linux"))]
-fn clipboard_text() -> anyhow::Result<String> {
-    use anyhow::Context;
-
-    clipboard_text_from(&mut arboard::Clipboard::new().context("could not open the clipboard")?)
-}
-
-#[cfg(any(target_os = "windows", target_os = "linux"))]
-fn clipboard_text_from(clipboard: &mut arboard::Clipboard) -> anyhow::Result<String> {
-    use anyhow::{Context, bail};
-
-    let text = clipboard
-        .get_text()
-        .context("the clipboard does not contain text")?;
-    if text.trim().is_empty() {
-        bail!("the clipboard does not contain text");
-    }
-    Ok(text)
+fn is_wayland() -> bool {
+    is_wayland_session()
 }
 
 #[cfg(test)]

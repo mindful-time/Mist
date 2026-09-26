@@ -65,17 +65,19 @@ The pet supports X11 and Wayland. Install the normal desktop build dependencies
 for winit plus one audio command: `pw-play`, `paplay`, `aplay`, or `ffplay`.
 
 ```sh
-cargo build --release
-./target/release/select-to-speak
+make install-linux
+"$HOME/.local/bin/select-to-speak"
 ```
 
 The shortcut reads Windows selections through Microsoft UI Automation and Linux
 X11 selections through PRIMARY; it never rewrites your clipboard. On Wayland,
 the app requests **Ctrl+Alt+S** through the XDG GlobalShortcuts portal. The
-desktop may show a one-time confirmation dialog. Reading the selected text also
-requires the compositor's ext-data-control or wlr-data-control primary-selection
-support. If either capability is unavailable, copy the text and use **Speak
-copied text** from the pet menu, or use manual text entry.
+desktop may show a one-time confirmation dialog or assign a different gesture,
+which the pet displays. The Linux installer also installs the stable desktop
+identity required by the portal. Reading the selected text requires the
+compositor's ext-data-control or wlr-data-control primary-selection support. If
+either capability is unavailable, copy the text and use **Speak copied text**
+from the pet menu, or use manual text entry.
 
 For a terminal smoke test:
 
@@ -107,7 +109,10 @@ macOS Accessibility + Service / Windows UIA / Linux selection
 - `ports.rs`: speech synthesis, model provisioning, and playback interfaces.
 - `adapters/macos_selection.rs`: macOS Accessibility selection adapter.
 - `adapters/macos_service.rs`: optional incoming macOS Services adapter.
-- `platform.rs`: native/portal global-shortcut and selection bridge.
+- `adapters/windows_selection.rs`: Windows UI Automation selection adapter.
+- `adapters/linux_selection.rs`: Linux X11/Wayland selection adapter.
+- `adapters/wayland_shortcut.rs`: Wayland GlobalShortcuts portal adapter.
+- `platform.rs`: shared native-event and selection-capture coordinator.
 - `adapters/kokoro.rs`: outgoing Kokoro/ONNX adapter.
 - `adapters/system_audio.rs`: outgoing macOS/Windows/Linux audio adapter.
 - `ui.rs` and `worker.rs`: the floating pet and background command boundary.
