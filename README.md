@@ -33,22 +33,26 @@ Then click **Download voice** on the pet.
 Requires macOS 13+ and the Xcode Command Line Tools:
 
 ```sh
+SELECT_TO_SPEAK_SIGNING_IDENTITY="Apple Development: Your Name (TEAMID)" \
 make install
-open "$HOME/Applications/Select to Speak.app"
+open "/Applications/Select to Speak.app"
 ```
 
-For a stable macOS Accessibility identity across local rebuilds, sign with an
-Apple Development or Developer ID certificate and keep one canonical install:
+The installer requires an Apple Development or Developer ID certificate and
+uses `/Applications` as the canonical location. This keeps the app's macOS
+Accessibility identity stable across rebuilds. To make an explicitly temporary
+development install instead, use ad-hoc signing and a separate home-directory
+destination:
 
 ```sh
-SELECT_TO_SPEAK_SIGNING_IDENTITY="Apple Development: Your Name (TEAMID)" \
-SELECT_TO_SPEAK_INSTALL_DIR=/Applications \
+SELECT_TO_SPEAK_SIGNING_IDENTITY=- \
+SELECT_TO_SPEAK_INSTALL_DIR="$HOME/Applications" \
 make install
 ```
 
-Ad-hoc signing remains the default for development, but macOS ties its
-Accessibility grant to that exact build. Rebuilding an ad-hoc-signed app
-therefore requires granting permission again.
+macOS ties an ad-hoc install's Accessibility grant to that exact build, so it
+requires granting permission again after every rebuild. Do not keep production
+and development copies installed at the same time.
 
 Open the installed app once. macOS asks for Accessibility permission so the
 global shortcut can read selections from applications with custom context
