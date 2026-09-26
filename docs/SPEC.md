@@ -31,10 +31,10 @@ user-selected text aloud with the local Hexgrad Kokoro-82M text-to-speech model.
 - The default voice is `af_heart` at normal speed.
 - Long selections are synthesized and played as ordered sentence chunks. The
   UI distinguishes generation of the first chunk from audible playback.
-- Hardware selection is automatic: CoreML on macOS; CUDA on Windows/Linux when
-  NVIDIA hardware is detected; DirectML as the Windows GPU fallback before CPU;
-  otherwise CPU. The UI displays the backend policy and fallback order without
-  claiming that a preferred provider was the resolved provider.
+- Hardware selection is automatic through ONNX Runtime provider probing:
+  CoreML then CPU on macOS; CUDA then DirectML then CPU on Windows; CUDA then
+  CPU on Linux. The UI displays that fallback order without claiming that a
+  preferred provider was the resolved provider.
 - The first-run model download is explicit and stored in the user's application
   data directory rather than committed to the source repository.
 

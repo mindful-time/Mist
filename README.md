@@ -111,17 +111,17 @@ Set `SELECT_TO_SPEAK_MODEL_DIR` to use a different model directory.
 
 The Rust Kokoro adapter selects a native ONNX Runtime backend automatically:
 
-- macOS: CoreML, with automatic CPU fallback.
-- Windows with an NVIDIA GPU: CUDA, then DirectML, then CPU.
-- Linux with an NVIDIA GPU: CUDA, with automatic CPU fallback.
-- Windows without an NVIDIA GPU: DirectML, with automatic CPU fallback.
-- Other Linux systems: CPU.
+- macOS probes CoreML, then falls back to CPU.
+- Windows probes CUDA, then DirectML, then CPU.
+- Linux probes CUDA, then CPU.
 
 The pet displays the automatic backend policy while preparing and playing
 speech; labels such as `CoreML → CPU` show the fallback order rather than
 claiming which provider ultimately accepted every graph node. Set
 `KOKORO_ORT_PROVIDER=cpu`, `coreml`, `cuda`, or `directml` to override that
 policy when troubleshooting; explicit accelerators are labeled as requested.
+The ONNX Runtime provider probe is the hardware detection step, so the app does
+not maintain a second, potentially inconsistent GPU detector.
 
 Kokoro can also run through MLX on Apple Silicon, but this app deliberately uses
 CoreML instead. CoreML is available to the native Rust/ONNX pipeline and keeps

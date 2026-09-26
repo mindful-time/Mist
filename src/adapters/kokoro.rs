@@ -1,8 +1,5 @@
 use std::{env, path::Path, sync::mpsc::sync_channel, thread};
 
-#[cfg(any(target_os = "windows", target_os = "linux"))]
-use std::process::Command;
-
 use anyhow::{Context, Result, anyhow, bail};
 use kokoro_en::{KokoroTts, Voice, split_sentences};
 use tokio::runtime::{Builder, Runtime};
@@ -24,7 +21,6 @@ pub enum InferencePolicy {
     CoreMlAuto,
     CudaAuto,
     CudaThenDirectMlAuto,
-    DirectMlAuto,
     Cpu,
     CoreMlRequested,
     CudaRequested,
@@ -37,7 +33,6 @@ impl InferencePolicy {
             Self::CoreMlAuto => "CoreML → CPU",
             Self::CudaAuto => "CUDA → CPU",
             Self::CudaThenDirectMlAuto => "CUDA → DirectML → CPU",
-            Self::DirectMlAuto => "DirectML → CPU",
             Self::Cpu => "CPU",
             Self::CoreMlRequested => "CoreML requested",
             Self::CudaRequested => "CUDA requested",
@@ -133,15 +128,12 @@ fn detect_inference_policy() -> InferencePolicy {
     policy_for(
         env::consts::OS,
         env::var("KOKORO_ORT_PROVIDER").ok().as_deref(),
-        nvidia_gpu_present(),
     )
 }
 
-fn policy_for(
-    operating_system: &str,
-    requested_provider: Option<&str>,
-    nvidia_gpu_present: bool,
-) -> InferencePolicy {
+/// Mirrors the provider cascade configured by `kokoro-en`. Provider probing is
+/// the hardware detection step; unavailable providers fall through in order.
+fn policy_for(operating_system: &str, requested_provider: Option<&str>) -> InferencePolicy {
     let requested_provider = requested_provider.unwrap_or("auto").to_ascii_lowercase();
     match (operating_system, requested_provider.as_str()) {
         (_, "cpu") => return InferencePolicy::Cpu,
@@ -153,24 +145,10 @@ fn policy_for(
 
     match operating_system {
         "macos" => InferencePolicy::CoreMlAuto,
-        "windows" if nvidia_gpu_present => InferencePolicy::CudaThenDirectMlAuto,
-        "windows" => InferencePolicy::DirectMlAuto,
-        "linux" if nvidia_gpu_present => InferencePolicy::CudaAuto,
+        "windows" => InferencePolicy::CudaThenDirectMlAuto,
+        "linux" => InferencePolicy::CudaAuto,
         _ => InferencePolicy::Cpu,
     }
-}
-
-#[cfg(any(target_os = "windows", target_os = "linux"))]
-fn nvidia_gpu_present() -> bool {
-    Command::new("nvidia-smi")
-        .arg("-L")
-        .output()
-        .is_ok_and(|output| output.status.success() && !output.stdout.is_empty())
-}
-
-#[cfg(not(any(target_os = "windows", target_os = "linux")))]
-fn nvidia_gpu_present() -> bool {
-    false
 }
 
 #[cfg(test)]
@@ -178,28 +156,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn auto_selects_native_acceleration_with_cpu_fallback() {
+    fn automatic_policy_matches_the_loader_provider_order() {
         assert_eq!(
-            policy_for("macos", Some("auto"), false),
+            policy_for("macos", Some("auto")),
             InferencePolicy::CoreMlAuto
         );
-        assert_eq!(policy_for("linux", None, true), InferencePolicy::CudaAuto);
+        assert_eq!(policy_for("linux", None), InferencePolicy::CudaAuto);
         assert_eq!(
-            policy_for("windows", None, true),
+            policy_for("windows", None),
             InferencePolicy::CudaThenDirectMlAuto
         );
-        assert_eq!(
-            policy_for("windows", None, false),
-            InferencePolicy::DirectMlAuto
-        );
-        assert_eq!(policy_for("linux", None, false), InferencePolicy::Cpu);
     }
 
     #[test]
     fn explicit_cpu_override_wins_on_every_platform() {
         for operating_system in ["macos", "windows", "linux"] {
             assert_eq!(
-                policy_for(operating_system, Some("CPU"), true),
+                policy_for(operating_system, Some("CPU")),
                 InferencePolicy::Cpu
             );
         }
@@ -208,15 +181,15 @@ mod tests {
     #[test]
     fn explicit_accelerator_override_is_labeled_as_requested() {
         assert_eq!(
-            policy_for("macos", Some("coreml"), false),
+            policy_for("macos", Some("coreml")),
             InferencePolicy::CoreMlRequested
         );
         assert_eq!(
-            policy_for("linux", Some("cuda"), false),
+            policy_for("linux", Some("cuda")),
             InferencePolicy::CudaRequested
         );
         assert_eq!(
-            policy_for("windows", Some("directml"), true),
+            policy_for("windows", Some("directml")),
             InferencePolicy::DirectMlRequested
         );
     }
