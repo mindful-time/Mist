@@ -7,5 +7,8 @@ pub mod ports;
 pub mod worker;
 
 pub use application::{InstallModel, SpeakSelection};
-pub use domain::{Audio, SelectedText, SelectionError, VoiceSettings};
+pub use domain::{
+    Audio, AudioFeatures, MistPalette, SelectedText, SelectionError, VOICE_CATALOG, VoiceId,
+    VoiceProfile, VoiceSettings, voice_profile,
+};
 pub use ports::{AudioPlayer, ModelProvisioner, SpeechSynthesizer};

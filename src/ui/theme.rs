@@ -2,8 +2,8 @@ use std::{fs, sync::Arc};
 
 use eframe::egui::{self, Color32, FontData, FontDefinitions, FontFamily, Vec2};
 
-pub(super) const CARD_BACKGROUND: Color32 = Color32::from_rgb(17, 19, 27);
-pub(super) const CARD_SURFACE: Color32 = Color32::from_rgb(25, 28, 39);
+pub(super) const PANEL_BACKGROUND: Color32 = Color32::from_rgba_premultiplied(14, 16, 23, 248);
+pub(super) const PANEL_SURFACE: Color32 = Color32::from_rgba_premultiplied(255, 255, 255, 7);
 pub(super) const TEXT_PRIMARY: Color32 = Color32::from_rgb(245, 246, 250);
 pub(super) const TEXT_SECONDARY: Color32 = Color32::from_rgb(169, 175, 193);
 pub(super) const TEXT_MUTED: Color32 = Color32::from_rgb(119, 126, 146);
@@ -12,15 +12,19 @@ pub(super) fn with_alpha(color: Color32, alpha: u8) -> Color32 {
     Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), alpha)
 }
 
+pub(super) fn palette_color(value: [u8; 3]) -> Color32 {
+    Color32::from_rgb(value[0], value[1], value[2])
+}
+
 pub(super) fn configure_interface(context: &egui::Context) {
     install_system_font(context);
     context.set_theme(egui::Theme::Dark);
     let mut style = (*context.style_of(egui::Theme::Dark)).clone();
     style.visuals = egui::Visuals::dark();
     style.visuals.panel_fill = Color32::TRANSPARENT;
-    style.visuals.window_fill = CARD_BACKGROUND;
+    style.visuals.window_fill = PANEL_BACKGROUND;
     style.visuals.override_text_color = Some(TEXT_PRIMARY);
-    style.visuals.widgets.noninteractive.bg_fill = CARD_SURFACE;
+    style.visuals.widgets.noninteractive.bg_fill = PANEL_SURFACE;
     style.visuals.widgets.inactive.bg_fill = Color32::from_white_alpha(9);
     style.visuals.widgets.hovered.bg_fill = Color32::from_white_alpha(18);
     style.visuals.widgets.active.bg_fill = Color32::from_white_alpha(24);

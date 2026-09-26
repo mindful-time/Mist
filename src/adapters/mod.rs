@@ -1,5 +1,6 @@
 pub mod kokoro;
 pub mod system_audio;
+pub mod voice_preferences;
 
 #[cfg(target_os = "linux")]
 pub mod linux_selection;

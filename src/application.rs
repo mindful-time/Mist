@@ -1,5 +1,5 @@
 use crate::{
-    domain::{SelectedText, VoiceSettings},
+    domain::{AudioFeatures, SelectedText, VoiceSettings},
     ports::{AudioPlayer, ModelProvisioner, SpeechSynthesizer},
 };
 
@@ -48,13 +48,29 @@ where
         self.execute_with_playback_started(text, || {})
     }
 
+    pub fn set_voice(&mut self, voice: VoiceSettings) {
+        self.voice = voice;
+    }
+
     pub fn execute_with_playback_started(
         &mut self,
         text: SelectedText,
         on_playback_started: impl FnOnce(),
     ) -> anyhow::Result<()> {
-        let player = &mut self.player;
         let mut on_playback_started = Some(on_playback_started);
+        self.execute_with_playback_cues(text, |_| {
+            if let Some(notify) = on_playback_started.take() {
+                notify();
+            }
+        })
+    }
+
+    pub fn execute_with_playback_cues(
+        &mut self,
+        text: SelectedText,
+        mut on_playback: impl FnMut(AudioFeatures),
+    ) -> anyhow::Result<()> {
+        let player = &mut self.player;
         let mut emitted_audio = false;
 
         self.synthesizer
@@ -63,11 +79,7 @@ where
                     return Ok(());
                 }
                 emitted_audio = true;
-                player.play(&audio, &mut || {
-                    if let Some(notify) = on_playback_started.take() {
-                        notify();
-                    }
-                })
+                player.play(&audio, &mut on_playback)
             })?;
 
         if !emitted_audio {
@@ -140,15 +152,26 @@ mod tests {
     }
 
     impl AudioPlayer for FakePlayer {
-        fn play(&mut self, audio: &Audio, on_started: &mut dyn FnMut()) -> anyhow::Result<()> {
-            on_started();
+        fn play(
+            &mut self,
+            audio: &Audio,
+            on_sample: &mut dyn FnMut(crate::domain::AudioFeatures),
+        ) -> anyhow::Result<()> {
+            on_sample(crate::domain::AudioFeatures {
+                energy: audio.energy(),
+                brightness: 64,
+            });
             self.sample_counts.lock().unwrap().push(audio.samples.len());
             Ok(())
         }
     }
 
     impl AudioPlayer for FailingPlayer {
-        fn play(&mut self, _audio: &Audio, _on_started: &mut dyn FnMut()) -> anyhow::Result<()> {
+        fn play(
+            &mut self,
+            _audio: &Audio,
+            _on_sample: &mut dyn FnMut(crate::domain::AudioFeatures),
+        ) -> anyhow::Result<()> {
             anyhow::bail!("audio device unavailable")
         }
     }
@@ -245,5 +268,63 @@ mod tests {
 
         assert_eq!(error.to_string(), "installation failed");
         assert_eq!(installs.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn selected_voice_is_used_without_reloading_the_speech_engine() {
+        struct VoiceRecorder(Arc<Mutex<Vec<String>>>);
+
+        impl SpeechSynthesizer for VoiceRecorder {
+            fn synthesize(
+                &mut self,
+                _text: &SelectedText,
+                voice: &VoiceSettings,
+            ) -> anyhow::Result<Audio> {
+                self.0
+                    .lock()
+                    .unwrap()
+                    .push(voice.voice_id.as_str().to_owned());
+                Ok(Audio::kokoro(vec![0.2]))
+            }
+        }
+
+        let voices = Arc::new(Mutex::new(Vec::new()));
+        let mut use_case = SpeakSelection::new(
+            VoiceRecorder(voices.clone()),
+            FakePlayer {
+                sample_counts: Arc::new(Mutex::new(Vec::new())),
+            },
+            VoiceSettings::default(),
+        );
+        use_case.set_voice(VoiceSettings::from_voice_id("bf_emma").unwrap());
+        use_case
+            .execute(SelectedText::new("A different voice").unwrap())
+            .unwrap();
+
+        assert_eq!(&*voices.lock().unwrap(), &["bf_emma"]);
+    }
+
+    #[test]
+    fn emits_audio_energy_only_after_each_chunk_starts_playing() {
+        let cues = Arc::new(Mutex::new(Vec::new()));
+        let mut use_case = SpeakSelection::new(
+            FakeSynthesizer {
+                seen: Arc::new(Mutex::new(Vec::new())),
+            },
+            FakePlayer {
+                sample_counts: Arc::new(Mutex::new(Vec::new())),
+            },
+            VoiceSettings::default(),
+        );
+
+        use_case
+            .execute_with_playback_cues(SelectedText::new("Read this").unwrap(), {
+                let cues = cues.clone();
+                move |cue| cues.lock().unwrap().push(cue.energy)
+            })
+            .unwrap();
+
+        assert_eq!(cues.lock().unwrap().len(), 2);
+        assert!(cues.lock().unwrap().iter().all(|energy| *energy > 0));
     }
 }

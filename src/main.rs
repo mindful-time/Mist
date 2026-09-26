@@ -9,8 +9,11 @@ fn main() -> eframe::Result {
     use std::env;
 
     use select_to_speak::{
-        SelectedText, SpeakSelection, VoiceSettings,
-        adapters::{kokoro::KokoroSynthesizer, system_audio::SystemAudioPlayer},
+        SelectedText, SpeakSelection,
+        adapters::{
+            kokoro::KokoroSynthesizer, system_audio::SystemAudioPlayer,
+            voice_preferences::VoicePreferencesStore,
+        },
         model_store::ModelStore,
         worker,
     };
@@ -29,23 +32,28 @@ fn main() -> eframe::Result {
 
     if arguments.first().is_some_and(|value| value == "--speak") {
         let text = SelectedText::new(arguments[1..].join(" ")).expect("provide text after --speak");
-        let synthesizer = KokoroSynthesizer::load(&store.model_path(), &store.voice_path())
+        let voice = VoicePreferencesStore::at(store.root()).load();
+        let synthesizer = KokoroSynthesizer::load(&store.model_path(), &store.voices_path())
             .expect("Kokoro is not ready; run --install-model first");
         let player = SystemAudioPlayer::new(&store.root().join("audio-cache"))
             .expect("could not create the audio cache");
-        SpeakSelection::new(synthesizer, player, VoiceSettings::default())
+        SpeakSelection::new(synthesizer, player, voice)
             .execute(text)
             .expect("could not speak the text");
         return Ok(());
     }
 
-    let worker::WorkerHandle { commands, statuses } = worker::spawn(store);
+    let worker::WorkerHandle {
+        commands,
+        statuses,
+        selected_voice,
+    } = worker::spawn(store);
     let native_options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
             .with_title("Select to Speak")
-            .with_inner_size([392.0, 272.0])
-            .with_min_inner_size([392.0, 272.0])
-            .with_max_inner_size([392.0, 272.0])
+            .with_inner_size([248.0, 248.0])
+            .with_min_inner_size([220.0, 220.0])
+            .with_max_inner_size([600.0, 680.0])
             .with_resizable(false)
             .with_decorations(false)
             .with_transparent(true)
@@ -61,6 +69,7 @@ fn main() -> eframe::Result {
                 creation_context,
                 commands,
                 statuses,
+                selected_voice,
             )))
         }),
     )

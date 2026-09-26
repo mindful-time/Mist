@@ -1,12 +1,20 @@
 # Select to Speak
 
-A tiny cross-platform desktop pet that reads selected text with Kokoro:
+A tiny cross-platform living-mist desktop pet that reads selected text with
+Kokoro:
 
 - **macOS / Windows / Linux:** select text anywhere and press **Ctrl+Alt+S**.
 - **macOS native-app alternative:** choose **Services → Speak Selection with
   Kokoro** from the application or text context menu.
-- **Windows/Linux fallback:** copy text, right-click the pet, and choose **Speak
-  copied text**. Manual text entry is available in that same menu.
+- **Windows/Linux fallback:** copy text, right-click the mist, and choose
+  **Speak copied text**. Manual text entry is available in that same menu.
+
+The normal desktop surface is only a translucent, animated mist. It changes
+color with the chosen voice and reacts throughout playback to time-windowed
+loudness and spectral brightness from the real generated audio.
+Voice selection, status, settings, and quit live in the macOS menu bar or the
+Windows/Linux system tray; setup and recoverable errors open a focused panel
+only when needed.
 
 Speech is generated locally with
 [Kokoro-82M](https://huggingface.co/spaces/hexgrad/Kokoro-TTS); selected text is
@@ -14,10 +22,12 @@ never sent to a server. Long selections are synthesized sentence by sentence,
 so playback starts after the first audio chunk instead of waiting for the whole
 selection.
 
-The first launch shows **Download voice**. That fetches the quantized Kokoro v1.0
-ONNX model (~92 MB) and the `af_heart` voice (~0.5 MB) from the Apache-2.0
-Hugging Face release into your user application-data directory. Downloads are
-pinned to a model revision and SHA-256 verified before use.
+The first launch presents eight distinct voice mists and a **Download voices**
+action. That fetches the quantized Kokoro v1.0 ONNX model (~92 MB) plus the
+curated English voice catalog (~4 MB) from the Apache-2.0 Hugging Face release
+into your user application-data directory. Every artifact is pinned to one
+model revision and SHA-256 verified before use. The chosen voice persists and
+can be changed from the menu bar/tray without restarting Kokoro.
 
 ## Build and run
 
@@ -28,7 +38,7 @@ make test
 make run
 ```
 
-Then click **Download voice** on the pet.
+Then choose a voice and click **Download voices** in onboarding.
 
 ### macOS app bundle
 
@@ -115,9 +125,9 @@ The Rust Kokoro adapter selects a native ONNX Runtime backend automatically:
 - Windows probes CUDA, then DirectML, then CPU.
 - Linux probes CUDA, then CPU.
 
-The pet displays the automatic backend policy while preparing and playing
-speech; labels such as `CoreML → CPU` show the fallback order rather than
-claiming which provider ultimately accepted every graph node. Set
+The settings panel displays the automatic backend policy while preparing and
+playing speech; labels such as `CoreML → CPU` show the fallback order rather
+than claiming which provider ultimately accepted every graph node. Set
 `KOKORO_ORT_PROVIDER=cpu`, `coreml`, `cuda`, or `directml` to override that
 policy when troubleshooting; explicit accelerators are labeled as requested.
 The ONNX Runtime provider probe is the hardware detection step, so the app does
@@ -135,7 +145,7 @@ The code uses a small hexagonal architecture:
 ```text
 macOS Accessibility + Service / Windows UIA / Linux selection
                               |
-                 global shortcut / pet UI
+               global shortcut / mist + tray
                        |
              SpeakSelection use-case
                 /                \
@@ -144,7 +154,8 @@ macOS Accessibility + Service / Windows UIA / Linux selection
          Kokoro ONNX        macOS / Windows / Linux
 ```
 
-- `domain.rs`: selected text, voice settings, and audio values.
+- `domain.rs`: selected text, the voice catalog, mist palettes, and audio
+  values.
 - `application.rs`: the `SpeakSelection` use-case.
 - `ports.rs`: speech synthesis, model provisioning, and playback interfaces.
 - `adapters/macos_selection.rs`: macOS Accessibility selection adapter.
@@ -156,13 +167,18 @@ macOS Accessibility + Service / Windows UIA / Linux selection
 - `adapters/kokoro.rs`: outgoing streaming Kokoro/ONNX adapter with native
   accelerator detection.
 - `adapters/system_audio.rs`: outgoing macOS/Windows/Linux audio adapter.
-- `ui.rs` and `worker.rs`: the floating pet and background command boundary.
+- `adapters/voice_preferences.rs`: validated, persistent voice-selection
+  adapter.
+- `ui/mist.rs`: the embedded, audio-reactive mist renderer.
+- `ui/tray.rs`: the cross-platform menu-bar/system-tray adapter.
+- `ui/voice_gallery.rs`: the accessible onboarding and settings voice gallery.
+- `ui.rs` and `worker.rs`: the floating surface and background command seam.
 
 The core has no AppKit, ONNX, filesystem, or process knowledge and is covered by
 unit tests using in-memory port fakes.
 
 ## Scope
 
-This first version is intentionally English-first. Kokoro exposes more languages
-and voices, but voice selection, launch-at-login, interruption, installers, and
-production signing/notarization are kept out of the MVP.
+This version is intentionally English-first. Additional languages,
+launch-at-login, interruption, graphical installers, and production
+signing/notarization remain outside the current scope.

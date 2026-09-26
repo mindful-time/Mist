@@ -1,150 +1,171 @@
-use eframe::egui::Color32;
-use select_to_speak::worker::AppStatus;
+use select_to_speak::{AudioFeatures, worker::AppStatus};
 
-#[derive(Clone, Copy, Eq, PartialEq)]
-pub(super) enum PanelKind {
-    Ready,
-    Setup,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum MistActivity {
+    Idle,
     Busy,
     Speaking,
-    Error,
+    Attention,
 }
 
-#[derive(Clone, Copy)]
-pub(super) enum Tone {
-    Violet,
-    Mint,
-    Amber,
-    Coral,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct MistPresentation {
+    pub(super) activity: MistActivity,
+    pub(super) features: AudioFeatures,
+    pub(super) requires_panel: bool,
 }
 
-impl Tone {
-    pub(super) fn color(self) -> Color32 {
-        match self {
-            Self::Violet => Color32::from_rgb(139, 145, 255),
-            Self::Mint => Color32::from_rgb(77, 216, 181),
-            Self::Amber => Color32::from_rgb(244, 183, 93),
-            Self::Coral => Color32::from_rgb(248, 116, 112),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum PrimaryAction {
     None,
-    DownloadVoice,
+    InstallVoices,
     OpenAccessibility,
 }
 
-pub(super) struct Presentation {
-    pub(super) kind: PanelKind,
-    pub(super) tone: Tone,
-    pub(super) badge: &'static str,
+pub(super) struct StatusCopy {
+    pub(super) eyebrow: &'static str,
     pub(super) title: &'static str,
     pub(super) detail: String,
     pub(super) action: PrimaryAction,
 }
 
-pub(super) fn for_status(
+pub(super) fn mist_for_status(
     status: &AppStatus,
-    registration_error: Option<&str>,
     accessibility_required: bool,
-) -> Presentation {
+    shell_error: Option<&str>,
+) -> MistPresentation {
+    if accessibility_required {
+        return MistPresentation {
+            activity: MistActivity::Attention,
+            features: features(18, 20),
+            requires_panel: true,
+        };
+    }
     match status {
-        AppStatus::CheckingModel => Presentation {
-            kind: PanelKind::Busy,
-            tone: Tone::Violet,
-            badge: "STARTING",
-            title: "Getting things ready",
-            detail: "Checking your local Kokoro voice…".to_owned(),
+        AppStatus::CheckingModel => busy(false),
+        AppStatus::MissingModel => MistPresentation {
+            activity: MistActivity::Idle,
+            features: features(8, 12),
+            requires_panel: true,
+        },
+        AppStatus::Ready if shell_error.is_some() => MistPresentation {
+            activity: MistActivity::Attention,
+            features: features(18, 20),
+            requires_panel: false,
+        },
+        AppStatus::Ready => MistPresentation {
+            activity: MistActivity::Idle,
+            features: features(10, 16),
+            requires_panel: false,
+        },
+        AppStatus::Downloading | AppStatus::Loading | AppStatus::Synthesizing { .. } => busy(false),
+        AppStatus::Speaking { features, .. } => MistPresentation {
+            activity: MistActivity::Speaking,
+            features: *features,
+            requires_panel: false,
+        },
+        AppStatus::Error(_) => MistPresentation {
+            activity: MistActivity::Attention,
+            features: features(24, 28),
+            requires_panel: false,
+        },
+    }
+}
+
+fn busy(requires_panel: bool) -> MistPresentation {
+    MistPresentation {
+        activity: MistActivity::Busy,
+        features: features(32, 36),
+        requires_panel,
+    }
+}
+
+const fn features(energy: u8, brightness: u8) -> AudioFeatures {
+    AudioFeatures { energy, brightness }
+}
+
+pub(super) fn copy_for_status(
+    status: &AppStatus,
+    accessibility_required: bool,
+    platform_error: Option<&str>,
+    tray_error: Option<&str>,
+) -> StatusCopy {
+    if accessibility_required {
+        return StatusCopy {
+            eyebrow: "ONE LAST STEP",
+            title: "Let the mist hear your selection",
+            detail: "Enable Select to Speak in Privacy & Security › Accessibility. Audio and selected text stay on this device.".to_owned(),
+            action: PrimaryAction::OpenAccessibility,
+        };
+    }
+    match status {
+        AppStatus::CheckingModel => StatusCopy {
+            eyebrow: "WAKING UP",
+            title: "Forming your mist",
+            detail: "Checking the local Kokoro voices…".to_owned(),
             action: PrimaryAction::None,
         },
-        AppStatus::MissingModel => Presentation {
-            kind: PanelKind::Setup,
-            tone: Tone::Violet,
-            badge: "SETUP",
-            title: "Set up your voice",
-            detail: "Download Kokoro once. Speech stays entirely on this device.".to_owned(),
-            action: PrimaryAction::DownloadVoice,
+        AppStatus::MissingModel => StatusCopy {
+            eyebrow: "WELCOME",
+            title: "Choose the voice in your mist",
+            detail: "Pick a character below, then download Kokoro once. Every voice runs locally and privately.".to_owned(),
+            action: PrimaryAction::InstallVoices,
         },
-        AppStatus::Ready => {
-            if accessibility_required {
-                permission_presentation()
-            } else if let Some(error) = registration_error {
-                error_presentation(error)
-            } else {
-                Presentation {
-                    kind: PanelKind::Ready,
-                    tone: Tone::Mint,
-                    badge: "READY",
-                    title: "Ready to speak",
-                    detail: "Select text in any app, then press".to_owned(),
-                    action: PrimaryAction::None,
-                }
-            }
-        }
-        AppStatus::Downloading => Presentation {
-            kind: PanelKind::Busy,
-            tone: Tone::Violet,
-            badge: "DOWNLOADING",
-            title: "Downloading Kokoro",
-            detail: "One-time setup. Keep this window open.".to_owned(),
+        AppStatus::Downloading => StatusCopy {
+            eyebrow: "LOCAL SETUP",
+            title: "Gathering the voices",
+            detail: "Downloading the verified Kokoro model and eight voice textures. This happens only once.".to_owned(),
             action: PrimaryAction::None,
         },
-        AppStatus::Loading => Presentation {
-            kind: PanelKind::Busy,
-            tone: Tone::Amber,
-            badge: "LOADING",
-            title: "Warming up the voice",
-            detail: "Preparing local speech for the first time…".to_owned(),
+        AppStatus::Loading => StatusCopy {
+            eyebrow: "WARMING UP",
+            title: "Giving the mist a voice",
+            detail: "Loading Kokoro with the fastest available local inference provider.".to_owned(),
             action: PrimaryAction::None,
         },
         AppStatus::Synthesizing {
             text,
             inference_policy,
-        } => Presentation {
-            kind: PanelKind::Busy,
-            tone: Tone::Amber,
-            badge: "GENERATING",
-            title: "Preparing first audio",
-            detail: format!("Preparing a stream · {inference_policy}\n“{text}”"),
+        } => StatusCopy {
+            eyebrow: "FORMING SPEECH",
+            title: "The first words are taking shape",
+            detail: format!("“{text}” · {inference_policy}"),
             action: PrimaryAction::None,
         },
         AppStatus::Speaking {
             text,
             inference_policy,
-        } => Presentation {
-            kind: PanelKind::Speaking,
-            tone: Tone::Mint,
-            badge: "SPEAKING",
-            title: "Speaking now",
-            detail: format!("“{text}”\nStreaming · {inference_policy}"),
+            ..
+        } => StatusCopy {
+            eyebrow: "SPEAKING",
+            title: "The mist is alive",
+            detail: format!("“{text}” · streaming with {inference_policy}"),
             action: PrimaryAction::None,
         },
-        AppStatus::Error(message) => error_presentation(message),
-    }
-}
-
-fn permission_presentation() -> Presentation {
-    Presentation {
-        kind: PanelKind::Error,
-        tone: Tone::Coral,
-        badge: "PERMISSION",
-        title: "Permission needed",
-        detail: "Enable Select to Speak in System Settings › Privacy & Security › Accessibility."
-            .to_owned(),
-        action: PrimaryAction::OpenAccessibility,
-    }
-}
-
-fn error_presentation(message: &str) -> Presentation {
-    Presentation {
-        kind: PanelKind::Error,
-        tone: Tone::Coral,
-        badge: "ATTENTION",
-        title: "Something went wrong",
-        detail: shorten(message, 145),
-        action: PrimaryAction::None,
+        AppStatus::Error(message) => StatusCopy {
+            eyebrow: "NEEDS ATTENTION",
+            title: "The mist lost its shape",
+            detail: shorten(message, 180),
+            action: PrimaryAction::None,
+        },
+        AppStatus::Ready => {
+            let warning = tray_error.or(platform_error);
+            if let Some(message) = warning {
+                StatusCopy {
+                    eyebrow: "READY WITH A LIMITATION",
+                    title: "Your voice is ready",
+                    detail: shorten(message, 180),
+                    action: PrimaryAction::None,
+                }
+            } else {
+                StatusCopy {
+                    eyebrow: "READY",
+                    title: "Your mist is listening",
+                    detail: "Select text anywhere and press Ctrl+Alt+S. Use the menu-bar or tray mist to change voices.".to_owned(),
+                    action: PrimaryAction::None,
+                }
+            }
+        }
     }
 }
 
@@ -163,32 +184,62 @@ mod tests {
     use super::*;
 
     #[test]
-    fn worker_error_takes_precedence_over_pending_accessibility_permission() {
-        let presentation = for_status(
-            &AppStatus::Error("The speech worker stopped.".to_owned()),
-            None,
-            true,
-        );
+    fn ready_desktop_surface_is_mist_only() {
+        let presentation = mist_for_status(&AppStatus::Ready, false, None);
+        assert_eq!(presentation.activity, MistActivity::Idle);
+        assert!(!presentation.requires_panel);
+    }
 
-        assert_eq!(presentation.badge, "ATTENTION");
-        assert_eq!(presentation.title, "Something went wrong");
-        assert_eq!(presentation.detail, "The speech worker stopped.");
-        assert!(matches!(presentation.action, PrimaryAction::None));
+    #[test]
+    fn actual_audio_energy_drives_the_speaking_mist() {
+        let presentation = mist_for_status(
+            &AppStatus::Speaking {
+                text: "Hello".to_owned(),
+                inference_policy: "CoreML → CPU".to_owned(),
+                features: features(147, 83),
+            },
+            false,
+            None,
+        );
+        assert_eq!(presentation.activity, MistActivity::Speaking);
+        assert_eq!(presentation.features.energy, 147);
+    }
+
+    #[test]
+    fn speaking_overrides_a_nonfatal_shell_warning() {
+        let presentation = mist_for_status(
+            &AppStatus::Speaking {
+                text: "Hello".to_owned(),
+                inference_policy: "CoreML → CPU".to_owned(),
+                features: features(96, 120),
+            },
+            false,
+            Some("The preferred shortcut is already in use"),
+        );
+        assert_eq!(presentation.activity, MistActivity::Speaking);
+        assert_eq!(presentation.features.energy, 96);
+    }
+
+    #[test]
+    fn setup_and_permission_states_remain_actionable() {
+        assert!(mist_for_status(&AppStatus::MissingModel, false, None).requires_panel);
+        assert!(mist_for_status(&AppStatus::Ready, true, None).requires_panel);
+        assert_eq!(
+            copy_for_status(&AppStatus::Ready, true, None, None).action,
+            PrimaryAction::OpenAccessibility
+        );
     }
 
     #[test]
     fn synthesis_is_not_presented_as_audible_playback() {
-        let presentation = for_status(
+        let presentation = mist_for_status(
             &AppStatus::Synthesizing {
                 text: "A long selection…".to_owned(),
                 inference_policy: "CoreML → CPU".to_owned(),
             },
-            None,
             false,
+            None,
         );
-
-        assert_eq!(presentation.badge, "GENERATING");
-        assert_eq!(presentation.title, "Preparing first audio");
-        assert!(presentation.detail.contains("CoreML → CPU"));
+        assert_eq!(presentation.activity, MistActivity::Busy);
     }
 }

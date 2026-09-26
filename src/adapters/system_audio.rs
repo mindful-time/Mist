@@ -1,17 +1,20 @@
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Child, Command, ExitStatus},
+    thread,
+    time::{Duration, Instant},
 };
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
-use std::process::Child;
 #[cfg(target_os = "linux")]
-use std::{io::ErrorKind, process::ExitStatus};
+use std::io::ErrorKind;
 
 use anyhow::{Context, Result, bail};
 
-use crate::{domain::Audio, ports::AudioPlayer};
+use crate::{
+    domain::{Audio, AudioFeatures},
+    ports::AudioPlayer,
+};
 
 /// Cross-platform system audio adapter. Keeping playback behind this port avoids
 /// pulling device APIs into the application core.
@@ -74,7 +77,11 @@ impl SystemAudioPlayer {
     }
 
     #[cfg(target_os = "linux")]
-    fn play_file(&self, on_started: &mut dyn FnMut()) -> Result<ExitStatus> {
+    fn play_file(
+        &self,
+        audio: &Audio,
+        on_sample: &mut dyn FnMut(AudioFeatures),
+    ) -> Result<ExitStatus> {
         let candidates: &[(&str, &[&str])] = &[
             ("pw-play", &[]),
             ("paplay", &[]),
@@ -90,10 +97,8 @@ impl SystemAudioPlayer {
                 .spawn()
             {
                 Ok(mut child) => {
-                    on_started();
-                    let status = child
-                        .wait()
-                        .with_context(|| format!("could not wait for {program} playback"))?;
+                    let status = monitor_playback(&mut child, audio, on_sample)
+                        .with_context(|| format!("could not monitor {program} playback"))?;
                     if status.success() {
                         return Ok(status);
                     }
@@ -115,21 +120,40 @@ impl SystemAudioPlayer {
 }
 
 impl AudioPlayer for SystemAudioPlayer {
-    fn play(&mut self, audio: &Audio, on_started: &mut dyn FnMut()) -> Result<()> {
+    fn play(&mut self, audio: &Audio, on_sample: &mut dyn FnMut(AudioFeatures)) -> Result<()> {
         self.write_wav(audio)?;
         #[cfg(any(target_os = "macos", target_os = "windows"))]
         let status = {
             let mut child = self.start_player()?;
-            on_started();
-            child
-                .wait()
-                .context("could not wait for system audio playback")?
+            monitor_playback(&mut child, audio, on_sample)
+                .context("could not monitor system audio playback")?
         };
         #[cfg(target_os = "linux")]
-        let status = self.play_file(on_started)?;
+        let status = self.play_file(audio, on_sample)?;
         if !status.success() {
             bail!("system audio playback exited with {status}");
         }
         Ok(())
+    }
+}
+
+fn monitor_playback(
+    child: &mut Child,
+    audio: &Audio,
+    on_sample: &mut dyn FnMut(AudioFeatures),
+) -> Result<ExitStatus> {
+    const SAMPLE_INTERVAL: Duration = Duration::from_millis(40);
+    const FEATURE_WINDOW: Duration = Duration::from_millis(80);
+
+    let started = Instant::now();
+    loop {
+        on_sample(audio.features_at(started.elapsed(), FEATURE_WINDOW));
+        if let Some(status) = child
+            .try_wait()
+            .context("could not query system audio playback")?
+        {
+            return Ok(status);
+        }
+        thread::sleep(SAMPLE_INTERVAL);
     }
 }

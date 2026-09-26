@@ -66,7 +66,7 @@ impl KokoroSynthesizer {
 
 impl SpeechSynthesizer for KokoroSynthesizer {
     fn synthesize(&mut self, text: &SelectedText, settings: &VoiceSettings) -> Result<Audio> {
-        let voice = Voice::new(&settings.name).with_speed(settings.speed);
+        let voice = Voice::new(settings.voice_id.as_str()).with_speed(settings.speed);
         let (samples, _) = self
             .runtime
             .block_on(self.tts.synth(text.as_str(), voice))
@@ -80,7 +80,7 @@ impl SpeechSynthesizer for KokoroSynthesizer {
         settings: &VoiceSettings,
         on_chunk: &mut dyn FnMut(Audio) -> Result<()>,
     ) -> Result<()> {
-        let voice = Voice::new(&settings.name).with_speed(settings.speed);
+        let voice = Voice::new(settings.voice_id.as_str()).with_speed(settings.speed);
         let sentences = split_sentences(text.as_str());
         if sentences.is_empty() {
             bail!("Kokoro could not find any speech chunks");

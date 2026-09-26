@@ -15,25 +15,27 @@ fn local_kokoro_model_produces_audio() {
     );
 
     let mut synthesizer =
-        KokoroSynthesizer::load(&store.model_path(), &store.voice_path()).expect("load Kokoro");
-    let mut chunks = Vec::new();
-    synthesizer
-        .synthesize_streaming(
-            &SelectedText::new("Hello from Kokoro.").unwrap(),
-            &VoiceSettings::default(),
-            &mut |audio| {
-                chunks.push(audio);
-                Ok(())
-            },
-        )
-        .expect("synthesize speech");
+        KokoroSynthesizer::load(&store.model_path(), &store.voices_path()).expect("load Kokoro");
+    for voice in ["af_heart", "bm_daniel"] {
+        let mut chunks = Vec::new();
+        synthesizer
+            .synthesize_streaming(
+                &SelectedText::new("Hello from Kokoro.").unwrap(),
+                &VoiceSettings::from_voice_id(voice).unwrap(),
+                &mut |audio| {
+                    chunks.push(audio);
+                    Ok(())
+                },
+            )
+            .expect("synthesize speech");
 
-    assert!(!chunks.is_empty());
-    assert!(chunks.iter().all(|audio| audio.sample_rate == 24_000));
-    assert!(
-        chunks
-            .iter()
-            .flat_map(|audio| &audio.samples)
-            .any(|sample| sample.abs() > 0.0001)
-    );
+        assert!(!chunks.is_empty());
+        assert!(chunks.iter().all(|audio| audio.sample_rate == 24_000));
+        assert!(
+            chunks
+                .iter()
+                .flat_map(|audio| &audio.samples)
+                .any(|sample| sample.abs() > 0.0001)
+        );
+    }
 }

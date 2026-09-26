@@ -1,9 +1,10 @@
-# Select to Speak — MVP specification
+# Select to Speak — living mist specification
 
 ## Goal
 
-Build a small Rust desktop application that stays visible like a pet and reads
-user-selected text aloud with the local Hexgrad Kokoro-82M text-to-speech model.
+Build a small Rust desktop application that stays visible as a living mist and
+reads user-selected text aloud with the local Hexgrad Kokoro-82M
+text-to-speech model.
 
 ## Platforms and interaction
 
@@ -20,15 +21,27 @@ user-selected text aloud with the local Hexgrad Kokoro-82M text-to-speech model.
   The installed desktop entry provides the stable host identity required by the
   portal. If either protocol is unavailable, the pet reports the limitation and
   retains copied-text/manual-entry fallbacks.
-- The draggable, always-on-top pet shows setup, loading, speaking, ready, and
-  error states without opening a conventional application window.
+- During normal operation the draggable, always-on-top surface contains only a
+  translucent animated mist: no card, chrome, title, buttons, or permanent
+  copy is visible on the desktop.
+- The mist changes movement and intensity with speech lifecycle and audio
+  energy. Each voice has a stable, recognisable color palette.
+- Setup, permission failures, and actionable errors may temporarily expand into
+  an accessible panel because the user must be able to recover without a
+  terminal.
+- A native macOS menu-bar / Windows and Linux system-tray menu provides voice
+  selection, settings, status, and quit actions while keeping controls off the
+  floating desktop surface.
 
 ## Speech
 
 - Use the Apache-2.0 Kokoro-82M v1.0 ONNX model referenced by the user's
   Hugging Face Space.
 - Synthesis happens on-device. Selected text is not sent to a speech service.
-- The default voice is `af_heart` at normal speed.
+- The default voice is `af_heart` at normal speed. Onboarding presents the
+  supported voice catalog as visual mist choices, and the selected voice is
+  persisted in the platform application-data directory.
+- Changing voice affects subsequent speech without restarting the app.
 - Long selections are synthesized and played as ordered sentence chunks. The
   UI distinguishes generation of the first chunk from audible playback.
 - Hardware selection is automatic through ONNX Runtime provider probing:
@@ -44,8 +57,8 @@ user-selected text aloud with the local Hexgrad Kokoro-82M text-to-speech model.
   architecture.
 - Domain and application code must not import GUI, OS, network, filesystem,
   ONNX, or audio-device libraries.
-- OS selection, Kokoro inference, model download, and audio playback are
-  adapters behind the application boundary.
+- OS selection, system tray, preferences, Kokoro inference, model download, and
+  audio playback are adapters behind the application boundary.
 - Primary selection capture must not modify or reconstruct the user's regular
   clipboard.
 - Slow model loading, synthesis, download, and playback must not block the pet's
@@ -57,6 +70,14 @@ user-selected text aloud with the local Hexgrad Kokoro-82M text-to-speech model.
 - The native target passes `cargo check`, `cargo test`, and clippy with warnings
   denied.
 - A macOS `.app` bundle advertises the text Service through `Info.plist`.
+- The bundled mist texture is embedded in the executable so packaged builds
+  cannot silently omit it.
+- After onboarding, the floating surface renders only mist. The tray/menu-bar
+  menu can reopen voice settings, and setup or error panels remain keyboard and
+  screen-reader legible.
+- Playback-synchronised, time-windowed loudness and brightness reach
+  presentation state only after the platform audio player has actually
+  started.
 - **Ctrl+Alt+S** is requested on every OS. Wayland displays the gesture actually
   granted by the compositor, and unsupported portal capabilities fail visibly.
 - The repository documents build and usage instructions for macOS, Windows, and
@@ -64,5 +85,5 @@ user-selected text aloud with the local Hexgrad Kokoro-82M text-to-speech model.
 
 ## Deferred
 
-Voice/language selection, launch at login, interrupting current speech,
-production signing/notarization, and graphical installers are outside this MVP.
+Additional languages, launch at login, interrupting current speech, production
+signing/notarization, and graphical installers are outside this version.
