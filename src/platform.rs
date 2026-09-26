@@ -24,6 +24,7 @@ pub struct PlatformBridge {
     _service_provider: objc2::rc::Retained<crate::adapters::macos_service::ServiceProvider>,
     manager: Option<global_hotkey::GlobalHotKeyManager>,
     hotkey: global_hotkey::hotkey::HotKey,
+    shortcut_label: String,
     usage_hint: String,
     registration_error: Option<String>,
     #[cfg(target_os = "macos")]
@@ -75,6 +76,7 @@ impl PlatformBridge {
             _service_provider: crate::adapters::macos_service::register(commands),
             manager,
             hotkey,
+            shortcut_label: "Ctrl+Alt+S".to_owned(),
             usage_hint: SHORTCUT_HINT.to_owned(),
             registration_error,
             #[cfg(target_os = "macos")]
@@ -110,6 +112,7 @@ impl PlatformBridge {
             match message {
                 WaylandShortcutMessage::Registered(trigger) => {
                     self.usage_hint = format!("Select text anywhere, then press {trigger}");
+                    self.shortcut_label = trigger;
                     self.registration_error = None;
                 }
                 WaylandShortcutMessage::Activated => {
@@ -167,9 +170,17 @@ impl PlatformBridge {
     }
 
     pub fn shortcut_label(&self) -> &str {
-        self.usage_hint
-            .strip_prefix("Select text anywhere, then press ")
-            .unwrap_or(&self.usage_hint)
+        &self.shortcut_label
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn accessibility_required(&self) -> bool {
+        self.accessibility_pending
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    pub fn accessibility_required(&self) -> bool {
+        false
     }
 
     pub fn registration_error(&self) -> Option<&str> {

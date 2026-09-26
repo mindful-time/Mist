@@ -1,70 +1,28 @@
+mod presentation;
+mod system_settings;
+mod theme;
+
 use std::{
-    fs,
-    sync::{
-        Arc,
-        mpsc::{self, TrySendError},
-    },
+    sync::mpsc::{self, TrySendError},
     time::Duration,
 };
 
 use eframe::egui::{
-    self, Align2, Button, Color32, FontData, FontDefinitions, FontFamily, FontId, Pos2, Rect,
-    RichText, Sense, Stroke, StrokeKind, Vec2,
+    self, Align2, Button, Color32, FontId, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, Vec2,
 };
 use select_to_speak::{
     platform::{PlatformBridge, PlatformEvent},
     worker::{AppStatus, WorkerCommand},
 };
 
-const CARD_BACKGROUND: Color32 = Color32::from_rgb(17, 19, 27);
-const CARD_SURFACE: Color32 = Color32::from_rgb(25, 28, 39);
-const TEXT_PRIMARY: Color32 = Color32::from_rgb(245, 246, 250);
-const TEXT_SECONDARY: Color32 = Color32::from_rgb(169, 175, 193);
-const TEXT_MUTED: Color32 = Color32::from_rgb(119, 126, 146);
-
-#[derive(Clone, Copy, Eq, PartialEq)]
-enum PanelKind {
-    Ready,
-    Setup,
-    Busy,
-    Speaking,
-    Error,
-}
-
-#[derive(Clone, Copy)]
-enum Tone {
-    Violet,
-    Mint,
-    Amber,
-    Coral,
-}
-
-impl Tone {
-    fn color(self) -> Color32 {
-        match self {
-            Self::Violet => Color32::from_rgb(139, 145, 255),
-            Self::Mint => Color32::from_rgb(77, 216, 181),
-            Self::Amber => Color32::from_rgb(244, 183, 93),
-            Self::Coral => Color32::from_rgb(248, 116, 112),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Eq, PartialEq)]
-enum PrimaryAction {
-    None,
-    DownloadVoice,
-    OpenAccessibility,
-}
-
-struct Presentation {
-    kind: PanelKind,
-    tone: Tone,
-    badge: &'static str,
-    title: &'static str,
-    detail: String,
-    action: PrimaryAction,
-}
+use self::{
+    presentation::{PanelKind, Presentation, PrimaryAction, Tone},
+    system_settings::open_accessibility_settings,
+    theme::{
+        CARD_BACKGROUND, CARD_SURFACE, TEXT_MUTED, TEXT_PRIMARY, TEXT_SECONDARY,
+        configure_interface, with_alpha,
+    },
+};
 
 pub struct PetApp {
     commands: mpsc::SyncSender<WorkerCommand>,
@@ -106,63 +64,6 @@ impl PetApp {
                 TrySendError::Disconnected(_) => "The speech worker stopped unexpectedly.",
             };
             self.status = AppStatus::Error(message.to_owned());
-        }
-    }
-
-    fn presentation(&self) -> Presentation {
-        match &self.status {
-            AppStatus::CheckingModel => Presentation {
-                kind: PanelKind::Busy,
-                tone: Tone::Violet,
-                badge: "STARTING",
-                title: "Getting things ready",
-                detail: "Checking your local Kokoro voice…".to_owned(),
-                action: PrimaryAction::None,
-            },
-            AppStatus::MissingModel => Presentation {
-                kind: PanelKind::Setup,
-                tone: Tone::Violet,
-                badge: "SETUP",
-                title: "Set up your voice",
-                detail: "Download Kokoro once. Speech stays entirely on this device.".to_owned(),
-                action: PrimaryAction::DownloadVoice,
-            },
-            AppStatus::Ready => self.platform.registration_error().map_or_else(
-                || Presentation {
-                    kind: PanelKind::Ready,
-                    tone: Tone::Mint,
-                    badge: "READY",
-                    title: "Ready to speak",
-                    detail: "Select text in any app, then press".to_owned(),
-                    action: PrimaryAction::None,
-                },
-                error_presentation,
-            ),
-            AppStatus::Downloading => Presentation {
-                kind: PanelKind::Busy,
-                tone: Tone::Violet,
-                badge: "DOWNLOADING",
-                title: "Downloading Kokoro",
-                detail: "One-time setup. Keep this window open.".to_owned(),
-                action: PrimaryAction::None,
-            },
-            AppStatus::Loading => Presentation {
-                kind: PanelKind::Busy,
-                tone: Tone::Amber,
-                badge: "LOADING",
-                title: "Warming up the voice",
-                detail: "Preparing local speech for the first time…".to_owned(),
-                action: PrimaryAction::None,
-            },
-            AppStatus::Speaking(text) => Presentation {
-                kind: PanelKind::Speaking,
-                tone: Tone::Mint,
-                badge: "SPEAKING",
-                title: "Speaking now",
-                detail: format!("“{text}”"),
-                action: PrimaryAction::None,
-            },
-            AppStatus::Error(message) => error_presentation(message),
         }
     }
 
@@ -512,15 +413,13 @@ impl PetApp {
         if matches!(self.status, AppStatus::MissingModel | AppStatus::Error(_))
             && ui.button("Download Kokoro voice").clicked()
         {
-            self.enqueue(WorkerCommand::InstallModel);
+            self.perform_action(PrimaryAction::DownloadVoice);
             ui.close();
         }
 
         #[cfg(target_os = "macos")]
         if ui.button("Open Accessibility settings").clicked() {
-            if let Err(error) = open_accessibility_settings() {
-                self.status = AppStatus::Error(error);
-            }
+            self.perform_action(PrimaryAction::OpenAccessibility);
             ui.close();
         }
 
@@ -565,7 +464,12 @@ impl eframe::App for PetApp {
             available.min + Vec2::new(12.0, 10.0),
             available.max - Vec2::new(12.0, 14.0),
         );
-        let presentation = self.presentation();
+        let card_response = ui.interact(card, ui.id().with("pet-card"), Sense::click());
+        let presentation = presentation::for_status(
+            &self.status,
+            self.platform.registration_error(),
+            self.platform.accessibility_required(),
+        );
         let time = context.input(|input| input.time as f32);
 
         self.paint_card(ui, card, &presentation);
@@ -574,7 +478,6 @@ impl eframe::App for PetApp {
         self.paint_body(ui, card, &presentation, time);
         self.paint_footer(ui, card);
 
-        let card_response = ui.interact(card, ui.id().with("pet-card"), Sense::click());
         let drag_rect =
             Rect::from_min_max(card.min, Pos2::new(card.right() - 46.0, card.top() + 47.0));
         let drag = ui.interact(drag_rect, ui.id().with("drag-handle"), Sense::drag());
@@ -603,121 +506,4 @@ impl eframe::App for PetApp {
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
         [0.0, 0.0, 0.0, 0.0]
     }
-}
-
-fn error_presentation(message: &str) -> Presentation {
-    let lower = message.to_ascii_lowercase();
-    if lower.contains("accessibility") {
-        return Presentation {
-            kind: PanelKind::Error,
-            tone: Tone::Coral,
-            badge: "PERMISSION",
-            title: "Permission needed",
-            detail:
-                "Enable Select to Speak in System Settings › Privacy & Security › Accessibility."
-                    .to_owned(),
-            action: PrimaryAction::OpenAccessibility,
-        };
-    }
-
-    let (title, action) = if lower.contains("global shortcut") || lower.contains("register ctrl") {
-        ("Shortcut unavailable", PrimaryAction::None)
-    } else if lower.contains("download kokoro") || lower.contains("model") {
-        ("Voice setup needed", PrimaryAction::DownloadVoice)
-    } else if lower.contains("wayland") || lower.contains("portal") {
-        ("Desktop integration needed", PrimaryAction::None)
-    } else {
-        ("Something went wrong", PrimaryAction::None)
-    };
-    Presentation {
-        kind: PanelKind::Error,
-        tone: Tone::Coral,
-        badge: "ATTENTION",
-        title,
-        detail: shorten(message, 145),
-        action,
-    }
-}
-
-fn shorten(message: &str, limit: usize) -> String {
-    let message = message.trim();
-    if message.chars().count() <= limit {
-        return message.to_owned();
-    }
-    let mut shortened: String = message.chars().take(limit.saturating_sub(1)).collect();
-    shortened.push('…');
-    shortened
-}
-
-fn with_alpha(color: Color32, alpha: u8) -> Color32 {
-    Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), alpha)
-}
-
-fn configure_interface(context: &egui::Context) {
-    install_system_font(context);
-    context.set_theme(egui::Theme::Dark);
-    let mut style = (*context.style_of(egui::Theme::Dark)).clone();
-    style.visuals = egui::Visuals::dark();
-    style.visuals.panel_fill = Color32::TRANSPARENT;
-    style.visuals.window_fill = CARD_BACKGROUND;
-    style.visuals.override_text_color = Some(TEXT_PRIMARY);
-    style.visuals.widgets.noninteractive.bg_fill = CARD_SURFACE;
-    style.visuals.widgets.inactive.bg_fill = Color32::from_white_alpha(9);
-    style.visuals.widgets.hovered.bg_fill = Color32::from_white_alpha(18);
-    style.visuals.widgets.active.bg_fill = Color32::from_white_alpha(24);
-    style.spacing.button_padding = Vec2::new(12.0, 7.0);
-    style.animation_time = 0.16;
-    context.set_style_of(egui::Theme::Dark, style);
-}
-
-fn install_system_font(context: &egui::Context) {
-    #[cfg(target_os = "macos")]
-    let candidates = [
-        "/System/Library/Fonts/SFNS.ttf",
-        "/System/Library/Fonts/Helvetica.ttc",
-    ];
-    #[cfg(target_os = "windows")]
-    let candidates = [
-        "C:\\Windows\\Fonts\\segoeui.ttf",
-        "C:\\Windows\\Fonts\\arial.ttf",
-    ];
-    #[cfg(target_os = "linux")]
-    let candidates = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
-    ];
-    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
-    let candidates: [&str; 0] = [];
-
-    for path in candidates {
-        let Ok(bytes) = fs::read(path) else {
-            continue;
-        };
-        let mut fonts = FontDefinitions::default();
-        let name = "system-ui".to_owned();
-        fonts
-            .font_data
-            .insert(name.clone(), Arc::new(FontData::from_owned(bytes)));
-        fonts
-            .families
-            .entry(FontFamily::Proportional)
-            .or_default()
-            .insert(0, name);
-        context.set_fonts(fonts);
-        break;
-    }
-}
-
-#[cfg(target_os = "macos")]
-fn open_accessibility_settings() -> Result<(), String> {
-    std::process::Command::new("open")
-        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
-        .spawn()
-        .map(|_| ())
-        .map_err(|error| format!("Could not open Accessibility settings: {error}"))
-}
-
-#[cfg(not(target_os = "macos"))]
-fn open_accessibility_settings() -> Result<(), String> {
-    Err("Accessibility settings are only available on macOS".to_owned())
 }
