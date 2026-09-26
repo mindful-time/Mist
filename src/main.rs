@@ -43,8 +43,10 @@ fn main() -> eframe::Result {
     let native_options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
             .with_title("Select to Speak")
-            .with_inner_size([184.0, 184.0])
-            .with_min_inner_size([150.0, 150.0])
+            .with_inner_size([392.0, 272.0])
+            .with_min_inner_size([392.0, 272.0])
+            .with_max_inner_size([392.0, 272.0])
+            .with_resizable(false)
             .with_decorations(false)
             .with_transparent(true)
             .with_always_on_top(),

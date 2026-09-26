@@ -166,6 +166,12 @@ impl PlatformBridge {
         &self.usage_hint
     }
 
+    pub fn shortcut_label(&self) -> &str {
+        self.usage_hint
+            .strip_prefix("Select text anywhere, then press ")
+            .unwrap_or(&self.usage_hint)
+    }
+
     pub fn registration_error(&self) -> Option<&str> {
         self.registration_error.as_deref()
     }
