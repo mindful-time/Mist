@@ -25,14 +25,20 @@ pub enum AppStatus {
     Ready,
     Downloading,
     Loading,
-    Synthesizing { text: String, backend: String },
-    Speaking { text: String, backend: String },
+    Synthesizing {
+        text: String,
+        inference_policy: String,
+    },
+    Speaking {
+        text: String,
+        inference_policy: String,
+    },
     Error(String),
 }
 
 struct SpeechSession {
     speaker: SpeakSelection<KokoroSynthesizer, SystemAudioPlayer>,
-    backend: String,
+    inference_policy: String,
 }
 
 pub struct WorkerHandle {
@@ -108,12 +114,12 @@ fn speak(
     if session.is_none() {
         send_status(statuses, AppStatus::Loading);
         let synthesizer = KokoroSynthesizer::load(&store.model_path(), &store.voice_path())?;
-        let backend = synthesizer.backend_label().to_owned();
+        let inference_policy = synthesizer.inference_policy_label().to_owned();
         let audio_cache = store.root().join("audio-cache");
         let player = SystemAudioPlayer::new(&audio_cache)?;
         *session = Some(SpeechSession {
             speaker: SpeakSelection::new(synthesizer, player, VoiceSettings::default()),
-            backend,
+            inference_policy,
         });
     }
 
@@ -121,12 +127,12 @@ fn speak(
         .as_mut()
         .context("speech engine was not initialized")?;
     let preview = text.preview(32);
-    let backend = session.backend.clone();
+    let inference_policy = session.inference_policy.clone();
     send_status(
         statuses,
         AppStatus::Synthesizing {
             text: preview.clone(),
-            backend: backend.clone(),
+            inference_policy: inference_policy.clone(),
         },
     );
     session.speaker.execute_with_playback_started(text, || {
@@ -134,7 +140,7 @@ fn speak(
             statuses,
             AppStatus::Speaking {
                 text: preview,
-                backend,
+                inference_policy,
             },
         );
     })

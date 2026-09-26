@@ -117,9 +117,10 @@ The Rust Kokoro adapter selects a native ONNX Runtime backend automatically:
 - Other Linux systems: CPU.
 
 The pet displays the automatic backend policy while preparing and playing
-speech; labels ending in `auto` include CPU fallback. Set
+speech; labels such as `CoreML → CPU` show the fallback order rather than
+claiming which provider ultimately accepted every graph node. Set
 `KOKORO_ORT_PROVIDER=cpu`, `coreml`, `cuda`, or `directml` to override that
-policy when troubleshooting.
+policy when troubleshooting; explicit accelerators are labeled as requested.
 
 Kokoro can also run through MLX on Apple Silicon, but this app deliberately uses
 CoreML instead. CoreML is available to the native Rust/ONNX pipeline and keeps

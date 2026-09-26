@@ -63,10 +63,11 @@ where
                     return Ok(());
                 }
                 emitted_audio = true;
-                if let Some(notify) = on_playback_started.take() {
-                    notify();
-                }
-                player.play(&audio)
+                player.play(&audio, &mut || {
+                    if let Some(notify) = on_playback_started.take() {
+                        notify();
+                    }
+                })
             })?;
 
         if !emitted_audio {
@@ -116,6 +117,8 @@ mod tests {
         sample_counts: Arc<Mutex<Vec<usize>>>,
     }
 
+    struct FailingPlayer;
+
     struct FakeModels {
         ready: bool,
         installs: Arc<AtomicUsize>,
@@ -137,9 +140,16 @@ mod tests {
     }
 
     impl AudioPlayer for FakePlayer {
-        fn play(&mut self, audio: &Audio) -> anyhow::Result<()> {
+        fn play(&mut self, audio: &Audio, on_started: &mut dyn FnMut()) -> anyhow::Result<()> {
+            on_started();
             self.sample_counts.lock().unwrap().push(audio.samples.len());
             Ok(())
+        }
+    }
+
+    impl AudioPlayer for FailingPlayer {
+        fn play(&mut self, _audio: &Audio, _on_started: &mut dyn FnMut()) -> anyhow::Result<()> {
+            anyhow::bail!("audio device unavailable")
         }
     }
 
@@ -168,6 +178,30 @@ mod tests {
         assert_eq!(&*seen.lock().unwrap(), &["Read this"]);
         assert_eq!(&*sample_counts.lock().unwrap(), &[2, 1]);
         assert_eq!(playback_starts.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn does_not_report_playback_before_the_player_starts() {
+        let playback_starts = Arc::new(AtomicUsize::new(0));
+        let mut use_case = SpeakSelection::new(
+            FakeSynthesizer {
+                seen: Arc::new(Mutex::new(Vec::new())),
+            },
+            FailingPlayer,
+            VoiceSettings::default(),
+        );
+
+        let error = use_case
+            .execute_with_playback_started(SelectedText::new("Read this").unwrap(), {
+                let playback_starts = playback_starts.clone();
+                move || {
+                    playback_starts.fetch_add(1, Ordering::Relaxed);
+                }
+            })
+            .unwrap_err();
+
+        assert_eq!(error.to_string(), "audio device unavailable");
+        assert_eq!(playback_starts.load(Ordering::Relaxed), 0);
     }
 
     #[test]

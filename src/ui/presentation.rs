@@ -99,20 +99,26 @@ pub(super) fn for_status(
             detail: "Preparing local speech for the first time…".to_owned(),
             action: PrimaryAction::None,
         },
-        AppStatus::Synthesizing { text, backend } => Presentation {
+        AppStatus::Synthesizing {
+            text,
+            inference_policy,
+        } => Presentation {
             kind: PanelKind::Busy,
             tone: Tone::Amber,
             badge: "GENERATING",
             title: "Preparing first audio",
-            detail: format!("Streaming on {backend}…\n“{text}”"),
+            detail: format!("Preparing a stream · {inference_policy}\n“{text}”"),
             action: PrimaryAction::None,
         },
-        AppStatus::Speaking { text, backend } => Presentation {
+        AppStatus::Speaking {
+            text,
+            inference_policy,
+        } => Presentation {
             kind: PanelKind::Speaking,
             tone: Tone::Mint,
             badge: "SPEAKING",
             title: "Speaking now",
-            detail: format!("“{text}”\nStreaming • {backend}"),
+            detail: format!("“{text}”\nStreaming · {inference_policy}"),
             action: PrimaryAction::None,
         },
         AppStatus::Error(message) => error_presentation(message),
@@ -175,7 +181,7 @@ mod tests {
         let presentation = for_status(
             &AppStatus::Synthesizing {
                 text: "A long selection…".to_owned(),
-                backend: "CoreML auto".to_owned(),
+                inference_policy: "CoreML → CPU".to_owned(),
             },
             None,
             false,
@@ -183,6 +189,6 @@ mod tests {
 
         assert_eq!(presentation.badge, "GENERATING");
         assert_eq!(presentation.title, "Preparing first audio");
-        assert!(presentation.detail.contains("CoreML auto"));
+        assert!(presentation.detail.contains("CoreML → CPU"));
     }
 }

@@ -1,11 +1,13 @@
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::{Command, ExitStatus},
+    process::Command,
 };
 
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+use std::process::Child;
 #[cfg(target_os = "linux")]
-use std::io::ErrorKind;
+use std::{io::ErrorKind, process::ExitStatus};
 
 use anyhow::{Context, Result, bail};
 
@@ -49,15 +51,15 @@ impl SystemAudioPlayer {
     }
 
     #[cfg(target_os = "macos")]
-    fn play_file(&self) -> Result<ExitStatus> {
+    fn start_player(&self) -> Result<Child> {
         Command::new("/usr/bin/afplay")
             .arg(&self.output_path)
-            .status()
+            .spawn()
             .context("could not start macOS audio playback")
     }
 
     #[cfg(target_os = "windows")]
-    fn play_file(&self) -> Result<ExitStatus> {
+    fn start_player(&self) -> Result<Child> {
         Command::new("powershell.exe")
             .args([
                 "-NoLogo",
@@ -67,12 +69,12 @@ impl SystemAudioPlayer {
                 "$player = New-Object System.Media.SoundPlayer $env:SELECT_TO_SPEAK_WAV; $player.PlaySync()",
             ])
             .env("SELECT_TO_SPEAK_WAV", &self.output_path)
-            .status()
+            .spawn()
             .context("could not start Windows audio playback")
     }
 
     #[cfg(target_os = "linux")]
-    fn play_file(&self) -> Result<ExitStatus> {
+    fn play_file(&self, on_started: &mut dyn FnMut()) -> Result<ExitStatus> {
         let candidates: &[(&str, &[&str])] = &[
             ("pw-play", &[]),
             ("paplay", &[]),
@@ -85,10 +87,18 @@ impl SystemAudioPlayer {
             match Command::new(program)
                 .args(*arguments)
                 .arg(&self.output_path)
-                .status()
+                .spawn()
             {
-                Ok(status) if status.success() => return Ok(status),
-                Ok(status) => playback_failures.push(format!("{program} exited with {status}")),
+                Ok(mut child) => {
+                    on_started();
+                    let status = child
+                        .wait()
+                        .with_context(|| format!("could not wait for {program} playback"))?;
+                    if status.success() {
+                        return Ok(status);
+                    }
+                    playback_failures.push(format!("{program} exited with {status}"));
+                }
                 Err(error) if error.kind() == ErrorKind::NotFound => continue,
                 Err(error) => return Err(error).context("could not start Linux audio playback"),
             }
@@ -105,9 +115,18 @@ impl SystemAudioPlayer {
 }
 
 impl AudioPlayer for SystemAudioPlayer {
-    fn play(&mut self, audio: &Audio) -> Result<()> {
+    fn play(&mut self, audio: &Audio, on_started: &mut dyn FnMut()) -> Result<()> {
         self.write_wav(audio)?;
-        let status = self.play_file()?;
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
+        let status = {
+            let mut child = self.start_player()?;
+            on_started();
+            child
+                .wait()
+                .context("could not wait for system audio playback")?
+        };
+        #[cfg(target_os = "linux")]
+        let status = self.play_file(on_started)?;
         if !status.success() {
             bail!("system audio playback exited with {status}");
         }

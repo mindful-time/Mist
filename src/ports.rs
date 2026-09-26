@@ -16,7 +16,9 @@ pub trait SpeechSynthesizer {
 
 /// Outbound port for the system's audio output.
 pub trait AudioPlayer {
-    fn play(&mut self, audio: &Audio) -> anyhow::Result<()>;
+    /// Starts and waits for an audio chunk. `on_started` is called only after
+    /// the platform player has launched successfully.
+    fn play(&mut self, audio: &Audio, on_started: &mut dyn FnMut()) -> anyhow::Result<()>;
 }
 
 /// Outbound port for the downloadable speech-model artifacts.

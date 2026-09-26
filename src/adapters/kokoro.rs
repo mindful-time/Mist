@@ -1,11 +1,10 @@
-use std::{env, path::Path};
+use std::{env, path::Path, sync::mpsc::sync_channel, thread};
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use std::process::Command;
 
-use anyhow::{Context, Result, bail};
-use futures_util::StreamExt;
-use kokoro_en::{KokoroTts, Voice};
+use anyhow::{Context, Result, anyhow, bail};
+use kokoro_en::{KokoroTts, Voice, split_sentences};
 use tokio::runtime::{Builder, Runtime};
 
 use crate::{
@@ -17,31 +16,37 @@ use crate::{
 pub struct KokoroSynthesizer {
     runtime: Runtime,
     tts: KokoroTts,
-    backend: InferenceBackend,
+    inference_policy: InferencePolicy,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum InferenceBackend {
+pub enum InferencePolicy {
     CoreMlAuto,
     CudaAuto,
     DirectMlAuto,
     Cpu,
+    CoreMlRequested,
+    CudaRequested,
+    DirectMlRequested,
 }
 
-impl InferenceBackend {
+impl InferencePolicy {
     pub fn label(self) -> &'static str {
         match self {
-            Self::CoreMlAuto => "CoreML auto",
-            Self::CudaAuto => "CUDA auto",
-            Self::DirectMlAuto => "DirectML auto",
+            Self::CoreMlAuto => "CoreML → CPU",
+            Self::CudaAuto => "CUDA → CPU",
+            Self::DirectMlAuto => "DirectML → CPU",
             Self::Cpu => "CPU",
+            Self::CoreMlRequested => "CoreML requested",
+            Self::CudaRequested => "CUDA requested",
+            Self::DirectMlRequested => "DirectML requested",
         }
     }
 }
 
 impl KokoroSynthesizer {
     pub fn load(model_path: &Path, voice_path: &Path) -> Result<Self> {
-        let backend = detect_backend();
+        let inference_policy = detect_inference_policy();
         let runtime = Builder::new_multi_thread()
             .enable_all()
             .build()
@@ -53,12 +58,12 @@ impl KokoroSynthesizer {
         Ok(Self {
             runtime,
             tts,
-            backend,
+            inference_policy,
         })
     }
 
-    pub fn backend_label(&self) -> &'static str {
-        self.backend.label()
+    pub fn inference_policy_label(&self) -> &'static str {
+        self.inference_policy.label()
     }
 }
 
@@ -79,24 +84,40 @@ impl SpeechSynthesizer for KokoroSynthesizer {
         on_chunk: &mut dyn FnMut(Audio) -> Result<()>,
     ) -> Result<()> {
         let voice = Voice::new(&settings.name).with_speed(settings.speed);
-        let source = text.as_str().to_owned();
+        let sentences = split_sentences(text.as_str());
+        if sentences.is_empty() {
+            bail!("Kokoro could not find any speech chunks");
+        }
         let tts = &self.tts;
+        let runtime = &self.runtime;
 
-        self.runtime.block_on(async {
-            let (mut sink, mut chunks) = tts.stream::<String, _>(voice);
-            sink.synth(source)
-                .await
-                .context("Kokoro could not queue the selected text")?;
-            drop(sink);
+        thread::scope(|scope| {
+            let (sender, receiver) = sync_channel::<Result<Audio>>(2);
+            let producer = scope.spawn(move || {
+                for (index, sentence) in sentences.into_iter().enumerate() {
+                    let result = runtime
+                        .block_on(tts.synth(sentence, voice.clone()))
+                        .with_context(|| format!("Kokoro failed on speech chunk {}", index + 1))
+                        .map(|(samples, _elapsed)| Audio::kokoro(samples));
+                    let failed = result.is_err();
+                    if sender.send(result).is_err() || failed {
+                        return;
+                    }
+                }
+            });
 
             let mut emitted = false;
-            while let Some((samples, _elapsed)) = chunks.next().await {
-                if samples.is_empty() {
+            for audio in receiver {
+                let audio = audio?;
+                if audio.samples.is_empty() {
                     continue;
                 }
                 emitted = true;
-                on_chunk(Audio::kokoro(samples))?;
+                on_chunk(audio)?;
             }
+            producer
+                .join()
+                .map_err(|_| anyhow!("Kokoro streaming worker panicked"))?;
 
             if !emitted {
                 bail!("Kokoro produced no streaming audio");
@@ -106,34 +127,34 @@ impl SpeechSynthesizer for KokoroSynthesizer {
     }
 }
 
-fn detect_backend() -> InferenceBackend {
-    backend_for(
+fn detect_inference_policy() -> InferencePolicy {
+    policy_for(
         env::consts::OS,
         env::var("KOKORO_ORT_PROVIDER").ok().as_deref(),
         nvidia_gpu_present(),
     )
 }
 
-fn backend_for(
+fn policy_for(
     operating_system: &str,
     requested_provider: Option<&str>,
     nvidia_gpu_present: bool,
-) -> InferenceBackend {
+) -> InferencePolicy {
     let requested_provider = requested_provider.unwrap_or("auto").to_ascii_lowercase();
     match (operating_system, requested_provider.as_str()) {
-        (_, "cpu") => return InferenceBackend::Cpu,
-        ("macos", "coreml") => return InferenceBackend::CoreMlAuto,
-        ("windows" | "linux", "cuda") => return InferenceBackend::CudaAuto,
-        ("windows", "directml") => return InferenceBackend::DirectMlAuto,
+        (_, "cpu") => return InferencePolicy::Cpu,
+        ("macos", "coreml") => return InferencePolicy::CoreMlRequested,
+        ("windows" | "linux", "cuda") => return InferencePolicy::CudaRequested,
+        ("windows", "directml") => return InferencePolicy::DirectMlRequested,
         _ => {}
     }
 
     match operating_system {
-        "macos" => InferenceBackend::CoreMlAuto,
-        "windows" if nvidia_gpu_present => InferenceBackend::CudaAuto,
-        "windows" => InferenceBackend::DirectMlAuto,
-        "linux" if nvidia_gpu_present => InferenceBackend::CudaAuto,
-        _ => InferenceBackend::Cpu,
+        "macos" => InferencePolicy::CoreMlAuto,
+        "windows" if nvidia_gpu_present => InferencePolicy::CudaAuto,
+        "windows" => InferencePolicy::DirectMlAuto,
+        "linux" if nvidia_gpu_present => InferencePolicy::CudaAuto,
+        _ => InferencePolicy::Cpu,
     }
 }
 
@@ -157,24 +178,40 @@ mod tests {
     #[test]
     fn auto_selects_native_acceleration_with_cpu_fallback() {
         assert_eq!(
-            backend_for("macos", Some("auto"), false),
-            InferenceBackend::CoreMlAuto
+            policy_for("macos", Some("auto"), false),
+            InferencePolicy::CoreMlAuto
         );
-        assert_eq!(backend_for("linux", None, true), InferenceBackend::CudaAuto);
+        assert_eq!(policy_for("linux", None, true), InferencePolicy::CudaAuto);
         assert_eq!(
-            backend_for("windows", None, false),
-            InferenceBackend::DirectMlAuto
+            policy_for("windows", None, false),
+            InferencePolicy::DirectMlAuto
         );
-        assert_eq!(backend_for("linux", None, false), InferenceBackend::Cpu);
+        assert_eq!(policy_for("linux", None, false), InferencePolicy::Cpu);
     }
 
     #[test]
     fn explicit_cpu_override_wins_on_every_platform() {
         for operating_system in ["macos", "windows", "linux"] {
             assert_eq!(
-                backend_for(operating_system, Some("CPU"), true),
-                InferenceBackend::Cpu
+                policy_for(operating_system, Some("CPU"), true),
+                InferencePolicy::Cpu
             );
         }
+    }
+
+    #[test]
+    fn explicit_accelerator_override_is_labeled_as_requested() {
+        assert_eq!(
+            policy_for("macos", Some("coreml"), false),
+            InferencePolicy::CoreMlRequested
+        );
+        assert_eq!(
+            policy_for("linux", Some("cuda"), false),
+            InferencePolicy::CudaRequested
+        );
+        assert_eq!(
+            policy_for("windows", Some("directml"), true),
+            InferencePolicy::DirectMlRequested
+        );
     }
 }

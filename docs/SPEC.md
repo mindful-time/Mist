@@ -33,7 +33,8 @@ user-selected text aloud with the local Hexgrad Kokoro-82M text-to-speech model.
   UI distinguishes generation of the first chunk from audible playback.
 - Hardware selection is automatic: CoreML on macOS; CUDA on Windows/Linux when
   NVIDIA hardware is detected; DirectML as the Windows GPU fallback; otherwise
-  CPU. The UI displays the automatic backend policy and its fallback behavior.
+  CPU. The UI displays the backend policy and fallback order without claiming
+  that a preferred provider was the resolved provider.
 - The first-run model download is explicit and stored in the user's application
   data directory rather than committed to the source repository.
 
