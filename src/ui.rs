@@ -462,7 +462,8 @@ impl eframe::App for PetApp {
             AppStatus::CheckingModel
                 | AppStatus::Downloading
                 | AppStatus::Loading
-                | AppStatus::Speaking(_)
+                | AppStatus::Synthesizing { .. }
+                | AppStatus::Speaking { .. }
         ) {
             33
         } else {

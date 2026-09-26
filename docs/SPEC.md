@@ -29,6 +29,11 @@ user-selected text aloud with the local Hexgrad Kokoro-82M text-to-speech model.
   Hugging Face Space.
 - Synthesis happens on-device. Selected text is not sent to a speech service.
 - The default voice is `af_heart` at normal speed.
+- Long selections are synthesized and played as ordered sentence chunks. The
+  UI distinguishes generation of the first chunk from audible playback.
+- Hardware selection is automatic: CoreML on macOS; CUDA on Windows/Linux when
+  NVIDIA hardware is detected; DirectML as the Windows GPU fallback; otherwise
+  CPU. The UI displays the automatic backend policy and its fallback behavior.
 - The first-run model download is explicit and stored in the user's application
   data directory rather than committed to the source repository.
 

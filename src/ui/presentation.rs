@@ -99,12 +99,20 @@ pub(super) fn for_status(
             detail: "Preparing local speech for the first time…".to_owned(),
             action: PrimaryAction::None,
         },
-        AppStatus::Speaking(text) => Presentation {
+        AppStatus::Synthesizing { text, backend } => Presentation {
+            kind: PanelKind::Busy,
+            tone: Tone::Amber,
+            badge: "GENERATING",
+            title: "Preparing first audio",
+            detail: format!("Streaming on {backend}…\n“{text}”"),
+            action: PrimaryAction::None,
+        },
+        AppStatus::Speaking { text, backend } => Presentation {
             kind: PanelKind::Speaking,
             tone: Tone::Mint,
             badge: "SPEAKING",
             title: "Speaking now",
-            detail: format!("“{text}”"),
+            detail: format!("“{text}”\nStreaming • {backend}"),
             action: PrimaryAction::None,
         },
         AppStatus::Error(message) => error_presentation(message),
@@ -160,5 +168,21 @@ mod tests {
         assert_eq!(presentation.title, "Something went wrong");
         assert_eq!(presentation.detail, "The speech worker stopped.");
         assert!(matches!(presentation.action, PrimaryAction::None));
+    }
+
+    #[test]
+    fn synthesis_is_not_presented_as_audible_playback() {
+        let presentation = for_status(
+            &AppStatus::Synthesizing {
+                text: "A long selection…".to_owned(),
+                backend: "CoreML auto".to_owned(),
+            },
+            None,
+            false,
+        );
+
+        assert_eq!(presentation.badge, "GENERATING");
+        assert_eq!(presentation.title, "Preparing first audio");
+        assert!(presentation.detail.contains("CoreML auto"));
     }
 }

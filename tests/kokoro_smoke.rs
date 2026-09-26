@@ -16,14 +16,24 @@ fn local_kokoro_model_produces_audio() {
 
     let mut synthesizer =
         KokoroSynthesizer::load(&store.model_path(), &store.voice_path()).expect("load Kokoro");
-    let audio = synthesizer
-        .synthesize(
+    let mut chunks = Vec::new();
+    synthesizer
+        .synthesize_streaming(
             &SelectedText::new("Hello from Kokoro.").unwrap(),
             &VoiceSettings::default(),
+            &mut |audio| {
+                chunks.push(audio);
+                Ok(())
+            },
         )
         .expect("synthesize speech");
 
-    assert_eq!(audio.sample_rate, 24_000);
-    assert!(!audio.samples.is_empty());
-    assert!(audio.samples.iter().any(|sample| sample.abs() > 0.0001));
+    assert!(!chunks.is_empty());
+    assert!(chunks.iter().all(|audio| audio.sample_rate == 24_000));
+    assert!(
+        chunks
+            .iter()
+            .flat_map(|audio| &audio.samples)
+            .any(|sample| sample.abs() > 0.0001)
+    );
 }

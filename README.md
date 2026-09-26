@@ -10,7 +10,9 @@ A tiny cross-platform desktop pet that reads selected text with Kokoro:
 
 Speech is generated locally with
 [Kokoro-82M](https://huggingface.co/spaces/hexgrad/Kokoro-TTS); selected text is
-never sent to a server.
+never sent to a server. Long selections are synthesized sentence by sentence,
+so playback starts after the first audio chunk instead of waiting for the whole
+selection.
 
 The first launch shows **Download voice**. That fetches the quantized Kokoro v1.0
 ONNX model (~92 MB) and the `af_heart` voice (~0.5 MB) from the Apache-2.0
@@ -105,6 +107,25 @@ select-to-speak --speak "Hello from Kokoro."
 
 Set `SELECT_TO_SPEAK_MODEL_DIR` to use a different model directory.
 
+### Inference acceleration
+
+The Rust Kokoro adapter selects a native ONNX Runtime backend automatically:
+
+- macOS: CoreML, with automatic CPU fallback.
+- Windows/Linux with an NVIDIA GPU: CUDA, with automatic CPU fallback.
+- Windows without CUDA: DirectML, with automatic CPU fallback.
+- Other Linux systems: CPU.
+
+The pet displays the automatic backend policy while preparing and playing
+speech; labels ending in `auto` include CPU fallback. Set
+`KOKORO_ORT_PROVIDER=cpu`, `coreml`, `cuda`, or `directml` to override that
+policy when troubleshooting.
+
+Kokoro can also run through MLX on Apple Silicon, but this app deliberately uses
+CoreML instead. CoreML is available to the native Rust/ONNX pipeline and keeps
+the same application architecture on macOS, Windows, and Linux; an MLX backend
+would require a separate Apple-only runtime and model package.
+
 ## Architecture
 
 The code uses a small hexagonal architecture:
@@ -130,7 +151,8 @@ macOS Accessibility + Service / Windows UIA / Linux selection
 - `adapters/linux_selection.rs`: Linux X11/Wayland selection adapter.
 - `adapters/wayland_shortcut.rs`: Wayland GlobalShortcuts portal adapter.
 - `platform.rs`: shared native-event and selection-capture coordinator.
-- `adapters/kokoro.rs`: outgoing Kokoro/ONNX adapter.
+- `adapters/kokoro.rs`: outgoing streaming Kokoro/ONNX adapter with native
+  accelerator detection.
 - `adapters/system_audio.rs`: outgoing macOS/Windows/Linux audio adapter.
 - `ui.rs` and `worker.rs`: the floating pet and background command boundary.
 

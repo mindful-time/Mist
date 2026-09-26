@@ -25,8 +25,14 @@ pub enum AppStatus {
     Ready,
     Downloading,
     Loading,
-    Speaking(String),
+    Synthesizing { text: String, backend: String },
+    Speaking { text: String, backend: String },
     Error(String),
+}
+
+struct SpeechSession {
+    speaker: SpeakSelection<KokoroSynthesizer, SystemAudioPlayer>,
+    backend: String,
 }
 
 pub struct WorkerHandle {
@@ -50,7 +56,7 @@ pub fn spawn(store: ModelStore) -> WorkerHandle {
 }
 
 fn run(commands: Receiver<WorkerCommand>, statuses: Sender<AppStatus>, store: ModelStore) {
-    let mut speaker = None;
+    let mut session = None;
     let mut model_ready = store.is_ready();
     send_status(
         &statuses,
@@ -70,7 +76,7 @@ fn run(commands: Receiver<WorkerCommand>, statuses: Sender<AppStatus>, store: Mo
                 }
                 result
             }
-            WorkerCommand::Speak(text) => speak(text, model_ready, &store, &statuses, &mut speaker),
+            WorkerCommand::Speak(text) => speak(text, model_ready, &store, &statuses, &mut session),
         };
 
         match result {
@@ -92,30 +98,46 @@ fn speak(
     model_ready: bool,
     store: &ModelStore,
     statuses: &Sender<AppStatus>,
-    speaker: &mut Option<SpeakSelection<KokoroSynthesizer, SystemAudioPlayer>>,
+    session: &mut Option<SpeechSession>,
 ) -> Result<()> {
     if !model_ready {
         send_status(statuses, AppStatus::MissingModel);
         anyhow::bail!("Download Kokoro from the pet first");
     }
 
-    if speaker.is_none() {
+    if session.is_none() {
         send_status(statuses, AppStatus::Loading);
         let synthesizer = KokoroSynthesizer::load(&store.model_path(), &store.voice_path())?;
+        let backend = synthesizer.backend_label().to_owned();
         let audio_cache = store.root().join("audio-cache");
         let player = SystemAudioPlayer::new(&audio_cache)?;
-        *speaker = Some(SpeakSelection::new(
-            synthesizer,
-            player,
-            VoiceSettings::default(),
-        ));
+        *session = Some(SpeechSession {
+            speaker: SpeakSelection::new(synthesizer, player, VoiceSettings::default()),
+            backend,
+        });
     }
 
-    send_status(statuses, AppStatus::Speaking(text.preview(32)));
-    speaker
+    let session = session
         .as_mut()
-        .context("speech engine was not initialized")?
-        .execute(text)
+        .context("speech engine was not initialized")?;
+    let preview = text.preview(32);
+    let backend = session.backend.clone();
+    send_status(
+        statuses,
+        AppStatus::Synthesizing {
+            text: preview.clone(),
+            backend: backend.clone(),
+        },
+    );
+    session.speaker.execute_with_playback_started(text, || {
+        send_status(
+            statuses,
+            AppStatus::Speaking {
+                text: preview,
+                backend,
+            },
+        );
+    })
 }
 
 fn send_status(statuses: &Sender<AppStatus>, status: AppStatus) {

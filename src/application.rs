@@ -45,8 +45,34 @@ where
     }
 
     pub fn execute(&mut self, text: SelectedText) -> anyhow::Result<()> {
-        let audio = self.synthesizer.synthesize(&text, &self.voice)?;
-        self.player.play(&audio)
+        self.execute_with_playback_started(text, || {})
+    }
+
+    pub fn execute_with_playback_started(
+        &mut self,
+        text: SelectedText,
+        on_playback_started: impl FnOnce(),
+    ) -> anyhow::Result<()> {
+        let player = &mut self.player;
+        let mut on_playback_started = Some(on_playback_started);
+        let mut emitted_audio = false;
+
+        self.synthesizer
+            .synthesize_streaming(&text, &self.voice, &mut |audio| {
+                if audio.samples.is_empty() {
+                    return Ok(());
+                }
+                emitted_audio = true;
+                if let Some(notify) = on_playback_started.take() {
+                    notify();
+                }
+                player.play(&audio)
+            })?;
+
+        if !emitted_audio {
+            anyhow::bail!("Kokoro produced no audio");
+        }
+        Ok(())
     }
 }
 
@@ -73,10 +99,21 @@ mod tests {
             self.seen.lock().unwrap().push(text.as_str().to_owned());
             Ok(Audio::kokoro(vec![0.0, 0.25, -0.25]))
         }
+
+        fn synthesize_streaming(
+            &mut self,
+            text: &SelectedText,
+            _voice: &VoiceSettings,
+            on_chunk: &mut dyn FnMut(Audio) -> anyhow::Result<()>,
+        ) -> anyhow::Result<()> {
+            self.seen.lock().unwrap().push(text.as_str().to_owned());
+            on_chunk(Audio::kokoro(vec![0.0, 0.25]))?;
+            on_chunk(Audio::kokoro(vec![-0.25]))
+        }
     }
 
     struct FakePlayer {
-        sample_count: Arc<Mutex<usize>>,
+        sample_counts: Arc<Mutex<Vec<usize>>>,
     }
 
     struct FakeModels {
@@ -101,29 +138,36 @@ mod tests {
 
     impl AudioPlayer for FakePlayer {
         fn play(&mut self, audio: &Audio) -> anyhow::Result<()> {
-            *self.sample_count.lock().unwrap() = audio.samples.len();
+            self.sample_counts.lock().unwrap().push(audio.samples.len());
             Ok(())
         }
     }
 
     #[test]
-    fn sends_synthesized_audio_to_the_player() {
+    fn streams_synthesized_audio_chunks_to_the_player_in_order() {
         let seen = Arc::new(Mutex::new(Vec::new()));
-        let sample_count = Arc::new(Mutex::new(0));
+        let sample_counts = Arc::new(Mutex::new(Vec::new()));
+        let playback_starts = Arc::new(AtomicUsize::new(0));
         let mut use_case = SpeakSelection::new(
             FakeSynthesizer { seen: seen.clone() },
             FakePlayer {
-                sample_count: sample_count.clone(),
+                sample_counts: sample_counts.clone(),
             },
             VoiceSettings::default(),
         );
 
         use_case
-            .execute(SelectedText::new("Read this").unwrap())
+            .execute_with_playback_started(SelectedText::new("Read this").unwrap(), {
+                let playback_starts = playback_starts.clone();
+                move || {
+                    playback_starts.fetch_add(1, Ordering::Relaxed);
+                }
+            })
             .unwrap();
 
         assert_eq!(&*seen.lock().unwrap(), &["Read this"]);
-        assert_eq!(*sample_count.lock().unwrap(), 3);
+        assert_eq!(&*sample_counts.lock().unwrap(), &[2, 1]);
+        assert_eq!(playback_starts.load(Ordering::Relaxed), 1);
     }
 
     #[test]
