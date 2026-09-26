@@ -16,6 +16,7 @@ type CaptureMessage = (u64, Result<SelectedText, String>);
 
 pub enum PlatformEvent {
     Speak(SelectedText),
+    AccessibilityPermissionRequired,
     Error(String),
 }
 
@@ -135,7 +136,7 @@ impl PlatformBridge {
                 self.capture_in_flight = None;
                 return Some(match message {
                     Ok(text) => PlatformEvent::Speak(text),
-                    Err(error) => PlatformEvent::Error(error),
+                    Err(error) => self.capture_error(error),
                 });
             }
         }
@@ -215,6 +216,21 @@ impl PlatformBridge {
                 format!("Could not start selection capture: {error}")
             })?;
         Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    fn capture_error(&mut self, error: String) -> PlatformEvent {
+        if !crate::adapters::macos_selection::is_accessibility_trusted() {
+            self.accessibility_pending = true;
+            PlatformEvent::AccessibilityPermissionRequired
+        } else {
+            PlatformEvent::Error(error)
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    fn capture_error(&mut self, error: String) -> PlatformEvent {
+        PlatformEvent::Error(error)
     }
 }
 

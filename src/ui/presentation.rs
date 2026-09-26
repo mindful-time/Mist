@@ -107,13 +107,7 @@ pub(super) fn for_status(
             detail: format!("“{text}”"),
             action: PrimaryAction::None,
         },
-        AppStatus::Error(message) => {
-            if accessibility_required {
-                permission_presentation()
-            } else {
-                error_presentation(message)
-            }
-        }
+        AppStatus::Error(message) => error_presentation(message),
     }
 }
 
@@ -148,4 +142,23 @@ fn shorten(message: &str, limit: usize) -> String {
     let mut shortened: String = message.chars().take(limit.saturating_sub(1)).collect();
     shortened.push('…');
     shortened
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn worker_error_takes_precedence_over_pending_accessibility_permission() {
+        let presentation = for_status(
+            &AppStatus::Error("The speech worker stopped.".to_owned()),
+            None,
+            true,
+        );
+
+        assert_eq!(presentation.badge, "ATTENTION");
+        assert_eq!(presentation.title, "Something went wrong");
+        assert_eq!(presentation.detail, "The speech worker stopped.");
+        assert!(matches!(presentation.action, PrimaryAction::None));
+    }
 }

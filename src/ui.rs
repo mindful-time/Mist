@@ -9,6 +9,7 @@ use std::{
 
 use eframe::egui::{
     self, Align2, Button, Color32, FontId, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, Vec2,
+    text::LayoutJob,
 };
 use select_to_speak::{
     platform::{PlatformBridge, PlatformEvent},
@@ -220,12 +221,16 @@ impl PetApp {
         );
 
         let detail_position = Pos2::new(content_left, card.top() + 103.0);
-        let detail = painter.layout(
+        let mut detail_job = LayoutJob::simple(
             presentation.detail.clone(),
             FontId::proportional(13.0),
             TEXT_SECONDARY,
             content_width,
         );
+        detail_job.wrap.max_rows = 3;
+        detail_job.wrap.break_anywhere = true;
+        detail_job.wrap.overflow_character = Some('…');
+        let detail = painter.layout_job(detail_job);
         let detail_bottom = detail_position.y + detail.size().y;
         painter.galley(detail_position, detail, TEXT_SECONDARY);
 
@@ -315,8 +320,16 @@ impl PetApp {
         accent: Color32,
     ) {
         let label = self.platform.shortcut_label();
-        let galley =
-            painter.layout_no_wrap(label.to_owned(), FontId::proportional(12.0), TEXT_PRIMARY);
+        let mut label_job = LayoutJob::simple(
+            label.to_owned(),
+            FontId::proportional(12.0),
+            TEXT_PRIMARY,
+            (max_width - 28.0).max(1.0),
+        );
+        label_job.wrap.max_rows = 1;
+        label_job.wrap.break_anywhere = true;
+        label_job.wrap.overflow_character = Some('…');
+        let galley = painter.layout_job(label_job);
         let size = Vec2::new((galley.size().x + 28.0).min(max_width), 32.0);
         let chip = Rect::from_min_size(position, size);
         painter.rect_filled(chip, 10.0, Color32::from_white_alpha(10));
@@ -440,6 +453,7 @@ impl eframe::App for PetApp {
         if let Some(event) = self.platform.poll() {
             match event {
                 PlatformEvent::Speak(text) => self.enqueue(WorkerCommand::Speak(text)),
+                PlatformEvent::AccessibilityPermissionRequired => {}
                 PlatformEvent::Error(message) => self.status = AppStatus::Error(message),
             }
         }
