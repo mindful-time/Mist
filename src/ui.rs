@@ -14,6 +14,8 @@ pub struct PetApp {
     statuses: mpsc::Receiver<AppStatus>,
     status: AppStatus,
     platform: PlatformBridge,
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    manual_text: String,
 }
 
 impl PetApp {
@@ -27,8 +29,10 @@ impl PetApp {
         Self {
             commands,
             statuses,
-            status: AppStatus::Ready,
+            status: AppStatus::CheckingModel,
             platform,
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            manual_text: String::new(),
         }
     }
 
@@ -50,6 +54,7 @@ impl PetApp {
 
     fn status_text(&self) -> &str {
         match &self.status {
+            AppStatus::CheckingModel => "Checking Kokoro voice…",
             AppStatus::MissingModel => "Kokoro needs a nap-sized download",
             AppStatus::Ready => self.platform.usage_hint(),
             AppStatus::Downloading => "Fetching my voice…",
@@ -63,7 +68,9 @@ impl PetApp {
         match self.status {
             AppStatus::Error(_) => Color32::from_rgb(235, 115, 112),
             AppStatus::Speaking(_) => Color32::from_rgb(89, 198, 165),
-            AppStatus::Downloading | AppStatus::Loading => Color32::from_rgb(247, 190, 84),
+            AppStatus::CheckingModel | AppStatus::Downloading | AppStatus::Loading => {
+                Color32::from_rgb(247, 190, 84)
+            }
             _ => Color32::from_rgb(112, 158, 235),
         }
     }
@@ -90,7 +97,10 @@ impl PetApp {
         painter.circle_filled(center, 50.0, color);
         painter.circle_filled(Pos2::new(center.x, center.y + 11.0), 28.0, cream);
 
-        let blink = matches!(self.status, AppStatus::Loading | AppStatus::Downloading);
+        let blink = matches!(
+            self.status,
+            AppStatus::CheckingModel | AppStatus::Loading | AppStatus::Downloading
+        );
         if blink {
             painter.line_segment(
                 [
@@ -176,12 +186,26 @@ impl eframe::App for PetApp {
 
         response.context_menu(|ui| {
             #[cfg(any(target_os = "windows", target_os = "linux"))]
-            if ui.button("Speak copied text").clicked() {
-                match self.platform.clipboard_text() {
-                    Ok(text) => self.enqueue(WorkerCommand::Speak(text)),
-                    Err(error) => self.status = AppStatus::Error(format!("{error:#}")),
+            {
+                if ui.button("Speak copied text").clicked() {
+                    if let Err(error) = self.platform.request_clipboard_text() {
+                        self.status = AppStatus::Error(error);
+                    }
+                    ui.close();
                 }
-                ui.close();
+                ui.label("Or type text:");
+                ui.add(
+                    egui::TextEdit::multiline(&mut self.manual_text)
+                        .desired_rows(3)
+                        .desired_width(220.0),
+                );
+                if ui.button("Speak typed text").clicked() {
+                    match select_to_speak::domain::SelectedText::new(&self.manual_text) {
+                        Ok(text) => self.enqueue(WorkerCommand::Speak(text)),
+                        Err(error) => self.status = AppStatus::Error(error.to_string()),
+                    }
+                    ui.close();
+                }
             }
             if matches!(self.status, AppStatus::MissingModel | AppStatus::Error(_))
                 && ui.button("Download Kokoro voice (~93 MB)").clicked()

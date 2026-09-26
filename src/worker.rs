@@ -20,6 +20,7 @@ pub enum WorkerCommand {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AppStatus {
+    CheckingModel,
     MissingModel,
     Ready,
     Downloading,
@@ -50,9 +51,10 @@ pub fn spawn(store: ModelStore) -> WorkerHandle {
 
 fn run(commands: Receiver<WorkerCommand>, statuses: Sender<AppStatus>, store: ModelStore) {
     let mut speaker = None;
+    let mut model_ready = store.is_ready();
     send_status(
         &statuses,
-        if store.is_ready() {
+        if model_ready {
             AppStatus::Ready
         } else {
             AppStatus::MissingModel
@@ -61,8 +63,14 @@ fn run(commands: Receiver<WorkerCommand>, statuses: Sender<AppStatus>, store: Mo
 
     while let Ok(command) = commands.recv() {
         let result = match command {
-            WorkerCommand::InstallModel => install_model(&store, &statuses),
-            WorkerCommand::Speak(text) => speak(text, &store, &statuses, &mut speaker),
+            WorkerCommand::InstallModel => {
+                let result = install_model(&store, &statuses);
+                if result.is_ok() {
+                    model_ready = true;
+                }
+                result
+            }
+            WorkerCommand::Speak(text) => speak(text, model_ready, &store, &statuses, &mut speaker),
         };
 
         match result {
@@ -81,11 +89,12 @@ fn install_model(store: &ModelStore, statuses: &Sender<AppStatus>) -> Result<()>
 
 fn speak(
     text: SelectedText,
+    model_ready: bool,
     store: &ModelStore,
     statuses: &Sender<AppStatus>,
     speaker: &mut Option<SpeakSelection<KokoroSynthesizer, SystemAudioPlayer>>,
 ) -> Result<()> {
-    if !store.is_ready() {
+    if !model_ready {
         send_status(statuses, AppStatus::MissingModel);
         anyhow::bail!("Download Kokoro from the pet first");
     }

@@ -52,7 +52,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, Mutex};
+    use std::sync::{
+        Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    };
 
     use super::*;
     use crate::domain::Audio;
@@ -74,6 +77,26 @@ mod tests {
 
     struct FakePlayer {
         sample_count: Arc<Mutex<usize>>,
+    }
+
+    struct FakeModels {
+        ready: bool,
+        installs: Arc<AtomicUsize>,
+        install_error: bool,
+    }
+
+    impl ModelProvisioner for FakeModels {
+        fn is_ready(&self) -> bool {
+            self.ready
+        }
+
+        fn install(&self) -> anyhow::Result<()> {
+            self.installs.fetch_add(1, Ordering::Relaxed);
+            if self.install_error {
+                anyhow::bail!("installation failed");
+            }
+            Ok(())
+        }
     }
 
     impl AudioPlayer for FakePlayer {
@@ -101,5 +124,48 @@ mod tests {
 
         assert_eq!(&*seen.lock().unwrap(), &["Read this"]);
         assert_eq!(*sample_count.lock().unwrap(), 3);
+    }
+
+    #[test]
+    fn skips_model_installation_when_artifacts_are_ready() {
+        let installs = Arc::new(AtomicUsize::new(0));
+        InstallModel::new(FakeModels {
+            ready: true,
+            installs: installs.clone(),
+            install_error: false,
+        })
+        .execute()
+        .unwrap();
+
+        assert_eq!(installs.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn installs_models_when_artifacts_are_missing() {
+        let installs = Arc::new(AtomicUsize::new(0));
+        InstallModel::new(FakeModels {
+            ready: false,
+            installs: installs.clone(),
+            install_error: false,
+        })
+        .execute()
+        .unwrap();
+
+        assert_eq!(installs.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn returns_model_installation_errors() {
+        let installs = Arc::new(AtomicUsize::new(0));
+        let error = InstallModel::new(FakeModels {
+            ready: false,
+            installs: installs.clone(),
+            install_error: true,
+        })
+        .execute()
+        .unwrap_err();
+
+        assert_eq!(error.to_string(), "installation failed");
+        assert_eq!(installs.load(Ordering::Relaxed), 1);
     }
 }

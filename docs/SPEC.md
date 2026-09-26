@@ -11,8 +11,11 @@ user-selected text aloud with the local Hexgrad Kokoro-82M text-to-speech model.
   can choose **Speak Selection with Kokoro** from the text context menu.
 - Windows and Linux X11: selected text is captured when the user presses the
   global shortcut **Ctrl+Alt+S**.
-- Linux Wayland: because compositors restrict universal context-menu and global
-  key hooks, copied text can be spoken from the pet's context menu.
+- Linux Wayland: because compositors restrict universal selection and global
+  key hooks, copied text can be spoken from the pet's context menu when the
+  compositor exposes clipboard data-control. Compositors without data-control
+  are outside the selected/copied-text workflow supported by this MVP; the pet
+  still offers manual text entry as a degraded mode.
 - The draggable, always-on-top pet shows setup, loading, speaking, ready, and
   error states without opening a conventional application window.
 
@@ -33,6 +36,7 @@ user-selected text aloud with the local Hexgrad Kokoro-82M text-to-speech model.
   ONNX, or audio-device libraries.
 - OS selection, Kokoro inference, model download, and audio playback are
   adapters behind the application boundary.
+- Selection capture must not modify or reconstruct the user's clipboard.
 - Slow model loading, synthesis, download, and playback must not block the pet's
   UI event loop.
 
@@ -49,4 +53,3 @@ user-selected text aloud with the local Hexgrad Kokoro-82M text-to-speech model.
 
 Voice/language selection, launch at login, interrupting current speech,
 production signing/notarization, and graphical installers are outside this MVP.
-

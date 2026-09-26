@@ -6,7 +6,8 @@ A tiny cross-platform desktop pet that reads selected text with Kokoro:
   Selection with Kokoro**.
 - **Windows / Linux X11:** select text and press **Ctrl+Alt+S**.
 - **Linux Wayland fallback:** copy selected text, right-click the pet, and choose
-  **Speak copied text**.
+  **Speak copied text**. If the compositor blocks clipboard reads, type text in
+  that same menu.
 
 Speech is generated locally with
 [Kokoro-82M](https://huggingface.co/spaces/hexgrad/Kokoro-TTS); selected text is
@@ -19,7 +20,7 @@ pinned to a model revision and SHA-256 verified before use.
 
 ## Build and run
 
-Requirements: Rust and internet access for the first build/model download.
+Requirements: Rust 1.95+ and internet access for the first build/model download.
 
 ```sh
 make test
@@ -46,7 +47,11 @@ not require Accessibility or screen-recording permission.
 
 ### Windows
 
+Use Rust's standard `stable-msvc` toolchain; ONNX Runtime does not provide the
+GNU Windows artifact used by this build.
+
 ```powershell
+rustup default stable-msvc
 cargo build --release
 .\target\release\select-to-speak.exe
 ```
@@ -61,10 +66,12 @@ cargo build --release
 ./target/release/select-to-speak
 ```
 
-The global shortcut library currently works on X11. Wayland intentionally
-restricts global input hooks, so use the copy + pet context-menu fallback there.
-Clipboard access needs the compositor's standard data-control protocol; the pet
-shows an error if that protocol is unavailable.
+The global shortcut reads Windows selections through Microsoft UI Automation
+and Linux X11 selections through PRIMARY; it never rewrites your clipboard.
+Wayland intentionally restricts global input hooks, so use the pet context menu
+there. Clipboard access needs the compositor's data-control protocol; if that
+is unavailable, automatic copied-text reading is unsupported and only the
+menu's manual type-text mode remains usable.
 
 For a terminal smoke test:
 

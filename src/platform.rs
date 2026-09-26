@@ -34,14 +34,7 @@ impl PlatformBridge {
 }
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
-type CaptureMessage = Result<CaptureOutcome, String>;
-
-#[cfg(any(target_os = "windows", target_os = "linux"))]
-struct CaptureOutcome {
-    result: Result<SelectedText, String>,
-    // Linux clipboards may require the writing process to remain the owner.
-    clipboard_owner: arboard::Clipboard,
-}
+type CaptureMessage = (u64, Result<SelectedText, String>);
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 pub struct PlatformBridge {
@@ -50,8 +43,8 @@ pub struct PlatformBridge {
     registration_error: Option<String>,
     capture_sender: std::sync::mpsc::Sender<CaptureMessage>,
     capture_receiver: std::sync::mpsc::Receiver<CaptureMessage>,
-    capture_in_flight: bool,
-    _clipboard_owner: Option<arboard::Clipboard>,
+    capture_generation: u64,
+    capture_in_flight: Option<(u64, std::time::Instant)>,
 }
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
@@ -60,15 +53,22 @@ impl PlatformBridge {
         use global_hotkey::hotkey::{Code, HotKey, Modifiers};
 
         let hotkey = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyS);
-        let (manager, registration_error) = match global_hotkey::GlobalHotKeyManager::new() {
-            Ok(manager) => match manager.register(hotkey) {
-                Ok(()) => (Some(manager), None),
-                Err(error) => (
-                    None,
-                    Some(format!("Could not register Ctrl+Alt+S: {error}")),
-                ),
-            },
-            Err(error) => (None, Some(format!("Global shortcut unavailable: {error}"))),
+        let (manager, registration_error) = if is_wayland_session() {
+            (
+                None,
+                Some("Wayland blocks the global shortcut; use the pet menu".to_owned()),
+            )
+        } else {
+            match global_hotkey::GlobalHotKeyManager::new() {
+                Ok(manager) => match manager.register(hotkey) {
+                    Ok(()) => (Some(manager), None),
+                    Err(error) => (
+                        None,
+                        Some(format!("Could not register Ctrl+Alt+S: {error}")),
+                    ),
+                },
+                Err(error) => (None, Some(format!("Global shortcut unavailable: {error}"))),
+            }
         };
         let (capture_sender, capture_receiver) = std::sync::mpsc::channel();
 
@@ -78,43 +78,46 @@ impl PlatformBridge {
             registration_error,
             capture_sender,
             capture_receiver,
-            capture_in_flight: false,
-            _clipboard_owner: None,
+            capture_generation: 0,
+            capture_in_flight: None,
         }
     }
 
     pub fn poll(&mut self) -> Option<PlatformEvent> {
         use global_hotkey::{GlobalHotKeyEvent, HotKeyState};
 
-        if let Ok(message) = self.capture_receiver.try_recv() {
-            self.capture_in_flight = false;
-            return Some(match message {
-                Ok(outcome) => {
-                    self._clipboard_owner = Some(outcome.clipboard_owner);
-                    match outcome.result {
-                        Ok(text) => PlatformEvent::Speak(text),
-                        Err(error) => PlatformEvent::Error(error),
-                    }
-                }
-                Err(error) => PlatformEvent::Error(error),
-            });
+        while let Ok((generation, message)) = self.capture_receiver.try_recv() {
+            if self
+                .capture_in_flight
+                .is_some_and(|(active, _)| active == generation)
+            {
+                self.capture_in_flight = None;
+                return Some(match message {
+                    Ok(text) => PlatformEvent::Speak(text),
+                    Err(error) => PlatformEvent::Error(error),
+                });
+            }
         }
 
-        if self.manager.is_none() || self.capture_in_flight {
+        if self
+            .capture_in_flight
+            .is_some_and(|(_, started)| started.elapsed() > std::time::Duration::from_secs(3))
+        {
+            self.capture_in_flight = None;
+            return Some(PlatformEvent::Error(
+                "Selection capture timed out; try again".to_owned(),
+            ));
+        }
+
+        if self.manager.is_none() || self.capture_in_flight.is_some() {
             return None;
         }
 
         while let Ok(event) = GlobalHotKeyEvent::receiver().try_recv() {
             if event.id == self.hotkey.id() && event.state == HotKeyState::Released {
-                self.capture_in_flight = true;
-                let sender = self.capture_sender.clone();
-                std::thread::Builder::new()
-                    .name("selected-text-capture".to_owned())
-                    .spawn(move || {
-                        let message = capture_selected_text().map_err(|error| format!("{error:#}"));
-                        let _ = sender.send(message);
-                    })
-                    .expect("selection capture thread should start");
+                if let Err(error) = self.start_capture(capture_selected_text) {
+                    return Some(PlatformEvent::Error(error));
+                }
                 break;
             }
         }
@@ -125,7 +128,7 @@ impl PlatformBridge {
         if self.manager.is_some() {
             "Select text, then press Ctrl+Alt+S"
         } else {
-            "Copy text, then right-click me"
+            "Right-click to paste or type text"
         }
     }
 
@@ -133,94 +136,116 @@ impl PlatformBridge {
         self.registration_error.as_deref()
     }
 
-    pub fn clipboard_text(&self) -> anyhow::Result<SelectedText> {
-        let text = clipboard_text()?;
-        SelectedText::new(text).map_err(Into::into)
+    pub fn request_clipboard_text(&mut self) -> Result<(), String> {
+        self.start_capture(capture_clipboard_text)
     }
-}
 
-#[cfg(any(target_os = "windows", target_os = "linux"))]
-enum ClipboardBackup {
-    Text(String),
-    Image(arboard::ImageData<'static>),
-    Empty,
-}
-
-#[cfg(any(target_os = "windows", target_os = "linux"))]
-impl ClipboardBackup {
-    fn read(clipboard: &mut arboard::Clipboard) -> Self {
-        if let Ok(text) = clipboard.get_text() {
-            Self::Text(text)
-        } else if let Ok(image) = clipboard.get_image() {
-            Self::Image(image)
-        } else {
-            Self::Empty
+    fn start_capture(
+        &mut self,
+        capture: fn() -> anyhow::Result<SelectedText>,
+    ) -> Result<(), String> {
+        if self.capture_in_flight.is_some() {
+            return Err("Selection capture is already in progress".to_owned());
         }
-    }
 
-    fn restore(self, clipboard: &mut arboard::Clipboard) -> anyhow::Result<()> {
-        use anyhow::Context;
-
-        match self {
-            Self::Text(text) => clipboard
-                .set_text(text)
-                .context("could not restore clipboard text"),
-            Self::Image(image) => clipboard
-                .set_image(image)
-                .context("could not restore clipboard image"),
-            Self::Empty => clipboard.clear().context("could not clear the clipboard"),
-        }
+        self.capture_generation = self.capture_generation.wrapping_add(1);
+        let generation = self.capture_generation;
+        self.capture_in_flight = Some((generation, std::time::Instant::now()));
+        let sender = self.capture_sender.clone();
+        std::thread::Builder::new()
+            .name("selected-text-capture".to_owned())
+            .spawn(move || {
+                let message = capture().map_err(|error| format!("{error:#}"));
+                let _ = sender.send((generation, message));
+            })
+            .map_err(|error| {
+                self.capture_in_flight = None;
+                format!("Could not start selection capture: {error}")
+            })?;
+        Ok(())
     }
 }
 
-#[cfg(any(target_os = "windows", target_os = "linux"))]
-fn capture_selected_text() -> anyhow::Result<CaptureOutcome> {
-    use std::{thread, time::Duration};
+#[cfg(target_os = "windows")]
+fn is_wayland_session() -> bool {
+    false
+}
+
+#[cfg(target_os = "linux")]
+fn is_wayland_session() -> bool {
+    std::env::var("XDG_SESSION_TYPE").is_ok_and(|value| value == "wayland")
+}
+
+/// Reads the focused control's selection without synthesizing Copy, so the
+/// user's clipboard remains completely untouched.
+#[cfg(target_os = "windows")]
+fn capture_selected_text() -> anyhow::Result<SelectedText> {
+    use anyhow::Context;
+    use uiautomation::{UIAutomation, patterns::UITextPattern};
+
+    let automation = UIAutomation::new().context("could not start Windows UI Automation")?;
+    let focused = automation
+        .get_focused_element()
+        .context("could not inspect the focused control")?;
+    let pattern: UITextPattern = focused
+        .get_pattern()
+        .context("the focused control does not expose selected text")?;
+    let ranges = pattern
+        .get_selection()
+        .context("could not read the selected text")?;
+    let mut text = String::new();
+    for range in ranges {
+        text.push_str(
+            &range
+                .get_text(-1)
+                .context("could not read a selected text range")?,
+        );
+    }
+    SelectedText::new(text).map_err(Into::into)
+}
+
+/// X11 publishes highlighted text through PRIMARY, independently of the normal
+/// clipboard. Reading it is both faster and lossless for existing clipboard
+/// contents.
+#[cfg(target_os = "linux")]
+fn capture_selected_text() -> anyhow::Result<SelectedText> {
+    use std::time::Duration;
 
     use anyhow::{Context, bail};
-    use arboard::Clipboard;
-    use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 
-    // Wait for Ctrl+Alt to be released, so the copy does not become Ctrl+Alt+C.
-    thread::sleep(Duration::from_millis(160));
+    if is_wayland_session() {
+        bail!("Wayland blocks global selection capture; copy the text and use the pet menu");
+    }
 
-    let mut clipboard = Clipboard::new().context("could not open the clipboard")?;
-    let backup = ClipboardBackup::read(&mut clipboard);
-    let marker = format!("select-to-speak-copy-marker-{}", std::process::id());
-    clipboard
-        .set_text(&marker)
-        .context("could not prepare the clipboard")?;
-
-    let capture_result = (|| -> anyhow::Result<SelectedText> {
-        let mut keyboard =
-            Enigo::new(&Settings::default()).context("could not access the keyboard")?;
-        keyboard
-            .key(Key::Control, Direction::Press)
-            .context("could not press Control")?;
-        let copy_result = keyboard.key(Key::Unicode('c'), Direction::Click);
-        let release_result = keyboard.key(Key::Control, Direction::Release);
-        copy_result.context("could not send Copy to the focused app")?;
-        release_result.context("could not release Control")?;
-
-        thread::sleep(Duration::from_millis(180));
-        let text = clipboard_text_from(&mut clipboard)?;
-        if text == marker {
-            bail!("the focused app did not provide selected text");
+    let clipboard =
+        x11_clipboard::Clipboard::new().context("could not connect to the X11 selection")?;
+    let utf8 = clipboard.load(
+        clipboard.getter.atoms.primary,
+        clipboard.getter.atoms.utf8_string,
+        clipboard.getter.atoms.property,
+        Duration::from_millis(500),
+    );
+    let text = match utf8 {
+        Ok(bytes) => String::from_utf8(bytes).context("the selected text is not valid UTF-8")?,
+        Err(_) => {
+            let bytes = clipboard
+                .load(
+                    clipboard.getter.atoms.primary,
+                    clipboard.getter.atoms.string,
+                    clipboard.getter.atoms.property,
+                    Duration::from_millis(500),
+                )
+                .context("the X11 primary selection does not contain text")?;
+            bytes.into_iter().map(char::from).collect()
         }
-        SelectedText::new(text).map_err(Into::into)
-    })();
-
-    let restore_result = backup.restore(&mut clipboard);
-    let result = match (capture_result, restore_result) {
-        (Ok(text), Ok(())) => Ok(text),
-        (Err(error), Ok(())) => Err(format!("{error:#}")),
-        (_, Err(error)) => Err(format!("{error:#}")),
     };
+    SelectedText::new(text.trim_matches('\0')).map_err(Into::into)
+}
 
-    Ok(CaptureOutcome {
-        result,
-        clipboard_owner: clipboard,
-    })
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+fn capture_clipboard_text() -> anyhow::Result<SelectedText> {
+    let text = clipboard_text()?;
+    SelectedText::new(text).map_err(Into::into)
 }
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
