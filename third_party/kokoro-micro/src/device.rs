@@ -1,7 +1,7 @@
 //! Where the model runs: the CPU, or a GPU execution provider of ONNX Runtime.
 //!
 //! GPU support is optional and compiled in with a platform execution-provider
-//! feature such as `coreml` or `cuda`.
+//! feature such as `coreml`, `cuda`, or `directml`.
 //! Without it every device choice resolves to the CPU, which is also what a
 //! [`Device::Auto`] build does on a machine with no usable GPU - registering
 //! an execution provider is a load-time decision, and a failed registration
@@ -137,6 +137,8 @@ pub fn compiled_gpu_providers() -> Vec<&'static str> {
     v.push("CoreMLExecutionProvider");
     #[cfg(feature = "cuda")]
     v.push("CUDAExecutionProvider");
+    #[cfg(feature = "directml")]
+    v.push("DmlExecutionProvider");
     v
 }
 
@@ -179,6 +181,25 @@ fn builder_for(provider: &str, device_index: i32) -> Result<SessionBuilder, Stri
                 .with_device_id(device_index)
                 .build(),
         ),
+        #[cfg(feature = "directml")]
+        "DmlExecutionProvider" => with_ep(
+            provider,
+            ort::ep::DirectML::default()
+                .with_performance_preference(
+                    ort::ep::directml::PerformancePreference::HighPerformance,
+                )
+                .build(),
+        )
+        .and_then(|builder| {
+            builder
+                .with_parallel_execution(false)
+                .map_err(|error| format!("configure {} sequential execution: {}", provider, error))
+        })
+        .and_then(|builder| {
+            builder
+                .with_memory_pattern(false)
+                .map_err(|error| format!("disable {} memory patterns: {}", provider, error))
+        }),
         other => Err(format!("execution provider {} is not compiled in", other)),
     }
 }
@@ -190,7 +211,7 @@ pub fn check_device(device: Device) -> Result<(), String> {
     if device.requires_gpu() && !gpu_support_compiled() {
         return Err(format!(
             "device {} requested but this build has no GPU support: rebuild with \
-             `--features cuda`",
+            `--features <provider>`",
             device
         ));
     }
@@ -210,7 +231,7 @@ pub fn resolve_backend(device: Device) -> Result<Backend, String> {
         if device.requires_gpu() {
             return Err(format!(
                 "device {} requested but this build has no GPU support: rebuild with \
-                 `--features cuda`",
+                    `--features <provider>`",
                 device
             ));
         }

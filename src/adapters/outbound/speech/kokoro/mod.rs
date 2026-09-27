@@ -99,7 +99,7 @@ fn capabilities_for(
 ) -> Vec<ProviderCapability> {
     let auto_detail = match operating_system {
         "macos" => "Chooses Core ML GPU when available, then ONNX CPU",
-        "windows" => "Chooses CUDA when validated, then ONNX CPU",
+        "windows" => "Chooses CUDA, then DirectML, then ONNX CPU",
         "linux" => "Chooses CUDA when validated, then ONNX CPU",
         _ => "Chooses a validated backend · currently ONNX CPU",
     };
@@ -361,6 +361,33 @@ mod tests {
         assert_eq!(provider_environment_value("coreml"), Some("coreml"));
         assert_eq!(provider_environment_value("auto"), None);
         assert_eq!(provider_environment_value("webgpu"), None);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_build_compiles_cuda_then_directml_before_cpu_fallback() {
+        assert_eq!(
+            kokoro_micro::compiled_gpu_providers(),
+            ["CUDAExecutionProvider", "DmlExecutionProvider"]
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_build_compiles_cuda_before_cpu_fallback() {
+        assert_eq!(
+            kokoro_micro::compiled_gpu_providers(),
+            ["CUDAExecutionProvider"]
+        );
+    }
+
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    #[test]
+    fn apple_silicon_build_compiles_coreml_before_cpu_fallback() {
+        assert_eq!(
+            kokoro_micro::compiled_gpu_providers(),
+            ["CoreMLExecutionProvider"]
+        );
     }
 
     #[test]

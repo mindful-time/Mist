@@ -46,6 +46,7 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 default = []
 cuda = ["ort/cuda"]
 coreml = ["ort/coreml"]
+directml = ["ort/directml"]
 
 [[example]]
 name = "simple"
