@@ -294,7 +294,10 @@ fn requested_device_for(_operating_system: &str, requested_provider: Option<&str
         .as_str()
     {
         "cpu" => Device::Cpu,
-        "cuda" | "coreml" => Device::Gpu,
+        // Accelerated preferences are priorities, not availability promises.
+        // The runtime still has to reach a usable CPU session if the preferred
+        // provider cannot register or cannot load the exact model.
+        "cuda" | "coreml" => Device::Auto,
         _ => Device::Auto,
     }
 }
@@ -349,9 +352,9 @@ mod tests {
     }
 
     #[test]
-    fn explicit_accelerator_requires_the_compiled_gpu_provider() {
-        assert_eq!(requested_device_for("linux", Some("cuda")), Device::Gpu);
-        assert_eq!(requested_device_for("macos", Some("coreml")), Device::Gpu);
+    fn accelerated_preferences_keep_cpu_as_the_last_resort() {
+        assert_eq!(requested_device_for("linux", Some("cuda")), Device::Auto);
+        assert_eq!(requested_device_for("macos", Some("coreml")), Device::Auto);
     }
 
     #[test]
