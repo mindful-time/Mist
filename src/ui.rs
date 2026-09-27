@@ -73,6 +73,36 @@ impl ViewportMode {
     }
 }
 
+struct VoicePanelState {
+    selected: VoiceSettings,
+    expanded_language: Option<::mist::LanguageId>,
+}
+
+impl VoicePanelState {
+    fn new(selected: VoiceSettings, catalog: &dyn VoiceCatalog) -> Self {
+        let expanded_language = catalog
+            .language_for(selected.voice_id.as_str())
+            .or_else(|| catalog.languages().first().map(|language| language.id));
+        Self {
+            selected,
+            expanded_language,
+        }
+    }
+
+    fn select(&mut self, selected: VoiceSettings, catalog: &dyn VoiceCatalog) {
+        self.expanded_language = catalog.language_for(selected.voice_id.as_str());
+        self.selected = selected;
+    }
+
+    fn toggle_language(&mut self, clicked: ::mist::LanguageId) {
+        self.expanded_language = if self.expanded_language == Some(clicked) {
+            None
+        } else {
+            Some(clicked)
+        };
+    }
+}
+
 pub struct PetApp {
     commands: WorkerCommands,
     statuses: mpsc::Receiver<AppStatus>,
@@ -85,7 +115,7 @@ pub struct PetApp {
     tray: Option<TrayAdapter>,
     tray_error: Option<String>,
     last_platform_error: Option<String>,
-    selected_voice: VoiceSettings,
+    voice_panel: VoicePanelState,
     voice_catalog: Arc<dyn VoiceCatalog>,
     voices_ready: bool,
     voice_preview: VoicePreviewActivity,
@@ -151,6 +181,7 @@ impl PetApp {
         };
         let last_platform_error = platform.registration_error().map(str::to_owned);
         let panel_open = open_panel || tray_error.is_some();
+        let voice_panel = VoicePanelState::new(selected_voice, voice_catalog.as_ref());
         let app = Self {
             commands,
             statuses,
@@ -163,7 +194,7 @@ impl PetApp {
             tray,
             tray_error,
             last_platform_error,
-            selected_voice,
+            voice_panel,
             voice_catalog,
             voices_ready: false,
             voice_preview: VoicePreviewActivity::Idle,
@@ -481,14 +512,15 @@ impl PetApp {
     fn enqueue_voice_command(&mut self, settings: VoiceSettings, command: WorkerCommand) -> bool {
         let queued = self.enqueue(command);
         let authoritative =
-            authoritative_voice_after_enqueue(&self.selected_voice, &settings, queued);
+            authoritative_voice_after_enqueue(&self.voice_panel.selected, &settings, queued);
         if let Some(tray) = &self.tray {
             tray.select_voice(authoritative.voice_id.as_str());
         }
         if !queued {
             return false;
         }
-        self.selected_voice = settings;
+        self.voice_panel
+            .select(settings, self.voice_catalog.as_ref());
         true
     }
 
@@ -500,7 +532,8 @@ impl PetApp {
         if let Some(tray) = &self.tray {
             tray.select_voice(settings.voice_id.as_str());
         }
-        self.selected_voice = settings;
+        self.voice_panel
+            .select(settings, self.voice_catalog.as_ref());
         true
     }
 
@@ -595,7 +628,7 @@ impl PetApp {
         };
         let rect = self.mist_rect(ui, mist_size);
         let response = ui.interact(rect, ui.id().with("living-mist"), Sense::click_and_drag());
-        let selected = self.selected_voice.voice_id.as_str();
+        let selected = self.voice_panel.selected.voice_id.as_str();
         let profile = self.voice_catalog.profile(selected).unwrap_or_else(|| {
             self.voice_catalog
                 .voices()
@@ -657,7 +690,7 @@ impl PetApp {
         }
 
         let items = self.speech_queue.items().to_vec();
-        let selected = self.selected_voice.voice_id.as_str();
+        let selected = self.voice_panel.selected.voice_id.as_str();
         let palette = self
             .voice_catalog
             .profile(selected)
@@ -695,7 +728,7 @@ impl PetApp {
             StrokeKind::Inside,
         );
 
-        let selected_voice = self.selected_voice.voice_id.as_str();
+        let selected_voice = self.voice_panel.selected.voice_id.as_str();
         let profile = self
             .voice_catalog
             .profile(selected_voice)
@@ -851,44 +884,22 @@ impl PetApp {
                     self.voice_preview,
                     self.speech_queue.active_id().is_none(),
                 );
-                let language = self
-                    .voice_catalog
-                    .language_for(self.selected_voice.voice_id.as_str())
-                    .unwrap_or_else(|| {
-                        self.voice_catalog
-                            .languages()
-                            .first()
-                            .expect("catalog is not empty")
-                            .id
-                    });
                 let gallery = voice_gallery::show(
                     ui,
                     &self.mist,
                     content,
                     voice_gallery::GalleryContent {
                         time,
-                        selected_voice: self.selected_voice.voice_id.as_str(),
+                        selected_voice: self.voice_panel.selected.voice_id.as_str(),
                         voices: self.voice_catalog.voices(),
                         languages: self.voice_catalog.languages(),
-                        selected_language: language,
+                        expanded_language: self.voice_panel.expanded_language,
                         mode: gallery_mode,
                         accent,
                     },
                 );
-                if let Some(language) = gallery.select_language {
-                    match language_voice_id(self.voice_catalog.as_ref(), language) {
-                        Ok(default_voice) => {
-                            if should_preview_language(
-                                self.voices_ready,
-                                self.speech_queue.active_id().is_none(),
-                            ) {
-                                self.preview_voice(&default_voice);
-                            } else {
-                                self.select_voice(&default_voice);
-                            }
-                        }
-                        Err(error) => self.set_error(error),
-                    }
+                if let Some(language) = gallery.toggle_language {
+                    self.voice_panel.toggle_language(language);
                 }
                 if let Some(voice) = gallery.select_voice {
                     self.preview_voice(&voice);
@@ -942,7 +953,7 @@ impl PetApp {
         ui.set_min_width(238.0);
         let profile = self
             .voice_catalog
-            .profile(self.selected_voice.voice_id.as_str())
+            .profile(self.voice_panel.selected.voice_id.as_str())
             .unwrap_or_else(|| {
                 self.voice_catalog
                     .voices()
@@ -1110,7 +1121,7 @@ fn dispatch_playback_preferences(app: &mut PetApp, previous: PlaybackPreferences
         return;
     }
     app.persist_playback_preferences();
-    app.selected_voice.speed = app.playback_preferences.speed.multiplier();
+    app.voice_panel.selected.speed = app.playback_preferences.speed.multiplier();
 }
 
 fn selected_voice_index(catalog: &dyn VoiceCatalog, selected: &str) -> usize {
@@ -1243,16 +1254,6 @@ fn voice_preview_settings(
         .ok_or_else(|| format!("Unknown voice: {voice_id}"))
 }
 
-fn language_voice_id(
-    catalog: &dyn VoiceCatalog,
-    language: ::mist::LanguageId,
-) -> Result<String, &'static str> {
-    catalog
-        .default_voice_for(language)
-        .map(str::to_owned)
-        .ok_or("The active speech model has no voice for that language")
-}
-
 fn queue_worker_available(
     status: &AppStatus,
     voices_ready: bool,
@@ -1263,10 +1264,6 @@ fn queue_worker_available(
         && preview == VoicePreviewActivity::Idle
         && playback == PlaybackPhase::Idle
         && matches!(status, AppStatus::Ready | AppStatus::Error(_))
-}
-
-fn should_preview_language(voices_ready: bool, queue_idle: bool) -> bool {
-    voices_ready && queue_idle
 }
 
 #[cfg(test)]
@@ -1319,10 +1316,21 @@ mod tests {
     }
 
     #[test]
-    fn language_change_persists_without_preview_while_queue_owns_playback() {
-        assert!(!should_preview_language(true, false));
-        assert!(should_preview_language(true, true));
-        assert!(!should_preview_language(false, true));
+    fn language_accordions_toggle_without_selecting_a_voice() {
+        let catalog = KokoroVoiceCatalog;
+        let english = ::mist::LanguageId::new("en-US");
+        let spanish = ::mist::LanguageId::new("es");
+        let selected = catalog.default_settings();
+        let selected_id = selected.voice_id.clone();
+        let mut panel = VoicePanelState::new(selected, &catalog);
+
+        panel.toggle_language(english);
+        assert_eq!(panel.expanded_language, None);
+        panel.toggle_language(english);
+        assert_eq!(panel.expanded_language, Some(english));
+        panel.toggle_language(spanish);
+        assert_eq!(panel.expanded_language, Some(spanish));
+        assert_eq!(panel.selected.voice_id, selected_id);
     }
 
     #[test]

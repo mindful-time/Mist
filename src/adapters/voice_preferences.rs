@@ -1,6 +1,6 @@
 use std::{fs, path::PathBuf};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 
 use crate::{domain::VoiceSettings, ports::VoiceCatalog};
 
@@ -21,32 +21,20 @@ impl VoicePreferencesStore {
         let Ok(contents) = fs::read_to_string(self.path()) else {
             return fallback;
         };
-        let mut lines = contents.lines();
-        let Some(voice) = lines.next().and_then(|id| catalog.settings(id)) else {
-            return fallback;
-        };
-        let Some(speed) = lines.next().and_then(|value| value.parse::<f32>().ok()) else {
-            return fallback;
-        };
-        if !(0.5..=2.0).contains(&speed) {
-            return fallback;
-        }
-        VoiceSettings { speed, ..voice }
+        contents
+            .lines()
+            .next()
+            .and_then(|id| catalog.settings(id))
+            .unwrap_or(fallback)
     }
 
     pub fn save(&self, settings: &VoiceSettings) -> Result<()> {
-        if !(0.5..=2.0).contains(&settings.speed) {
-            bail!("voice speed must be between 0.5 and 2.0");
-        }
         fs::create_dir_all(&self.root)
             .with_context(|| format!("could not create {}", self.root.display()))?;
         let destination = self.path();
         let temporary = destination.with_extension("new");
-        fs::write(
-            &temporary,
-            format!("{}\n{}\n", settings.voice_id.as_str(), settings.speed),
-        )
-        .with_context(|| format!("could not write {}", temporary.display()))?;
+        fs::write(&temporary, format!("{}\n", settings.voice_id.as_str()))
+            .with_context(|| format!("could not write {}", temporary.display()))?;
         if destination.exists() {
             fs::remove_file(&destination)
                 .with_context(|| format!("could not replace {}", destination.display()))?;
@@ -66,15 +54,36 @@ mod tests {
     use crate::{adapters::kokoro_catalog::KokoroVoiceCatalog, ports::VoiceCatalog};
 
     #[test]
-    fn persists_a_valid_voice_selection() {
+    fn persists_only_the_voice_selection() {
         let temporary = tempfile::tempdir().unwrap();
         let preferences = VoicePreferencesStore::at(temporary.path());
         let catalog = KokoroVoiceCatalog;
-        let selected = catalog.settings("am_michael").unwrap();
+        let mut selected = catalog.settings("am_michael").unwrap();
+        selected.speed = 3.0;
 
         preferences.save(&selected).unwrap();
 
-        assert_eq!(preferences.load(&catalog), selected);
+        assert_eq!(
+            preferences.load(&catalog),
+            catalog.settings("am_michael").unwrap()
+        );
+        assert_eq!(
+            fs::read_to_string(preferences.path()).unwrap(),
+            "am_michael\n"
+        );
+    }
+
+    #[test]
+    fn ignores_speed_from_legacy_preferences() {
+        let temporary = tempfile::tempdir().unwrap();
+        let preferences = VoicePreferencesStore::at(temporary.path());
+        let catalog = KokoroVoiceCatalog;
+        fs::write(preferences.path(), "am_michael\n2.0\n").unwrap();
+
+        assert_eq!(
+            preferences.load(&catalog),
+            catalog.settings("am_michael").unwrap()
+        );
     }
 
     #[test]

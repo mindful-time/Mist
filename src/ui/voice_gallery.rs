@@ -11,7 +11,7 @@ use super::{
 
 pub(super) struct GalleryResponse {
     pub(super) select_voice: Option<String>,
-    pub(super) select_language: Option<LanguageId>,
+    pub(super) toggle_language: Option<LanguageId>,
 }
 
 pub(super) struct GalleryContent<'a> {
@@ -19,7 +19,7 @@ pub(super) struct GalleryContent<'a> {
     pub(super) selected_voice: &'a str,
     pub(super) voices: &'a [VoiceProfile],
     pub(super) languages: &'a [LanguageProfile],
-    pub(super) selected_language: LanguageId,
+    pub(super) expanded_language: Option<LanguageId>,
     pub(super) mode: GalleryMode,
     pub(super) accent: Color32,
 }
@@ -63,7 +63,7 @@ pub(super) fn show(
         selected_voice,
         voices: catalog,
         languages,
-        selected_language,
+        expanded_language,
         mode,
         accent,
     } = gallery;
@@ -96,10 +96,12 @@ pub(super) fn show(
         Pos2::new(content.left(), section_y + 80.0),
         Pos2::new(content.right() - 16.0, content.bottom()),
     );
-    let expanded_voice_count = catalog
-        .iter()
-        .filter(|voice| voice.language == selected_language)
-        .count();
+    let expanded_voice_count = expanded_language.map_or(0, |language| {
+        catalog
+            .iter()
+            .filter(|voice| voice.language == language)
+            .count()
+    });
     let content_height = accordion_height(languages.len(), expanded_voice_count);
     let max_scroll = (content_height - list_view.height()).max(0.0);
     let scroll_id = ui.id().with("voice-accordion-scroll");
@@ -127,7 +129,7 @@ pub(super) fn show(
     let mut selected_voice_event = None;
     let mut selected_language_event = None;
     for language in languages {
-        let expanded = language.id == selected_language;
+        let expanded = expanded_language == Some(language.id);
         let voice_count = catalog
             .iter()
             .filter(|voice| voice.language == language.id)
@@ -136,7 +138,7 @@ pub(super) fn show(
             Pos2::new(list_view.left(), cursor_y),
             Vec2::new(list_view.width(), HEADER_HEIGHT),
         );
-        if language_header(ui, header, language, voice_count, expanded, accent) && !expanded {
+        if language_header(ui, header, language, voice_count, expanded, accent) {
             selected_language_event = Some(language.id);
         }
         cursor_y += HEADER_HEIGHT + HEADER_GAP;
@@ -196,7 +198,7 @@ pub(super) fn show(
 
     GalleryResponse {
         select_voice: selected_voice_event,
-        select_language: selected_language_event,
+        toggle_language: selected_language_event,
     }
 }
 
