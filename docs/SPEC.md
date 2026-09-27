@@ -103,12 +103,15 @@ text-to-speech model.
   audio**. Real-time is the default and begins after the first sentence chunk;
   Complete audio buffers the full generated selection before audio starts. A
   persisted 0.5×–3× speed setting applies across languages and voices.
-- The current multilingual runtime uses CPU on macOS and CUDA with CPU fallback
-  on Windows/Linux. CUDA is enabled only when an NVIDIA device is detected.
-  WebGPU and MLX remain disabled when the shipped adapter cannot run them; the
-  UI uses friendly Recommended, Standard, Accelerated, and Apple-optimized
-  labels with the technical runtime in secondary detail. It never equates
-  hardware branding with runtime support or claims unmeasured speed.
+- The current multilingual runtime prefers Core ML with CPU fallback on Apple
+  silicon macOS, CUDA then DirectML then CPU on Windows, and CUDA then CPU on
+  Linux. Explicit CPU remains available. The UI reports the backend from the
+  loaded model session; Windows/Linux acceleration still requires native GPU
+  acceptance evidence. WebGPU and MLX remain disabled when the shipped adapter
+  cannot run them; the UI uses friendly Recommended, Standard, Accelerated,
+  and Apple-optimized labels with the technical runtime in secondary detail.
+  It never equates hardware branding with runtime support or claims unmeasured
+  speed.
 - The Model restart notice occupies header space and cannot intersect a
   provider row in the expanded settings viewport.
 - The first-run model download is explicit and stored in the user's application

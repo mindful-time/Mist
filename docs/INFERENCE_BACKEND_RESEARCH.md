@@ -8,12 +8,12 @@ from a backend that Mist has actually integrated and validated.
 | Target | Backend candidate | Current Mist support | Same ONNX model and voice pack? | Honest status |
 | --- | --- | --- | --- | --- |
 | All supported targets | ONNX Runtime CPU | Yes | Yes | Production baseline |
-| macOS, especially Apple silicon | Core ML | No | Yes, subject to graph partitioning | Best native macOS candidate; exact model partially proved |
+| Apple silicon macOS | Core ML | Yes | Yes, subject to graph partitioning | Integrated; exact multilingual model/session smoke passed locally |
 | macOS / Windows / Linux | Native ONNX Runtime WebGPU | No | Yes, subject to graph partitioning | Best single cross-platform experiment |
 | Apple silicon macOS; Linux CPU/NVIDIA | MLX | No | No: the graph and weights need an MLX port | Separate future engine; no documented Windows distribution |
-| Windows with NVIDIA | CUDA | Compiled path exists; no release GPU validation recorded | Yes | Candidate after native CUDA test |
-| Windows with a DirectX 12 GPU | DirectML | No | Yes, subject to provider coverage | Best broad Windows candidate |
-| Linux with NVIDIA | CUDA | Compiled path exists; no release GPU validation recorded | Yes | Candidate after native CUDA test |
+| Windows with NVIDIA | CUDA | GPU-first automatic path compiled; no hardware validation recorded | Yes | CUDA runtime/GPU acceptance still required |
+| Windows with a DirectX 12 GPU | DirectML | Automatic fallback after CUDA is integrated | Yes, subject to provider coverage | Native compile covered by CI; hardware acceptance still required |
+| Linux with NVIDIA | CUDA | GPU-first automatic path compiled; no hardware validation recorded | Yes | CUDA runtime/GPU acceptance still required |
 | Linux with Vulkan GPU/driver | Native ONNX Runtime WebGPU | No | Yes, subject to provider coverage | Best broad Linux experiment |
 | Linux with AMD ROCm | MIGraphX | No | Yes, subject to provider coverage | Vendor-specific later option; not the smallest path |
 
@@ -25,30 +25,34 @@ itself as the active backend.
 
 ## What ships today
 
-Mist pins `kokoro-micro = 1.3.0` without a GPU feature on macOS. The upstream
-crate exposes only one optional acceleration feature, `cuda = ["ort/cuda"]`;
-its provider list contains only `CUDAExecutionProvider`, and an empty provider
-list resolves `Auto` to CPU. See the immutable upstream
+Mist vendors and documents a narrow patch over `kokoro-micro = 1.3.0`. The
+published upstream crate exposes only `cuda = ["ort/cuda"]`; its provider list
+contains only `CUDAExecutionProvider`, and an empty provider list resolves
+`Auto` to CPU. See the immutable upstream
 [`1.3.0` published-source manifest](https://github.com/DavidValin/kokoro-micro/blob/5381b4f7f0e3bb20e9412b16fc0d13a6920ca656/Cargo.toml#L24-L47)
 and
 [`device.rs`](https://github.com/DavidValin/kokoro-micro/blob/5381b4f7f0e3bb20e9412b16fc0d13a6920ca656/src/device.rs#L130-L173).
-The upstream README makes the same contract explicit: without the `cuda`
+The upstream README makes the original contract explicit: without the `cuda`
 feature, inference is CPU-only
 ([Kokoro Micro device documentation](https://github.com/DavidValin/kokoro-micro#choosing-a-device)).
 
-Mist enables that CUDA feature only in its Windows and Linux target dependency
-sections. That creates a CUDA-capable build path; it is not evidence of a
-working end-user CUDA installation or a completed GPU acceptance run. Nothing
-in the shipped macOS dependency graph registers Core ML, MLX, WebGPU, or another
-Metal-backed inference provider. Kokoro Micro does not expose DirectML,
-MIGraphX, or WebGPU on the other targets either. The current dependency graph
-contains only ONNX CPU everywhere and optional CUDA on Windows/Linux.
+Mist's patch adds Core ML and DirectML feature gates and makes `Device::Auto`
+try the compiled providers in platform order before creating a CPU session:
+Core ML -> CPU on Apple silicon macOS, CUDA -> DirectML -> CPU on Windows, and
+CUDA -> CPU on Linux. Explicit CPU remains available. A provider is skipped if
+it cannot register or load the exact model. The loaded synthesizer exports
+`TtsEngine::backend()` through the speech port, so the UI receives the backend
+from the created model session instead of echoing the requested policy.
 
-Mist currently detects CUDA for the settings page by running `nvidia-smi`, but
-the loaded synthesizer records the requested policy (`CUDA -> CPU`) instead of
-reading `TtsEngine::backend()`. The production capability check must use
-successful provider registration plus exact-model loading, and the UI must show
-the backend that the session actually selected.
+On the current Apple silicon Mac, the pinned production model and voice pack
+loaded as `CoreMLExecutionProvider (device 0)` and generated finite, non-silent
+24 kHz English, Spanish, Japanese, and Mandarin samples. That validates the
+Core ML session path and multilingual parity. It does not separately prove how
+many graph nodes ran on the physical GPU. Windows and Linux builds still need
+real GPU acceptance runs; compile-only CI cannot establish acceleration.
+
+WebGPU, MLX, and MIGraphX remain disabled. Mist does not expose a backend merely
+because the host has a compatible graphics API or hardware brand.
 
 ## Exact multilingual artifact contract
 
@@ -86,20 +90,22 @@ plus WebGPU
 ([Rust feature list](https://github.com/pykeio/ort/blob/002f41a8e175eac7f6695ff361d2e51a50874c48/Cargo.toml#L95-L112),
 [binary matrix](https://github.com/pykeio/ort/blob/002f41a8e175eac7f6695ff361d2e51a50874c48/ort-sys/build/download/dist.tsv#L1-L4)).
 
-A diagnostic probe on the current ARM64 Mac loaded Mist's exact model with
-ONNX Runtime 1.19.2 using `CoreMLExecutionProvider` plus CPU fallback. ONNX
-Runtime reported 129 Core ML partitions and 1,048 supported nodes out of 2,476
+A preliminary diagnostic probe on the current ARM64 Mac loaded Mist's exact
+model with ONNX Runtime 1.19.2 using `CoreMLExecutionProvider` plus CPU
+fallback. ONNX Runtime reported 129 Core ML partitions and 1,048 supported
+nodes out of 2,476
 optimized nodes; a four-token inference returned finite audio. This is useful
 evidence that the artifact can be partitioned, but it is **not** acceptance:
 the probe used an older Python runtime than Mist's pinned Rust runtime, did not
 use a real voice/text sample, delegated more than half the optimized graph
 outside Core ML, and did not prove which Core ML compute unit ran each node.
 
-The smallest credible macOS implementation is therefore a Kokoro ONNX adapter
-that explicitly registers Core ML, requests `CPUAndGPU` (or `ALL`), enables a
-model cache, keeps CPU second in the provider order, and exposes the actual
-session/provider result. A release test must use `ProfileComputePlan` to prove
-meaningful GPU/ANE dispatch and benchmark real multilingual samples. MLX is not
+Mist now implements the first production step: it registers Core ML with the
+`CPUAndGPU` policy, keeps CPU as the automatic fallback, and exposes the loaded
+session backend. The real Rust adapter's exact-model multilingual smoke closes
+the earlier Python probe's model/runtime gap. A later performance acceptance
+test should still use `ProfileComputePlan` or equivalent instrumentation to
+measure physical GPU assignment and benchmark representative text. MLX is not
 the first implementation step because it cannot reuse the ONNX graph.
 
 Intel macOS needs a separate decision. Core ML itself supports compatible Intel
@@ -110,7 +116,7 @@ testing; CPU is the only currently evidenced fallback.
 
 ## Windows: DirectML for breadth, CUDA for NVIDIA
 
-CUDA is already the only accelerator Kokoro Micro can register. It works only
+CUDA works only
 with NVIDIA GPUs and a matching ONNX Runtime/CUDA/cuDNN runtime. ONNX Runtime
 1.28 GPU packages use CUDA 13 and cuDNN 9 by default, and CUDA/cuDNN major
 compatibility is strict
@@ -119,7 +125,7 @@ The pinned Rust download matrix has an x86-64 Windows CUDA 13 package, but not a
 Windows ARM64 CUDA package. CUDA should therefore be an optional NVIDIA-capable
 artifact or provider, not a requirement for the general Windows installer.
 
-For the broad Windows build, DirectML accepts DirectX 12 devices from NVIDIA,
+For the broad Windows path, DirectML accepts DirectX 12 devices from NVIDIA,
 AMD, Intel, and Qualcomm and is available from Windows 10 version 1903. It
 supports ONNX opset 20, matching Mist's model, but requires sequential session
 execution and disabled memory-pattern optimization
@@ -130,11 +136,11 @@ new Windows deployments, but using the existing Rust ONNX boundary is the
 smaller change than introducing a separate WinRT model host
 ([Windows guidance](https://onnxruntime.ai/docs/get-started/with-windows.html)).
 
-The practical provider order is CUDA (only when its complete runtime and model
-probe succeed), then DirectML, then CPU. WebGPU over D3D12/Vulkan is a useful
-cross-platform experiment, but should not displace the established DirectML
-path until it wins the same exact-model tests. The pinned Rust matrix supplies
-WebGPU for Windows x86-64, not ARM64.
+Mist now compiles the practical provider order: CUDA (only when its complete
+runtime and model load succeed), then DirectML, then CPU. WebGPU over
+D3D12/Vulkan is a useful cross-platform experiment, but should not displace the
+established DirectML path until it wins the same exact-model tests. The pinned
+Rust matrix supplies WebGPU for Windows x86-64, not ARM64.
 
 ## Linux: CUDA for NVIDIA, WebGPU for a cross-vendor path
 
@@ -280,8 +286,8 @@ native dependencies match the providers it offers:
 | Release profile | Packaged runtime | Host requirements | Initial provider order |
 | --- | --- | --- | --- |
 | macOS ARM64 | ONNX Runtime with Core ML; optionally a separately tested WebGPU build/plugin | System Core ML/Metal; bundled dynamic libraries must be inside and signed with the app | Core ML -> CPU |
-| Windows x86-64/ARM64 standard | ONNX Runtime DirectML build and DirectML redistributable as required | Windows 10 1903+ and DirectX 12 driver | DirectML -> CPU |
-| Windows x86-64 NVIDIA | Separate CUDA-capable ONNX Runtime build | Compatible NVIDIA driver, CUDA 13, cuDNN 9 for the pinned ORT 1.28 family | CUDA -> DirectML -> CPU |
+| Windows x86-64 current build | ONNX Runtime with CUDA and DirectML providers | DirectML-capable driver; compatible NVIDIA runtime for CUDA | CUDA -> DirectML -> CPU |
+| Windows ARM64 future package | Matching ONNX Runtime DirectML artifact and native release test | Windows 10 1903+ and DirectX 12 driver | DirectML -> CPU |
 | Linux x86-64 standard | CPU build initially; WebGPU build/plugin after validation | For WebGPU, compatible Vulkan loader/driver | WebGPU -> CPU |
 | Linux x86-64 NVIDIA | Separate CUDA-capable ONNX Runtime build | Compatible NVIDIA driver, CUDA 13, cuDNN 9, and required system libraries | CUDA -> CPU |
 | Intel macOS, Windows ARM64 WebGPU, Linux ARM64 GPU | No matching accelerated artifact in the pinned Rust download matrix | Custom ONNX Runtime build and native test infrastructure | CPU until supplied |
@@ -331,10 +337,10 @@ preference separately from the current session result.
    Do not leak Core ML, DirectML, CUDA, or WebGPU identifiers into the domain or
    application layers. Return both the requested policy and the provider that
    actually loaded the model.
-3. Add the smallest mature native providers: Core ML -> CPU on macOS,
-   DirectML -> CPU for the standard Windows package, and retain CUDA -> CPU for
-   NVIDIA Windows/Linux packages. Run the multilingual corpus on native CI or
-   release machines before exposing each capability.
+3. Keep the implemented mature-provider order: Core ML -> CPU on macOS,
+   CUDA -> DirectML -> CPU on Windows, and CUDA -> CPU on Linux. Run the exact
+   multilingual corpus on native GPU release machines before claiming hardware
+   acceleration for Windows or Linux.
 4. In parallel, spike native ONNX Runtime WebGPU once against the exact model on
    Metal, Direct3D 12, and Vulkan. If correctness, provider assignment, and
    latency pass, it becomes the shared cross-vendor path—especially for Linux

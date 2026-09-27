@@ -103,7 +103,7 @@ and be selected at composition time.
 
 Provider availability is evidence-based. An adapter reports only providers it
 can actually initialize on the current device; unsupported choices stay
-disabled in the UI. CPU remains the portable fallback. Adding CoreML,
+disabled in the UI. CPU remains the portable fallback. Adding Core ML,
 DirectML, CUDA, WebGPU, or MLX therefore belongs in an outbound speech adapter,
 never in the domain or UI.
 

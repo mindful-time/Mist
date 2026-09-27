@@ -83,10 +83,12 @@ either defects, stale records, or verification work still required.
 - **issue/risk · open-by-design** — Windows and Linux have compile-time and
   adapter tests in this macOS workspace, but final native OS interaction still
   requires testing on real Windows and Linux desktops.
-- **issue/risk · open-by-design** — The current macOS Kokoro adapter is CPU-only.
-  MLX requires a separate model port, while WebGPU requires an exact-model ONNX
-  Runtime validation spike. Both remain disabled; see
-  `docs/INFERENCE_BACKEND_RESEARCH.md`.
+- **verification · partial** — Apple silicon macOS now prefers Core ML and the
+  exact multilingual production model passed a real Rust synthesis smoke test,
+  with CPU retained as fallback. Physical GPU node assignment still needs
+  profiling. Windows now compiles CUDA -> DirectML -> CPU and Linux compiles
+  CUDA -> CPU; both still need exact-model tests on real GPU hardware. WebGPU
+  and MLX remain disabled; see `docs/INFERENCE_BACKEND_RESEARCH.md`.
 - **verification · open-by-design** — macOS Accessibility authorization is
   tied to the installed app identity. Ad-hoc development bundles cannot prove
   the canonical signed install retains permission across rebuilds.
