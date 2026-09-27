@@ -243,7 +243,8 @@ pub struct PlaybackSpeed(u16);
 
 impl PlaybackSpeed {
     pub const MIN_PERCENT: u16 = 50;
-    pub const MAX_PERCENT: u16 = 200;
+    pub const MAX_PERCENT: u16 = 300;
+    pub const STEP_PERCENT: u16 = 25;
 
     pub const fn from_percent(percent: u16) -> Option<Self> {
         if percent >= Self::MIN_PERCENT && percent <= Self::MAX_PERCENT {
@@ -579,6 +580,15 @@ mod tests {
     fn preview_is_unicode_safe() {
         let selected = SelectedText::new("你好世界").unwrap();
         assert_eq!(selected.preview(2), "你好…");
+    }
+
+    #[test]
+    fn playback_speed_covers_half_to_triple_speed() {
+        assert_eq!(PlaybackSpeed::from_percent(50).unwrap().multiplier(), 0.5);
+        assert_eq!(PlaybackSpeed::from_percent(125).unwrap().multiplier(), 1.25);
+        assert_eq!(PlaybackSpeed::from_percent(300).unwrap().multiplier(), 3.0);
+        assert!(PlaybackSpeed::from_percent(49).is_none());
+        assert!(PlaybackSpeed::from_percent(301).is_none());
     }
 
     #[test]

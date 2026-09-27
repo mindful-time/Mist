@@ -207,8 +207,8 @@ fn speed_row(
             &mut percent,
             PlaybackSpeed::MIN_PERCENT..=PlaybackSpeed::MAX_PERCENT,
         )
-        .step_by(5.0)
-        .suffix("%"),
+        .step_by(f64::from(PlaybackSpeed::STEP_PERCENT))
+        .custom_formatter(|percent, _| format_speed(percent.round() as u16)),
     );
     if response.changed() {
         preferences.speed = PlaybackSpeed::from_percent(percent)
@@ -221,6 +221,16 @@ fn speed_row(
             Stroke::new(1.0, with_alpha(accent, 90)),
             StrokeKind::Inside,
         );
+    }
+}
+
+fn format_speed(percent: u16) -> String {
+    let whole = percent / 100;
+    let fraction = percent % 100;
+    match fraction {
+        0 => format!("{whole}×"),
+        50 => format!("{whole}.5×"),
+        _ => format!("{whole}.{fraction:02}×"),
     }
 }
 
@@ -797,6 +807,14 @@ fn row_text(ui: &eframe::egui::Ui, rect: Rect, title: &str, detail: &str, enable
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn speed_labels_use_compact_multipliers() {
+        assert_eq!(format_speed(50), "0.5×");
+        assert_eq!(format_speed(100), "1×");
+        assert_eq!(format_speed(125), "1.25×");
+        assert_eq!(format_speed(300), "3×");
+    }
 
     #[test]
     fn restart_notice_never_intersects_a_model_provider_row() {
