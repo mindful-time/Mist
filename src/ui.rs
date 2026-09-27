@@ -943,11 +943,7 @@ impl PetApp {
                 None
             }
         };
-        if self.playback_preferences != preferences_before {
-            self.persist_playback_preferences();
-            self.selected_voice.speed = self.playback_preferences.speed.multiplier();
-            self.enqueue(WorkerCommand::ConfigurePlayback(self.playback_preferences));
-        }
+        apply_playback_preferences(self, preferences_before);
         match settings_action {
             Some(SettingsAction::PlayClipboard) => {
                 if let Err(error) = self.platform.request_clipboard_text() {
@@ -1114,6 +1110,26 @@ impl Drop for PetApp {
             let _ = self.platform.clear_temporary_clipboard(&lease);
         }
     }
+}
+
+fn apply_playback_preferences(app: &mut PetApp, previous: PlaybackPreferences) {
+    if app.playback_preferences != previous {
+        dispatch_playback_preferences(app, previous);
+    }
+}
+
+fn dispatch_playback_preferences(app: &mut PetApp, previous: PlaybackPreferences) {
+    if app
+        .commands
+        .configure_playback(app.playback_preferences)
+        .is_err()
+    {
+        app.playback_preferences = previous;
+        app.set_error("The speech worker stopped unexpectedly.");
+        return;
+    }
+    app.persist_playback_preferences();
+    app.selected_voice.speed = app.playback_preferences.speed.multiplier();
 }
 
 fn selected_voice_index(catalog: &dyn VoiceCatalog, selected: &str) -> usize {

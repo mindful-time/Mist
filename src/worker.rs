@@ -28,13 +28,13 @@ pub enum WorkerCommand {
     },
     InstallModel,
     SelectVoice(VoiceSettings),
-    ConfigurePlayback(PlaybackPreferences),
 }
 
 #[derive(Clone, Debug)]
 enum WorkerMessage {
     Command(WorkerCommand),
     PreviewWake,
+    PlaybackConfigurationWake,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -46,6 +46,7 @@ pub enum WorkerSendError {
 #[derive(Clone, Debug)]
 pub struct WorkerCommands {
     sender: SyncSender<WorkerMessage>,
+    playback_requests: LatestRequest<PlaybackPreferences>,
 }
 
 impl WorkerCommands {
@@ -55,6 +56,56 @@ impl WorkerCommands {
             Err(TrySendError::Full(_)) => Err(WorkerSendError::Full),
             Err(TrySendError::Disconnected(_)) => Err(WorkerSendError::Disconnected),
         }
+    }
+
+    /// Coalesces rapid UI changes. A full channel already guarantees another
+    /// worker iteration, where the latest configuration is read from the slot.
+    pub fn configure_playback(
+        &self,
+        preferences: PlaybackPreferences,
+    ) -> Result<(), WorkerSendError> {
+        self.playback_requests.request(preferences);
+        match self
+            .sender
+            .try_send(WorkerMessage::PlaybackConfigurationWake)
+        {
+            Ok(()) | Err(TrySendError::Full(_)) => Ok(()),
+            Err(TrySendError::Disconnected(_)) => Err(WorkerSendError::Disconnected),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct LatestRequest<T> {
+    latest: Arc<Mutex<Option<T>>>,
+}
+
+impl<T> Clone for LatestRequest<T> {
+    fn clone(&self) -> Self {
+        Self {
+            latest: self.latest.clone(),
+        }
+    }
+}
+
+impl<T> Default for LatestRequest<T> {
+    fn default() -> Self {
+        Self {
+            latest: Arc::new(Mutex::new(None)),
+        }
+    }
+}
+
+impl<T> LatestRequest<T> {
+    fn request(&self, value: T) {
+        *self.latest.lock().expect("latest request was poisoned") = Some(value);
+    }
+
+    fn take_latest(&self) -> Option<T> {
+        self.latest
+            .lock()
+            .expect("latest request was poisoned")
+            .take()
     }
 }
 
@@ -109,6 +160,7 @@ struct WorkerRuntime {
     playback_preferences: PlaybackPreferences,
     playback: PlaybackController,
     preview_requests: PreviewRequests,
+    playback_requests: LatestRequest<PlaybackPreferences>,
     engine_factory: Arc<dyn SpeechEngineFactory>,
     catalog: Arc<dyn VoiceCatalog>,
 }
@@ -120,7 +172,7 @@ struct WorkerRuntime {
 /// card changes cancel the current sample and stale queued samples are skipped.
 #[derive(Clone, Debug, Default)]
 pub struct PreviewRequests {
-    latest: Arc<Mutex<Option<VoiceSettings>>>,
+    latest: LatestRequest<VoiceSettings>,
 }
 
 #[derive(Clone, Debug)]
@@ -147,14 +199,11 @@ impl PreviewDispatcher {
 
 impl PreviewRequests {
     pub fn request(&self, voice: &VoiceSettings) {
-        *self.latest.lock().expect("preview requests were poisoned") = Some(voice.clone());
+        self.latest.request(voice.clone());
     }
 
     fn take_latest(&self) -> Option<VoiceSettings> {
-        self.latest
-            .lock()
-            .expect("preview requests were poisoned")
-            .take()
+        self.latest.take_latest()
     }
 }
 
@@ -176,8 +225,11 @@ pub fn spawn(
     let worker_playback = playback.clone();
     let preview_requests = PreviewRequests::default();
     let worker_preview_requests = preview_requests.clone();
+    let playback_requests = LatestRequest::default();
+    let worker_playback_requests = playback_requests.clone();
     let commands = WorkerCommands {
         sender: command_tx.clone(),
+        playback_requests,
     };
     let previews = PreviewDispatcher::new(command_tx, preview_requests);
     thread::Builder::new()
@@ -193,6 +245,7 @@ pub fn spawn(
                 playback_preferences,
                 playback: worker_playback,
                 preview_requests: worker_preview_requests,
+                playback_requests: worker_playback_requests,
                 engine_factory,
                 catalog,
             })
@@ -219,6 +272,7 @@ fn run(runtime: WorkerRuntime) {
         mut playback_preferences,
         playback,
         preview_requests,
+        playback_requests,
         engine_factory,
         catalog,
     } = runtime;
@@ -234,6 +288,14 @@ fn run(runtime: WorkerRuntime) {
     );
 
     loop {
+        if let Some(preferences) = playback_requests.take_latest() {
+            configure_playback(
+                preferences,
+                &mut playback_preferences,
+                &mut selected_voice,
+                &mut session,
+            );
+        }
         if let Some(voice) = preview_requests.take_latest() {
             // A cancelled request may never have reached the worker. Reset its
             // shared preview session before starting the coalesced latest one.
@@ -281,15 +343,6 @@ fn run(runtime: WorkerRuntime) {
             WorkerCommand::SelectVoice(voice) => {
                 select_voice(voice, &preferences, &mut selected_voice, &mut session)
             }
-            WorkerCommand::ConfigurePlayback(preferences) => {
-                playback_preferences = preferences;
-                selected_voice.speed = preferences.speed.multiplier();
-                if let Some(session) = session.as_mut() {
-                    session.speaker.set_playback_mode(preferences.mode);
-                    session.speaker.set_voice(selected_voice.clone());
-                }
-                Ok(())
-            }
             WorkerCommand::Speak { token, text } => {
                 if !model_ready {
                     send_status(&statuses, AppStatus::MissingModel);
@@ -313,6 +366,20 @@ fn run(runtime: WorkerRuntime) {
         };
 
         send_result_status(&statuses, model_ready, result);
+    }
+}
+
+fn configure_playback(
+    preferences: PlaybackPreferences,
+    current: &mut PlaybackPreferences,
+    selected_voice: &mut VoiceSettings,
+    session: &mut Option<SpeechSession>,
+) {
+    *current = preferences;
+    selected_voice.speed = preferences.speed.multiplier();
+    if let Some(session) = session.as_mut() {
+        session.speaker.set_playback_mode(preferences.mode);
+        session.speaker.set_voice(selected_voice.clone());
     }
 }
 
@@ -577,9 +644,7 @@ mod tests {
     fn full_worker_channel_keeps_the_coalesced_latest_preview_pending() {
         let (sender, _receiver) = mpsc::sync_channel(1);
         sender
-            .try_send(WorkerMessage::Command(WorkerCommand::ConfigurePlayback(
-                PlaybackPreferences::default(),
-            )))
+            .try_send(WorkerMessage::Command(WorkerCommand::InstallModel))
             .unwrap();
         let requests = PreviewRequests::default();
         let previews = PreviewDispatcher::new(sender, requests.clone());
@@ -587,6 +652,26 @@ mod tests {
 
         assert_eq!(previews.request(&voice), Ok(()));
         assert_eq!(requests.take_latest(), Some(voice));
+    }
+
+    #[test]
+    fn full_worker_channel_keeps_the_latest_playback_configuration_pending() {
+        let (sender, _receiver) = mpsc::sync_channel(1);
+        sender
+            .try_send(WorkerMessage::Command(WorkerCommand::InstallModel))
+            .unwrap();
+        let requests = LatestRequest::default();
+        let commands = WorkerCommands {
+            sender,
+            playback_requests: requests.clone(),
+        };
+        let latest = PlaybackPreferences {
+            speed: crate::PlaybackSpeed::from_percent(175).unwrap(),
+            ..PlaybackPreferences::default()
+        };
+
+        assert_eq!(commands.configure_playback(latest), Ok(()));
+        assert_eq!(requests.take_latest(), Some(latest));
     }
 
     #[test]

@@ -12,6 +12,12 @@ elif [ "$#" -ne 0 ]; then
     exit 2
 fi
 
+crap_version=$(cargo crap --version)
+if [ "$crap_version" != "cargo-crap 0.5.0" ]; then
+    printf 'CRAP gate requires cargo-crap 0.5.0; found: %s\n' "$crap_version" >&2
+    exit 1
+fi
+
 mkdir -p target/quality
 warning_threshold=5
 blocking_threshold=10
