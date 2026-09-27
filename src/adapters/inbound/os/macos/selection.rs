@@ -3,7 +3,7 @@
 use std::{error::Error, fmt};
 use std::{ffi::c_void, ptr};
 
-use anyhow::{Context, bail};
+use anyhow::Context;
 use core_foundation::{
     array::CFArray,
     base::{Boolean, CFRange, CFType, CFTypeRef, TCFType},
@@ -20,10 +20,12 @@ type AXUIElementRef = *const c_void;
 type AXValueRef = *const c_void;
 
 const AX_ERROR_SUCCESS: AXError = 0;
+const AX_ERROR_CANNOT_COMPLETE: AXError = -25_204;
 const AX_ERROR_API_DISABLED: AXError = -25_211;
 const AX_ERROR_ATTRIBUTE_UNSUPPORTED: AXError = -25_205;
 const AX_ERROR_NO_VALUE: AXError = -25_212;
 const AX_VALUE_CF_RANGE_TYPE: u32 = 4;
+const AX_MESSAGING_TIMEOUT_SECONDS: f32 = 1.0;
 
 #[derive(Debug)]
 struct AccessibilityAttributeError(AXError);
@@ -49,11 +51,18 @@ unsafe extern "C" {
         attribute: CFStringRef,
         value: *mut CFTypeRef,
     ) -> AXError;
+    fn AXUIElementCopyParameterizedAttributeValue(
+        element: AXUIElementRef,
+        attribute: CFStringRef,
+        parameter: CFTypeRef,
+        value: *mut CFTypeRef,
+    ) -> AXError;
     fn AXUIElementSetAttributeValue(
         element: AXUIElementRef,
         attribute: CFStringRef,
         value: CFTypeRef,
     ) -> AXError;
+    fn AXUIElementSetMessagingTimeout(element: AXUIElementRef, timeout_in_seconds: f32) -> AXError;
     fn AXValueGetType(value: AXValueRef) -> u32;
     fn AXValueGetValue(value: AXValueRef, value_type: u32, value_ptr: *mut c_void) -> Boolean;
 }
@@ -85,6 +94,7 @@ pub fn capture_selected_text(frontmost_pid: i32) -> anyhow::Result<SelectedText>
     // SAFETY: The create function returns an owned Core Foundation object.
     let system_wide =
         unsafe { CFType::wrap_under_create_rule(AXUIElementCreateSystemWide().cast::<c_void>()) };
+    set_messaging_timeout(&system_wide);
     match optional_focused_element(&system_wide) {
         Ok(Some(focused)) => {
             ensure_not_protected(&focused)?;
@@ -100,6 +110,7 @@ pub fn capture_selected_text(frontmost_pid: i32) -> anyhow::Result<SelectedText>
         Err(error) => return Err(error),
     }
     let application = application_element(frontmost_pid);
+    set_messaging_timeout(&application);
     match selected_text_from_application(&application) {
         Ok(Some(selection)) => return Ok(selection),
         Ok(None) => {}
@@ -145,6 +156,17 @@ fn enable_manual_accessibility(application: &CFType) -> bool {
     }
 }
 
+fn set_messaging_timeout(element: &CFType) {
+    // SAFETY: The element is a retained AXUIElement and the timeout is a finite,
+    // positive duration accepted by the Accessibility API.
+    let _ = unsafe {
+        AXUIElementSetMessagingTimeout(
+            element.as_CFTypeRef().cast::<c_void>(),
+            AX_MESSAGING_TIMEOUT_SECONDS,
+        )
+    };
+}
+
 fn selected_text_from_application(application: &CFType) -> anyhow::Result<Option<SelectedText>> {
     let focused = focused_element(application)?;
     ensure_not_protected(&focused)?;
@@ -160,54 +182,106 @@ fn selected_text_from_application(application: &CFType) -> anyhow::Result<Option
 }
 
 fn selected_text(element: &CFType) -> anyhow::Result<Option<SelectedText>> {
-    if let Ok(selected) = copy_attribute(element, "AXSelectedText")
-        && let Some(selected) = selected.downcast_into::<CFString>()
-    {
-        let value = selected.to_string();
-        if !value.trim().is_empty() {
-            return SelectedText::new(value).map(Some).map_err(Into::into);
-        }
+    if let Some(selected) = selected_text_attribute(element) {
+        return Ok(Some(selected));
     }
-    selected_text_from_range(element)
+    if let Some(selected) = selected_text_from_ranges(element) {
+        return Ok(Some(selected));
+    }
+    Ok(selected_text_from_range(element))
 }
 
-fn selected_text_from_range(element: &CFType) -> anyhow::Result<Option<SelectedText>> {
-    let Ok(value) = copy_attribute(element, "AXValue") else {
-        return Ok(None);
-    };
-    let Some(value) = value.downcast_into::<CFString>() else {
-        return Ok(None);
-    };
-    let Ok(range_value) = copy_attribute(element, "AXSelectedTextRange") else {
-        return Ok(None);
-    };
+fn selected_text_attribute(element: &CFType) -> Option<SelectedText> {
+    string_attribute(element, "AXSelectedText")
+        .and_then(|value| SelectedText::new(value.to_string()).ok())
+}
+
+fn selected_text_from_ranges(element: &CFType) -> Option<SelectedText> {
+    let values = array_attribute(element, "AXSelectedTextRanges")?;
+    let selections = values
+        .get_all_values()
+        .into_iter()
+        .filter_map(|value| selected_text_for_range_value(element, value))
+        .collect();
+    selected_text_from_fragments(selections)
+}
+
+fn selected_text_for_range_value(element: &CFType, value: CFTypeRef) -> Option<String> {
+    // SAFETY: `AXSelectedTextRanges` contains borrowed AXValue objects. The
+    // get rule retains the value for this wrapper's lifetime.
+    let value = unsafe { CFType::wrap_under_get_rule(value) };
+    accessibility_range(&value)
+        .and_then(|range| text_for_accessibility_range(element, &value, range))
+}
+
+fn selected_text_from_range(element: &CFType) -> Option<SelectedText> {
+    let range_value = copy_attribute(element, "AXSelectedTextRange").ok()?;
+    accessibility_range(&range_value)
+        .and_then(|range| text_for_accessibility_range(element, &range_value, range))
+        .and_then(|selection| SelectedText::new(selection).ok())
+}
+
+fn accessibility_range(range_value: &CFType) -> Option<CFRange> {
     // SAFETY: AXSelectedTextRange values are AXValue objects. The type check
     // precedes copying the embedded Core Foundation range into valid storage.
-    let range = unsafe {
-        if AXValueGetType(range_value.as_CFTypeRef().cast::<c_void>()) != AX_VALUE_CF_RANGE_TYPE {
-            return Ok(None);
-        }
-        let mut range = CFRange {
-            location: 0,
-            length: 0,
-        };
-        if AXValueGetValue(
+    let is_range = unsafe { AXValueGetType(range_value.as_CFTypeRef().cast::<c_void>()) }
+        == AX_VALUE_CF_RANGE_TYPE;
+    is_range.then_some(())?;
+    let mut range = CFRange {
+        location: 0,
+        length: 0,
+    };
+    // SAFETY: The type check above established a CFRange payload and `range`
+    // is valid writable storage for the duration of the call.
+    let copied = unsafe {
+        AXValueGetValue(
             range_value.as_CFTypeRef().cast::<c_void>(),
             AX_VALUE_CF_RANGE_TYPE,
             (&raw mut range).cast::<c_void>(),
-        ) == 0
-        {
-            return Ok(None);
-        }
-        range
+        ) != 0
     };
-    let Some(selection) = utf16_range(&value.to_string(), range) else {
-        return Ok(None);
-    };
-    if selection.trim().is_empty() {
-        return Ok(None);
-    }
-    SelectedText::new(selection).map(Some).map_err(Into::into)
+    copied.then_some(range)
+}
+
+fn text_for_accessibility_range(
+    element: &CFType,
+    range_value: &CFType,
+    range: CFRange,
+) -> Option<String> {
+    parameterized_string_attribute(element, "AXStringForRange", range_value)
+        .map(|value| value.to_string())
+        .filter(|value| is_nonblank(value))
+        .or_else(|| {
+            string_attribute(element, "AXValue")
+                .and_then(|value| utf16_range(&value.to_string(), range))
+                .filter(|value| is_nonblank(value))
+        })
+}
+
+fn string_attribute(element: &CFType, attribute: &str) -> Option<CFString> {
+    copy_attribute(element, attribute)
+        .ok()
+        .and_then(|value| value.downcast_into::<CFString>())
+}
+
+fn array_attribute(element: &CFType, attribute: &str) -> Option<CFArray> {
+    copy_attribute(element, attribute)
+        .ok()
+        .and_then(|value| value.downcast_into::<CFArray>())
+}
+
+fn parameterized_string_attribute(
+    element: &CFType,
+    attribute: &str,
+    parameter: &CFType,
+) -> Option<CFString> {
+    copy_parameterized_attribute(element, attribute, parameter)
+        .ok()
+        .and_then(|value| value.downcast_into::<CFString>())
+}
+
+fn is_nonblank(value: &str) -> bool {
+    !value.trim().is_empty()
 }
 
 fn utf16_range(value: &str, range: CFRange) -> Option<String> {
@@ -216,6 +290,24 @@ fn utf16_range(value: &str, range: CFRange) -> Option<String> {
     let end = start.checked_add(length)?;
     let utf16: Vec<u16> = value.encode_utf16().collect();
     String::from_utf16(utf16.get(start..end)?).ok()
+}
+
+#[cfg(test)]
+fn utf16_ranges(value: &str, ranges: &[CFRange]) -> Option<String> {
+    let selections = ranges
+        .iter()
+        .filter_map(|range| utf16_range(value, *range))
+        .filter(|selection| !selection.trim().is_empty())
+        .collect();
+    join_fragments(selections)
+}
+
+fn selected_text_from_fragments(selections: Vec<String>) -> Option<SelectedText> {
+    join_fragments(selections).and_then(|selection| SelectedText::new(selection).ok())
+}
+
+fn join_fragments(selections: Vec<String>) -> Option<String> {
+    (!selections.is_empty()).then(|| selections.join("\n"))
 }
 
 fn selected_text_from_tree(root: &CFType) -> anyhow::Result<Option<SelectedText>> {
@@ -251,8 +343,16 @@ fn optional_focused_element(element: &CFType) -> anyhow::Result<Option<CFType>> 
     match copy_attribute(element, "AXFocusedUIElement") {
         Ok(focused) => Ok(Some(focused)),
         Err(error) if attribute_unavailable(&error) => Ok(None),
-        Err(error) if attribute_error_code(&error) == Some(AX_ERROR_API_DISABLED) => {
-            Err(SelectionCaptureError::PermissionRequired.into())
+        Err(error)
+            if matches!(
+                error.downcast_ref::<SelectionCaptureError>(),
+                Some(
+                    SelectionCaptureError::PermissionRequired
+                        | SelectionCaptureError::ProviderTimeout
+                )
+            ) =>
+        {
+            Err(error)
         }
         Err(_) => Err(SelectionCaptureError::ProtectionUnknown.into()),
     }
@@ -334,21 +434,66 @@ fn copy_attribute(element: &CFType, attribute: &str) -> anyhow::Result<CFType> {
             &mut value,
         )
     };
-    if error != AX_ERROR_SUCCESS {
-        return Err(AccessibilityAttributeError(error).into());
-    }
-    if value.is_null() {
-        bail!("macOS returned an empty accessibility value");
-    }
+    ensure_copy_succeeded(error)?;
+    owned_copy_value(value, "macOS returned an empty accessibility value")
+}
 
-    // SAFETY: A successful Copy call returned a non-null owned CFTypeRef.
-    Ok(unsafe { CFType::wrap_under_create_rule(value) })
+fn copy_parameterized_attribute(
+    element: &CFType,
+    attribute: &str,
+    parameter: &CFType,
+) -> anyhow::Result<CFType> {
+    let attribute = CFString::new(attribute);
+    let mut value = ptr::null();
+    // SAFETY: The element, attribute, and parameter are valid Core Foundation
+    // objects for the duration of the call. A successful Copy call transfers
+    // ownership of a non-null result to the returned wrapper.
+    let error = unsafe {
+        AXUIElementCopyParameterizedAttributeValue(
+            element.as_CFTypeRef().cast::<c_void>(),
+            attribute.as_concrete_TypeRef(),
+            parameter.as_CFTypeRef(),
+            &mut value,
+        )
+    };
+    ensure_copy_succeeded(error)?;
+    owned_copy_value(
+        value,
+        "macOS returned an empty parameterized accessibility value",
+    )
+}
+
+fn ensure_copy_succeeded(error: AXError) -> anyhow::Result<()> {
+    (error == AX_ERROR_SUCCESS)
+        .then_some(())
+        .ok_or_else(|| accessibility_attribute_error(error))
+}
+
+fn owned_copy_value(value: CFTypeRef, empty_message: &str) -> anyhow::Result<CFType> {
+    (!value.is_null())
+        // SAFETY: A successful Copy call returned a non-null owned CFTypeRef.
+        .then(|| unsafe { CFType::wrap_under_create_rule(value) })
+        .ok_or_else(|| anyhow::anyhow!(empty_message.to_owned()))
 }
 
 fn attribute_error_code(error: &anyhow::Error) -> Option<AXError> {
     error
         .downcast_ref::<AccessibilityAttributeError>()
         .map(|error| error.0)
+}
+
+fn accessibility_attribute_error(error: AXError) -> anyhow::Error {
+    typed_accessibility_error(error)
+        .map(anyhow::Error::new)
+        .unwrap_or_else(|| AccessibilityAttributeError(error).into())
+}
+
+fn typed_accessibility_error(error: AXError) -> Option<SelectionCaptureError> {
+    match error {
+        AX_ERROR_API_DISABLED => Some(SelectionCaptureError::PermissionRequired),
+        AX_ERROR_CANNOT_COMPLETE => Some(SelectionCaptureError::ProviderTimeout),
+        _ => None,
+    }
 }
 
 fn attribute_unavailable(error: &anyhow::Error) -> bool {
@@ -370,6 +515,9 @@ fn accessibility_error(error: AXError) -> String {
         AX_ERROR_API_DISABLED => {
             "Accessibility permission is required to read selected text".to_owned()
         }
+        AX_ERROR_CANNOT_COMPLETE => {
+            "The focused application did not answer before the selection timeout".to_owned()
+        }
         AX_ERROR_ATTRIBUTE_UNSUPPORTED | AX_ERROR_NO_VALUE => {
             "This control does not expose selected text through Accessibility".to_owned()
         }
@@ -385,6 +533,10 @@ mod tests {
     fn accessibility_errors_are_actionable() {
         assert!(accessibility_error(AX_ERROR_API_DISABLED).contains("permission"));
         assert!(accessibility_error(AX_ERROR_NO_VALUE).contains("does not expose"));
+        assert_eq!(
+            typed_accessibility_error(AX_ERROR_CANNOT_COMPLETE),
+            Some(SelectionCaptureError::ProviderTimeout)
+        );
     }
 
     #[test]
@@ -398,6 +550,25 @@ mod tests {
         );
 
         assert_eq!(selection.as_deref(), Some("🌫"));
+    }
+
+    #[test]
+    fn accessibility_multiple_ranges_preserve_order_and_utf16_offsets() {
+        let selection = utf16_ranges(
+            "First 🌫 second mist",
+            &[
+                CFRange {
+                    location: 6,
+                    length: 2,
+                },
+                CFRange {
+                    location: 16,
+                    length: 4,
+                },
+            ],
+        );
+
+        assert_eq!(selection.as_deref(), Some("🌫\nmist"));
     }
 
     #[test]

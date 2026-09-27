@@ -57,4 +57,16 @@ pub enum SelectionCaptureError {
     ProtectionUnknown,
     #[error("Select some text first")]
     NoSelection,
+    #[error("The focused application does not expose selected text")]
+    ProviderUnsupported,
+    #[error("The focused application did not answer before the selection timeout")]
+    ProviderTimeout,
+    #[error("The configured Speak shortcut is already in use")]
+    ShortcutConflict,
+    #[error("The focused application is outside Mist's accessibility integrity boundary")]
+    IntegrityBoundary,
+    #[error("This desktop does not expose a compatible primary-selection protocol")]
+    CompositorProtocolMissing,
+    #[error("The desktop denied the requested selection or shortcut portal")]
+    PortalDenied,
 }

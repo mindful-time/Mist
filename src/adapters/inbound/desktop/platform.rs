@@ -465,6 +465,9 @@ fn allows_clipboard_fallback(error: &anyhow::Error) -> bool {
             SelectionCaptureError::PermissionRequired
                 | SelectionCaptureError::ProtectedContent
                 | SelectionCaptureError::ProtectionUnknown
+                | SelectionCaptureError::ShortcutConflict
+                | SelectionCaptureError::IntegrityBoundary
+                | SelectionCaptureError::PortalDenied
         )
     )
 }
@@ -532,6 +535,24 @@ mod tests {
         ));
         assert!(super::allows_clipboard_fallback(
             &SelectionCaptureError::NoSelection.into()
+        ));
+        assert!(super::allows_clipboard_fallback(
+            &SelectionCaptureError::ProviderUnsupported.into()
+        ));
+        assert!(super::allows_clipboard_fallback(
+            &SelectionCaptureError::ProviderTimeout.into()
+        ));
+        assert!(super::allows_clipboard_fallback(
+            &SelectionCaptureError::CompositorProtocolMissing.into()
+        ));
+        assert!(!super::allows_clipboard_fallback(
+            &SelectionCaptureError::ShortcutConflict.into()
+        ));
+        assert!(!super::allows_clipboard_fallback(
+            &SelectionCaptureError::IntegrityBoundary.into()
+        ));
+        assert!(!super::allows_clipboard_fallback(
+            &SelectionCaptureError::PortalDenied.into()
         ));
     }
 

@@ -3,7 +3,7 @@
 use anyhow::Context;
 use uiautomation::{UIAutomation, patterns::UITextPattern};
 
-use crate::domain::{SelectedText, SelectionCaptureError};
+use crate::domain::{SelectedText, SelectionCaptureError, SelectionError};
 
 /// Reads the focused control's selection without synthesizing Copy, so the
 /// user's clipboard remains untouched.
@@ -18,9 +18,11 @@ pub fn capture_selected_text() -> anyhow::Result<SelectedText> {
     {
         return Err(SelectionCaptureError::ProtectedContent.into());
     }
-    let walker = automation
-        .get_control_view_walker()
-        .map_err(|_| SelectionCaptureError::ProtectionUnknown)?;
+    let walker = automation.get_control_view_walker().map_err(|error| {
+        anyhow::Error::new(SelectionCaptureError::ProviderUnsupported).context(format!(
+            "could not inspect the focused UIA hierarchy: {error}"
+        ))
+    })?;
     let mut candidate = focused;
     for _ in 0..16 {
         if candidate
@@ -44,9 +46,10 @@ fn selected_text_from(element: &uiautomation::UIElement) -> anyhow::Result<Optio
     let Ok(pattern) = element.get_pattern::<UITextPattern>() else {
         return Ok(None);
     };
-    let ranges = pattern
-        .get_selection()
-        .context("could not read the selected text")?;
+    let ranges = pattern.get_selection().map_err(|error| {
+        anyhow::Error::new(SelectionCaptureError::ProviderUnsupported)
+            .context(format!("could not read the selected text: {error}"))
+    })?;
     let mut text = String::new();
     for range in ranges {
         let range = range
@@ -63,5 +66,10 @@ fn selected_text_from(element: &uiautomation::UIElement) -> anyhow::Result<Optio
     if text.trim().is_empty() {
         return Ok(None);
     }
-    SelectedText::new(text).map(Some).map_err(Into::into)
+    SelectedText::new(text)
+        .map(Some)
+        .map_err(|error| match error {
+            SelectionError::Empty => SelectionCaptureError::NoSelection.into(),
+            error => anyhow::Error::new(error),
+        })
 }

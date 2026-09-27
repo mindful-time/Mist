@@ -4,7 +4,7 @@ use std::{io::Read, time::Duration};
 
 use anyhow::Context;
 
-use crate::domain::SelectedText;
+use crate::domain::{SelectedText, SelectionCaptureError, SelectionError};
 
 pub fn is_wayland_session() -> bool {
     std::env::var("XDG_SESSION_TYPE").is_ok_and(|value| value == "wayland")
@@ -24,19 +24,25 @@ fn capture_wayland_selection() -> anyhow::Result<SelectedText> {
     use wl_clipboard_rs::paste::{ClipboardType, MimeType, Seat, get_contents};
 
     let (mut pipe, _) = get_contents(ClipboardType::Primary, Seat::Unspecified, MimeType::Text)
-        .context("the Wayland compositor does not expose the primary text selection")?;
+        .map_err(|error| {
+            anyhow::Error::new(SelectionCaptureError::CompositorProtocolMissing).context(format!(
+                "the Wayland compositor does not expose the primary text selection: {error}"
+            ))
+        })?;
     let mut bytes = Vec::new();
     pipe.read_to_end(&mut bytes)
         .context("could not read the Wayland text selection")?;
     let text = String::from_utf8(bytes).context("the selected text is not valid UTF-8")?;
-    SelectedText::new(text.trim_matches('\0')).map_err(Into::into)
+    selected_text(text.trim_matches('\0'))
 }
 
 /// X11 publishes highlighted text through PRIMARY, independently of the
 /// regular clipboard.
 fn capture_x11_selection() -> anyhow::Result<SelectedText> {
-    let clipboard =
-        x11_clipboard::Clipboard::new().context("could not connect to the X11 selection")?;
+    let clipboard = x11_clipboard::Clipboard::new().map_err(|error| {
+        anyhow::Error::new(SelectionCaptureError::ProviderUnsupported)
+            .context(format!("could not connect to the X11 selection: {error}"))
+    })?;
     let utf8 = clipboard.load(
         clipboard.getter.atoms.primary,
         clipboard.getter.atoms.utf8_string,
@@ -53,9 +59,29 @@ fn capture_x11_selection() -> anyhow::Result<SelectedText> {
                     clipboard.getter.atoms.property,
                     Duration::from_millis(500),
                 )
-                .context("the X11 primary selection does not contain text")?;
+                .map_err(x11_selection_error)?;
             bytes.into_iter().map(char::from).collect()
         }
     };
-    SelectedText::new(text.trim_matches('\0')).map_err(Into::into)
+    selected_text(text.trim_matches('\0'))
+}
+
+fn x11_selection_error(error: x11_clipboard::error::Error) -> anyhow::Error {
+    let capture_error = is_timeout(&error)
+        .then_some(SelectionCaptureError::ProviderTimeout)
+        .unwrap_or(SelectionCaptureError::ProviderUnsupported);
+    anyhow::Error::new(capture_error).context(format!(
+        "the X11 primary selection does not contain supported text: {error}"
+    ))
+}
+
+fn is_timeout(error: &x11_clipboard::error::Error) -> bool {
+    matches!(error, x11_clipboard::error::Error::Timeout)
+}
+
+fn selected_text(text: &str) -> anyhow::Result<SelectedText> {
+    SelectedText::new(text).map_err(|error| match error {
+        SelectionError::Empty => SelectionCaptureError::NoSelection.into(),
+        error => anyhow::Error::new(error),
+    })
 }
