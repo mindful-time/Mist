@@ -54,10 +54,10 @@ impl MistRenderer {
 
         let span = rect.width().min(rect.height()) * 1.02;
         let layers = [
-            (1.0, 0.0, 72u8, primary),
-            (0.9, 1.8, 46, secondary),
-            (0.78, 3.7, 30, glow),
-            (0.67, 5.4, 22, primary),
+            (1.0, 0.0, 22u8, primary),
+            (0.9, 1.8, 14, secondary),
+            (0.78, 3.7, 8, glow),
+            (0.67, 5.4, 5, primary),
         ];
         for (index, (scale, offset, alpha, color)) in layers.into_iter().enumerate() {
             let layer_phase = phase * (1.0 + index as f32 * 0.12) + offset;
@@ -81,7 +81,7 @@ impl MistRenderer {
                 * (0.045 + index as f32 * 0.009)
                 * if index % 2 == 0 { 1.0 } else { -1.0 }
                 + voice_wave * reactivity * (0.035 + index as f32 * 0.006);
-            let opacity = (f32::from(alpha) + reactivity * 72.0)
+            let opacity = (f32::from(alpha) + reactivity * 100.0)
                 .round()
                 .clamp(0.0, 255.0) as u8;
             painter.add(textured_quad(
@@ -121,7 +121,7 @@ impl MistRenderer {
 }
 
 fn audio_reactivity(energy: u8) -> f32 {
-    ((f32::from(energy) - 8.0) / 247.0).clamp(0.0, 1.0).sqrt()
+    ((f32::from(energy) - 12.0) / 243.0).clamp(0.0, 1.0).sqrt()
 }
 
 fn motion_for(activity: MistActivity, reactivity: f32, brightness: f32) -> MistMotion {

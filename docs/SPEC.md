@@ -24,7 +24,9 @@ text-to-speech model.
 - During normal operation the draggable, always-on-top surface contains only a
   translucent animated mist: no card, chrome, title, buttons, or permanent
   copy is visible on the desktop. The native window shadow, backing disk,
-  outline, and decorative pulse rings are disabled.
+  outline, and decorative pulse rings are disabled. Its idle footprint stays
+  compact and low-opacity so work remains legible beneath it; speech can make
+  the same surface denser and brighter without expanding into a blocking card.
 - The mist changes movement and intensity with speech lifecycle and audio
   energy. Audio features are eased between playback windows so movement never
   jumps at the 40 ms sampling boundary; when idle, the mist continues a slow,

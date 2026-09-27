@@ -32,8 +32,26 @@ use self::{
     tray::{TrayAction, TrayAdapter},
 };
 
-pub(crate) const MIST_WINDOW: Vec2 = Vec2::new(300.0, 300.0);
+pub(crate) const MIST_WINDOW: Vec2 = Vec2::new(164.0, 164.0);
+const CONTEXT_MENU_WINDOW: Vec2 = Vec2::new(280.0, 420.0);
 const PANEL_WINDOW: Vec2 = Vec2::new(600.0, 680.0);
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ViewportMode {
+    Mist,
+    ContextMenu,
+    Panel,
+}
+
+impl ViewportMode {
+    fn size(self) -> Vec2 {
+        match self {
+            Self::Mist => MIST_WINDOW,
+            Self::ContextMenu => CONTEXT_MENU_WINDOW,
+            Self::Panel => PANEL_WINDOW,
+        }
+    }
+}
 
 pub struct PetApp {
     commands: mpsc::SyncSender<WorkerCommand>,
@@ -49,7 +67,8 @@ pub struct PetApp {
     voices_ready: bool,
     voice_preview: VoicePreviewActivity,
     panel_open: bool,
-    panel_visible_last_frame: bool,
+    viewport_mode: ViewportMode,
+    mist_screen_center: Option<Pos2>,
     #[cfg(any(target_os = "windows", target_os = "linux"))]
     manual_text: String,
 }
@@ -85,7 +104,8 @@ impl PetApp {
             voices_ready: false,
             voice_preview: VoicePreviewActivity::Idle,
             panel_open,
-            panel_visible_last_frame: false,
+            viewport_mode: ViewportMode::Mist,
+            mist_screen_center: None,
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             manual_text: String::new(),
         };
@@ -230,16 +250,40 @@ impl PetApp {
         }
     }
 
-    fn sync_window_size(&mut self, context: &egui::Context, panel_visible: bool) {
-        if panel_visible == self.panel_visible_last_frame {
+    fn sync_window_size(&mut self, context: &egui::Context, mode: ViewportMode) {
+        if mode == self.viewport_mode {
             return;
         }
-        self.panel_visible_last_frame = panel_visible;
-        context.send_viewport_cmd(egui::ViewportCommand::InnerSize(if panel_visible {
-            PANEL_WINDOW
-        } else {
-            MIST_WINDOW
-        }));
+        let outer_rect = context.input(|input| input.viewport().outer_rect);
+        if self.mist_screen_center.is_none() {
+            self.mist_screen_center = outer_rect.map(|rect| rect.center());
+        }
+        if let Some(center) = self.mist_screen_center {
+            let position = viewport_origin_for_center(center, mode.size());
+            context.send_viewport_cmd(egui::ViewportCommand::OuterPosition(position));
+        }
+        self.viewport_mode = mode;
+        context.send_viewport_cmd(egui::ViewportCommand::InnerSize(mode.size()));
+    }
+
+    fn mist_rect(&mut self, ui: &egui::Ui) -> Rect {
+        let outer_rect = ui.ctx().input(|input| input.viewport().outer_rect);
+        if self.viewport_mode == ViewportMode::Mist
+            && outer_rect.is_some_and(|rect| {
+                (rect.width() - MIST_WINDOW.x).abs() <= 2.0
+                    && (rect.height() - MIST_WINDOW.y).abs() <= 2.0
+            })
+        {
+            self.mist_screen_center = None;
+        }
+        let center = match (self.mist_screen_center, outer_rect) {
+            (Some(screen_center), Some(viewport)) => screen_center - viewport.min.to_vec2(),
+            (None, _) if self.viewport_mode != ViewportMode::Mist => {
+                ui.max_rect().min + MIST_WINDOW * 0.5
+            }
+            _ => ui.max_rect().center(),
+        };
+        Rect::from_center_size(center, MIST_WINDOW).shrink(2.0)
     }
 
     fn paint_mist_only(
@@ -247,9 +291,9 @@ impl PetApp {
         ui: &mut egui::Ui,
         time: f32,
         presentation: presentation::MistPresentation,
-    ) {
+    ) -> bool {
         let context = ui.ctx().clone();
-        let rect = ui.max_rect().shrink(2.0);
+        let rect = self.mist_rect(ui);
         let response = ui.interact(rect, ui.id().with("living-mist"), Sense::click_and_drag());
         let selected = self.selected_voice.voice_id.as_str();
         let profile = voice_profile(selected).unwrap_or(&VOICE_CATALOG[0]);
@@ -261,6 +305,7 @@ impl PetApp {
             context.send_viewport_cmd(egui::ViewportCommand::StartDrag);
         }
         response.context_menu(|ui| self.context_menu(ui, &context));
+        response.context_menu_opened()
     }
 
     fn paint_panel(
@@ -539,14 +584,19 @@ impl eframe::App for PetApp {
             shell_error,
         );
         let panel_visible = self.panel_open || presentation.requires_panel;
-        self.sync_window_size(&context, panel_visible);
         let time = context.input(|input| input.time as f32);
         let presentation = self.mist_smoother.update(presentation, time);
-        if panel_visible {
+        let context_menu_visible = if panel_visible {
             self.paint_panel(ui, time, presentation);
+            false
         } else {
-            self.paint_mist_only(ui, time, presentation);
-        }
+            self.paint_mist_only(ui, time, presentation)
+        };
+        let mode = viewport_mode(
+            self.panel_open || presentation.requires_panel,
+            context_menu_visible,
+        );
+        self.sync_window_size(&context, mode);
     }
 
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
@@ -559,6 +609,20 @@ fn selected_voice_index(selected: &str) -> usize {
         .iter()
         .position(|voice| voice.id == selected)
         .unwrap_or(0)
+}
+
+fn viewport_mode(panel_visible: bool, context_menu_visible: bool) -> ViewportMode {
+    if panel_visible {
+        ViewportMode::Panel
+    } else if context_menu_visible {
+        ViewportMode::ContextMenu
+    } else {
+        ViewportMode::Mist
+    }
+}
+
+fn viewport_origin_for_center(center: Pos2, size: Vec2) -> Pos2 {
+    center - size * 0.5
 }
 
 fn authoritative_voice_after_enqueue<'a>(
@@ -710,6 +774,21 @@ mod tests {
                 .voice_id
                 .as_str(),
             "af_bella"
+        );
+    }
+
+    #[test]
+    fn settings_panel_wins_over_context_menu_viewport_size() {
+        assert_eq!(viewport_mode(true, true), ViewportMode::Panel);
+        assert_eq!(viewport_mode(false, true), ViewportMode::ContextMenu);
+        assert_eq!(viewport_mode(false, false), ViewportMode::Mist);
+    }
+
+    #[test]
+    fn expanded_viewport_preserves_center_on_secondary_monitors() {
+        assert_eq!(
+            viewport_origin_for_center(Pos2::new(-300.0, -200.0), CONTEXT_MENU_WINDOW),
+            Pos2::new(-440.0, -410.0)
         );
     }
 }
