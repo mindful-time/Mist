@@ -14,7 +14,7 @@ eframe = { version = "0.36.2", default-features = false, features = ["default_fo
 enigo = "0.6.1"
 hound = "3.5"
 image = { version = "0.25.10", default-features = false, features = ["png"] }
-kokoro-en = { version = "0.1.5", default-features = false, features = ["misaki-lean"] }
+kokoro-micro = { version = "=1.3.0", default-features = false }
 sha2 = "0.10"
 thiserror = "2.0"
 tokio = { version = "1.49", features = ["rt-multi-thread"] }
@@ -35,6 +35,7 @@ global-hotkey = "0.8"
 uiautomation = "0.25.1"
 tray-icon = { version = "0.25.1", default-features = false }
 windows-sys = { version = "0.61.2", features = ["Win32_Media_Multimedia"] }
+kokoro-micro = { version = "=1.3.0", default-features = false, features = ["cuda"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 arboard = { version = "3.6", features = ["wayland-data-control"] }
@@ -46,6 +47,7 @@ libc = "0.2"
 wl-clipboard-rs = "0.9.3"
 x11-clipboard = "0.9.3"
 tray-icon = { version = "0.25.1", default-features = false, features = ["ksni"] }
+kokoro-micro = { version = "=1.3.0", default-features = false, features = ["cuda"] }
 
 [dev-dependencies]
 tempfile = "3.23"

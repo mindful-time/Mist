@@ -9,9 +9,13 @@ pub mod worker;
 
 pub use application::{InstallModel, SpeakSelection};
 pub use domain::{
-    Audio, AudioFeatures, MistPalette, PlaybackPreferences, QueueError, QueueItemId,
-    QueueItemState, QueuedSpeech, SelectedText, SelectionCaptureError, SelectionError, SpeechQueue,
-    VOICE_CATALOG, VoiceId, VoiceProfile, VoiceSettings, voice_profile,
+    Audio, AudioFeatures, InferenceProviderId, LanguageId, LanguageProfile, MistPalette,
+    PlaybackMode, PlaybackPreferences, PlaybackSpeed, ProviderCapability, ProviderPerformance,
+    QueueError, QueueItemId, QueueItemState, QueuedSpeech, SelectedText, SelectionCaptureError,
+    SelectionError, SpeechQueue, VoiceId, VoiceProfile, VoiceSettings,
 };
 pub use playback::{PlaybackController, PlaybackPhase, PlaybackStopped, PlaybackToken};
-pub use ports::{AudioPlayer, ModelProvisioner, SpeechSynthesizer};
+pub use ports::{
+    AudioPlayer, DynSpeechSynthesizer, LoadedSpeechEngine, ModelProvisioner, SpeechEngineFactory,
+    SpeechSynthesizer, VoiceCatalog,
+};

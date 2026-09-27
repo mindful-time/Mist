@@ -11,6 +11,11 @@ pub struct ServiceProviderIvars {
     selections: Sender<SelectedText>,
 }
 
+// This declaration is compiled out, but gives all-cfg source analyzers a
+// stable owner for methods emitted by objc2's `define_class!` macro below.
+#[cfg(any())]
+pub struct ServiceProvider;
+
 define_class!(
     // SAFETY: NSObject has no subclassing requirements and this type is main-thread-only.
     #[unsafe(super = NSObject)]

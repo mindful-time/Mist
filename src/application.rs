@@ -1,16 +1,14 @@
 use crate::{
-    domain::{AudioFeatures, SelectedText, VoiceSettings},
+    domain::{AudioFeatures, PlaybackMode, SelectedText, VoiceSettings},
     ports::{AudioPlayer, ModelProvisioner, SpeechSynthesizer},
 };
 
-pub const VOICE_PREVIEW_TEXT: &str = "Hello. This is how I'll bring your selected words to life.";
-
-/// Application use-case. It knows nothing about AppKit, Kokoro, or system audio.
+/// Application use-case. It knows nothing about AppKit, model runtimes, or system audio.
 pub struct SpeakSelection<S, P> {
     synthesizer: S,
     player: P,
     voice: VoiceSettings,
-    streaming_playback: bool,
+    playback_mode: PlaybackMode,
 }
 
 /// Application use-case for the explicit first-run model installation.
@@ -44,7 +42,7 @@ where
             synthesizer,
             player,
             voice,
-            streaming_playback: true,
+            playback_mode: PlaybackMode::RealTime,
         }
     }
 
@@ -56,8 +54,8 @@ where
         self.voice = voice;
     }
 
-    pub fn set_streaming_playback(&mut self, enabled: bool) {
-        self.streaming_playback = enabled;
+    pub fn set_playback_mode(&mut self, mode: PlaybackMode) {
+        self.playback_mode = mode;
     }
 
     /// Plays the short catalog sample with the voice the user just activated.
@@ -65,12 +63,11 @@ where
     pub fn preview_voice_with_playback_cues(
         &mut self,
         voice: VoiceSettings,
+        preview_text: SelectedText,
         on_playback: impl FnMut(AudioFeatures),
     ) -> anyhow::Result<()> {
         self.set_voice(voice);
-        let sample = SelectedText::new(VOICE_PREVIEW_TEXT)
-            .expect("the built-in voice preview copy must remain valid");
-        self.execute_with_playback_cues(sample, on_playback)
+        self.execute_with_playback_cues(preview_text, on_playback)
     }
 
     pub fn execute_with_playback_started(
@@ -94,7 +91,7 @@ where
         let player = &mut self.player;
         let mut emitted_audio = false;
 
-        if self.streaming_playback {
+        if self.playback_mode.streams_audio() {
             self.synthesizer
                 .synthesize_streaming(&text, &self.voice, &mut |audio| {
                     if audio.samples.is_empty() {
@@ -112,7 +109,7 @@ where
         }
 
         if !emitted_audio {
-            anyhow::bail!("Kokoro produced no audio");
+            anyhow::bail!("the speech engine produced no audio");
         }
         Ok(())
     }
@@ -128,6 +125,10 @@ mod tests {
     use super::*;
     use crate::domain::Audio;
 
+    fn test_voice(id: &str) -> VoiceSettings {
+        VoiceSettings::new(id).unwrap()
+    }
+
     struct FakeSynthesizer {
         seen: Arc<Mutex<Vec<String>>>,
     }
@@ -139,7 +140,7 @@ mod tests {
             _voice: &VoiceSettings,
         ) -> anyhow::Result<Audio> {
             self.seen.lock().unwrap().push(text.as_str().to_owned());
-            Ok(Audio::kokoro(vec![0.0, 0.25, -0.25]))
+            Ok(Audio::new(vec![0.0, 0.25, -0.25], 24_000))
         }
 
         fn synthesize_streaming(
@@ -149,8 +150,8 @@ mod tests {
             on_chunk: &mut dyn FnMut(Audio) -> anyhow::Result<()>,
         ) -> anyhow::Result<()> {
             self.seen.lock().unwrap().push(text.as_str().to_owned());
-            on_chunk(Audio::kokoro(vec![0.0, 0.25]))?;
-            on_chunk(Audio::kokoro(vec![-0.25]))
+            on_chunk(Audio::new(vec![0.0, 0.25], 24_000))?;
+            on_chunk(Audio::new(vec![-0.25], 24_000))
         }
     }
 
@@ -159,6 +160,10 @@ mod tests {
     }
 
     struct FailingPlayer;
+
+    struct VoiceRecorder(Arc<Mutex<Vec<(String, f32)>>>);
+
+    struct PreviewRecorder(Arc<Mutex<Vec<(String, String)>>>);
 
     struct FakeModels {
         ready: bool,
@@ -205,6 +210,34 @@ mod tests {
         }
     }
 
+    impl SpeechSynthesizer for VoiceRecorder {
+        fn synthesize(
+            &mut self,
+            _text: &SelectedText,
+            voice: &VoiceSettings,
+        ) -> anyhow::Result<Audio> {
+            self.0
+                .lock()
+                .unwrap()
+                .push((voice.voice_id.as_str().to_owned(), voice.speed));
+            Ok(Audio::new(vec![0.2], 24_000))
+        }
+    }
+
+    impl SpeechSynthesizer for PreviewRecorder {
+        fn synthesize(
+            &mut self,
+            text: &SelectedText,
+            voice: &VoiceSettings,
+        ) -> anyhow::Result<Audio> {
+            self.0
+                .lock()
+                .unwrap()
+                .push((text.as_str().to_owned(), voice.voice_id.as_str().to_owned()));
+            Ok(Audio::new(vec![0.2], 24_000))
+        }
+    }
+
     #[test]
     fn streams_synthesized_audio_chunks_to_the_player_in_order() {
         let seen = Arc::new(Mutex::new(Vec::new()));
@@ -215,7 +248,7 @@ mod tests {
             FakePlayer {
                 sample_counts: sample_counts.clone(),
             },
-            VoiceSettings::default(),
+            test_voice("test-default"),
         );
 
         use_case
@@ -242,9 +275,9 @@ mod tests {
             FakePlayer {
                 sample_counts: sample_counts.clone(),
             },
-            VoiceSettings::default(),
+            test_voice("test-default"),
         );
-        use_case.set_streaming_playback(false);
+        use_case.set_playback_mode(PlaybackMode::CompleteAudio);
 
         use_case
             .execute(SelectedText::new("Read after synthesis").unwrap())
@@ -261,7 +294,7 @@ mod tests {
                 seen: Arc::new(Mutex::new(Vec::new())),
             },
             FailingPlayer,
-            VoiceSettings::default(),
+            test_voice("test-default"),
         );
 
         let error = use_case
@@ -321,76 +354,50 @@ mod tests {
     }
 
     #[test]
-    fn selected_voice_is_used_without_reloading_the_speech_engine() {
-        struct VoiceRecorder(Arc<Mutex<Vec<String>>>);
-
-        impl SpeechSynthesizer for VoiceRecorder {
-            fn synthesize(
-                &mut self,
-                _text: &SelectedText,
-                voice: &VoiceSettings,
-            ) -> anyhow::Result<Audio> {
-                self.0
-                    .lock()
-                    .unwrap()
-                    .push(voice.voice_id.as_str().to_owned());
-                Ok(Audio::kokoro(vec![0.2]))
-            }
-        }
-
+    fn selected_voice_and_speed_are_used_without_reloading_the_speech_engine() {
         let voices = Arc::new(Mutex::new(Vec::new()));
         let mut use_case = SpeakSelection::new(
             VoiceRecorder(voices.clone()),
             FakePlayer {
                 sample_counts: Arc::new(Mutex::new(Vec::new())),
             },
-            VoiceSettings::default(),
+            test_voice("test-default"),
         );
-        use_case.set_voice(VoiceSettings::from_voice_id("bf_emma").unwrap());
+        let mut voice = test_voice("bf_emma");
+        voice.speed = 1.35;
+        use_case.set_voice(voice);
         use_case
             .execute(SelectedText::new("A different voice").unwrap())
             .unwrap();
 
-        assert_eq!(&*voices.lock().unwrap(), &["bf_emma"]);
+        assert_eq!(&*voices.lock().unwrap(), &[("bf_emma".to_owned(), 1.35)]);
     }
 
     #[test]
     fn voice_preview_uses_the_clicked_voice_and_preview_copy() {
-        struct PreviewRecorder(Arc<Mutex<Vec<(String, String)>>>);
-
-        impl SpeechSynthesizer for PreviewRecorder {
-            fn synthesize(
-                &mut self,
-                text: &SelectedText,
-                voice: &VoiceSettings,
-            ) -> anyhow::Result<Audio> {
-                self.0
-                    .lock()
-                    .unwrap()
-                    .push((text.as_str().to_owned(), voice.voice_id.as_str().to_owned()));
-                Ok(Audio::kokoro(vec![0.2]))
-            }
-        }
-
         let previews = Arc::new(Mutex::new(Vec::new()));
         let mut use_case = SpeakSelection::new(
             PreviewRecorder(previews.clone()),
             FakePlayer {
                 sample_counts: Arc::new(Mutex::new(Vec::new())),
             },
-            VoiceSettings::default(),
+            test_voice("test-default"),
         );
 
         use_case
             .preview_voice_with_playback_cues(
-                VoiceSettings::from_voice_id("bm_daniel").unwrap(),
+                test_voice("bm_daniel"),
+                SelectedText::new("Preview supplied by adapter").unwrap(),
                 |_| {},
             )
             .unwrap();
 
         assert_eq!(
             &*previews.lock().unwrap(),
-            &[(VOICE_PREVIEW_TEXT.to_owned(), "bm_daniel".to_owned())]
+            &[(
+                "Preview supplied by adapter".to_owned(),
+                "bm_daniel".to_owned()
+            )]
         );
     }
 
@@ -404,7 +411,7 @@ mod tests {
             FakePlayer {
                 sample_counts: Arc::new(Mutex::new(Vec::new())),
             },
-            VoiceSettings::default(),
+            test_voice("test-default"),
         );
 
         use_case

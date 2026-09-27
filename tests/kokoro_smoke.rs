@@ -1,6 +1,8 @@
 use mist::{
-    SelectedText, SpeechSynthesizer, VoiceSettings, adapters::kokoro::KokoroSynthesizer,
+    SelectedText, SpeechSynthesizer,
+    adapters::{kokoro::KokoroSynthesizer, kokoro_catalog::KokoroVoiceCatalog},
     model_store::ModelStore,
+    ports::VoiceCatalog,
 };
 
 /// Optional end-to-end model check. It is ignored in normal CI because the
@@ -13,12 +15,18 @@ fn local_kokoro_model_produces_audio() {
 
     let mut synthesizer =
         KokoroSynthesizer::load(&store.model_path(), &store.voices_path()).expect("load Kokoro");
-    for voice in ["af_heart", "bm_daniel"] {
+    let catalog = KokoroVoiceCatalog;
+    for (voice, sample) in [
+        ("af_heart", "Hello from Mist."),
+        ("ef_dora", "Hola desde Mist."),
+        ("jf_alpha", "こんにちは、ミストです。"),
+        ("zf_xiaoni", "你好，这里是 Mist。"),
+    ] {
         let mut chunks = Vec::new();
         synthesizer
             .synthesize_streaming(
-                &SelectedText::new("Hello from Kokoro.").unwrap(),
-                &VoiceSettings::from_voice_id(voice).unwrap(),
+                &SelectedText::new(sample).unwrap(),
+                &catalog.settings(voice).unwrap(),
                 &mut |audio| {
                     chunks.push(audio);
                     Ok(())

@@ -87,7 +87,7 @@ pub(super) fn mist_for_status(
         return MistPresentation {
             activity: MistActivity::Attention,
             features: features(18, 20),
-            requires_panel: true,
+            requires_panel: false,
         };
     }
     match status {
@@ -135,41 +135,33 @@ const fn features(energy: u8, brightness: u8) -> AudioFeatures {
 
 pub(super) fn copy_for_status(
     status: &AppStatus,
-    accessibility_required: bool,
+    _accessibility_required: bool,
     platform_error: Option<&str>,
     tray_error: Option<&str>,
 ) -> StatusCopy {
-    if accessibility_required {
-        return StatusCopy {
-            eyebrow: "ONE LAST STEP",
-            title: "Let the mist hear your selection",
-            detail: "Enable Mist in Privacy & Security › Accessibility. Audio and selected text stay on this device.".to_owned(),
-            action: PrimaryAction::OpenAccessibility,
-        };
-    }
     match status {
         AppStatus::CheckingModel => StatusCopy {
             eyebrow: "WAKING UP",
             title: "Forming your mist",
-            detail: "Checking the local Kokoro voices…".to_owned(),
+            detail: "Checking the local speech voices…".to_owned(),
             action: PrimaryAction::None,
         },
         AppStatus::MissingModel => StatusCopy {
             eyebrow: "WELCOME",
             title: "Choose the voice in your mist",
-            detail: "Pick a character below, then download Kokoro once. Every voice runs locally and privately.".to_owned(),
+            detail: "Pick a character below, then download the speech model once. Every voice runs locally and privately.".to_owned(),
             action: PrimaryAction::InstallVoices,
         },
         AppStatus::Downloading => StatusCopy {
             eyebrow: "LOCAL SETUP",
             title: "Gathering the voices",
-            detail: "Downloading the verified Kokoro model and eight voice textures. This happens only once.".to_owned(),
+            detail: "Downloading the verified speech model and voice pack. This happens only once.".to_owned(),
             action: PrimaryAction::None,
         },
         AppStatus::Loading => StatusCopy {
             eyebrow: "WARMING UP",
             title: "Giving the mist a voice",
-            detail: "Loading Kokoro with the fastest available local inference provider.".to_owned(),
+            detail: "Loading the speech engine with the selected local inference provider.".to_owned(),
             action: PrimaryAction::None,
         },
         AppStatus::Synthesizing {
@@ -188,7 +180,7 @@ pub(super) fn copy_for_status(
         } => StatusCopy {
             eyebrow: "SPEAKING",
             title: "The mist is alive",
-            detail: format!("“{text}” · streaming with {inference_policy}"),
+            detail: format!("“{text}” · local playback · {inference_policy}"),
             action: PrimaryAction::None,
         },
         AppStatus::Error(message) => StatusCopy {
@@ -270,12 +262,12 @@ mod tests {
     }
 
     #[test]
-    fn setup_and_permission_states_remain_actionable() {
+    fn setup_stays_actionable_but_privacy_permission_does_not_trap_settings_open() {
         assert!(mist_for_status(&AppStatus::MissingModel, false, None).requires_panel);
-        assert!(mist_for_status(&AppStatus::Ready, true, None).requires_panel);
+        assert!(!mist_for_status(&AppStatus::Ready, true, None).requires_panel);
         assert_eq!(
             copy_for_status(&AppStatus::Ready, true, None, None).action,
-            PrimaryAction::OpenAccessibility
+            PrimaryAction::None
         );
     }
 

@@ -36,37 +36,90 @@ pub(super) fn configure_interface(context: &egui::Context) {
 fn install_system_font(context: &egui::Context) {
     #[cfg(target_os = "macos")]
     let candidates = [
-        "/System/Library/Fonts/SFNS.ttf",
-        "/System/Library/Fonts/Helvetica.ttc",
+        ("system-ui", "/System/Library/Fonts/SFNS.ttf"),
+        ("system-cjk", "/System/Library/Fonts/Hiragino Sans GB.ttc"),
+        (
+            "system-devanagari",
+            "/System/Library/Fonts/Supplemental/Devanagari Sangam MN.ttc",
+        ),
     ];
     #[cfg(target_os = "windows")]
     let candidates = [
-        "C:\\Windows\\Fonts\\segoeui.ttf",
-        "C:\\Windows\\Fonts\\arial.ttf",
+        ("system-ui", "C:\\Windows\\Fonts\\segoeui.ttf"),
+        ("system-japanese", "C:\\Windows\\Fonts\\meiryo.ttc"),
+        ("system-chinese", "C:\\Windows\\Fonts\\msyh.ttc"),
+        ("system-devanagari", "C:\\Windows\\Fonts\\Nirmala.ttf"),
     ];
     #[cfg(target_os = "linux")]
     let candidates = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+        (
+            "system-ui",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        ),
+        (
+            "system-cjk",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        ),
+        (
+            "system-devanagari",
+            "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf",
+        ),
+        (
+            "system-ui-fallback",
+            "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+        ),
     ];
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
-    let candidates: [&str; 0] = [];
+    let candidates: [(&str, &str); 0] = [];
 
-    for path in candidates {
+    let mut fonts = FontDefinitions::default();
+    let mut loaded = Vec::new();
+    for (name, path) in candidates {
         let Ok(bytes) = fs::read(path) else {
             continue;
         };
-        let mut fonts = FontDefinitions::default();
-        let name = "system-ui".to_owned();
+        let name = name.to_owned();
         fonts
             .font_data
             .insert(name.clone(), Arc::new(FontData::from_owned(bytes)));
+        loaded.push(name);
+    }
+    if !loaded.is_empty() {
         fonts
             .families
             .entry(FontFamily::Proportional)
             .or_default()
-            .insert(0, name);
+            .splice(0..0, loaded);
         context.set_fonts(fonts);
-        break;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use eframe::egui::{FontFamily, FontId, RawInput};
+
+    use super::*;
+
+    #[test]
+    fn configured_interface_covers_every_supported_writing_system() {
+        let context = egui::Context::default();
+        configure_interface(&context);
+        context.begin_pass(RawInput::default());
+
+        let font = FontId::new(16.0, FontFamily::Proportional);
+        for sample in [
+            "Mist speaks clearly",
+            "ミストが話します",
+            "薄雾会说话",
+            "मिस्ट बोलता है",
+        ] {
+            assert!(
+                context.fonts_mut(|fonts| fonts.has_glyphs(&font, sample)),
+                "configured UI fonts do not cover {sample:?}"
+            );
+        }
+
+        let mut output = context.end_pass();
+        output.textures_delta.clear();
     }
 }

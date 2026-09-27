@@ -1,6 +1,7 @@
 mod mist;
 mod presentation;
 mod queue_tray;
+mod settings;
 mod system_settings;
 mod theme;
 mod tray;
@@ -8,19 +9,22 @@ mod voice_gallery;
 
 use std::{
     collections::HashMap,
-    sync::mpsc::{self, TrySendError},
+    sync::{Arc, mpsc},
     time::Duration,
 };
 
 use ::mist::{
-    PlaybackController, PlaybackPhase, PlaybackPreferences, PlaybackToken, QueueItemId,
-    QueueItemState, SpeechQueue, VOICE_CATALOG, VoiceSettings,
+    InferenceProviderId, PlaybackController, PlaybackPhase, PlaybackPreferences, PlaybackToken,
+    ProviderCapability, QueueItemId, QueueItemState, SpeechQueue, VoiceSettings,
     adapters::{
-        clipboard_fallback::ClipboardLease, playback_preferences::PlaybackPreferencesStore,
+        clipboard_fallback::ClipboardLease, model_preferences::ModelPreferencesStore,
+        playback_preferences::PlaybackPreferencesStore,
     },
     platform::{CapturedSelection, PlatformBridge, PlatformEvent},
-    voice_profile,
-    worker::{AppStatus, WorkerCommand},
+    ports::VoiceCatalog,
+    worker::{
+        AppStatus, PreviewDispatcher, WorkerCommand, WorkerCommands, WorkerHandle, WorkerSendError,
+    },
 };
 use eframe::egui::{
     self, Align2, Button, Color32, FontId, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, Vec2,
@@ -31,6 +35,7 @@ use self::{
     mist::MistRenderer,
     presentation::{MistSmoother, PrimaryAction, copy_for_status, mist_for_status},
     queue_tray::{QueueAction, QueueTrayResponse},
+    settings::{SettingsAction, SettingsSection},
     system_settings::open_accessibility_settings,
     theme::{
         PANEL_BACKGROUND, TEXT_MUTED, TEXT_PRIMARY, TEXT_SECONDARY, configure_interface,
@@ -43,7 +48,7 @@ pub(crate) const MIST_WINDOW: Vec2 = Vec2::new(164.0, 164.0);
 const SPEAKING_MIST_WINDOW: Vec2 = Vec2::new(232.0, 232.0);
 const QUEUE_WINDOW_WIDTH: f32 = 282.0;
 const CONTEXT_MENU_WINDOW: Vec2 = Vec2::new(280.0, 420.0);
-const PANEL_WINDOW: Vec2 = Vec2::new(600.0, 680.0);
+const PANEL_WINDOW: Vec2 = Vec2::new(720.0, 680.0);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ViewportMode {
@@ -69,9 +74,10 @@ impl ViewportMode {
 }
 
 pub struct PetApp {
-    commands: mpsc::SyncSender<WorkerCommand>,
+    commands: WorkerCommands,
     statuses: mpsc::Receiver<AppStatus>,
     playback: PlaybackController,
+    previews: PreviewDispatcher,
     status: AppStatus,
     platform: PlatformBridge,
     mist: MistRenderer,
@@ -80,6 +86,7 @@ pub struct PetApp {
     tray_error: Option<String>,
     last_platform_error: Option<String>,
     selected_voice: VoiceSettings,
+    voice_catalog: Arc<dyn VoiceCatalog>,
     voices_ready: bool,
     voice_preview: VoicePreviewActivity,
     panel_open: bool,
@@ -92,36 +99,63 @@ pub struct PetApp {
     queue_playback_started: bool,
     playback_preferences: PlaybackPreferences,
     playback_preferences_store: PlaybackPreferencesStore,
+    settings_section: SettingsSection,
+    model_provider: InferenceProviderId,
+    active_model_provider: InferenceProviderId,
+    model_preferences_store: ModelPreferencesStore,
+    provider_capabilities: Vec<ProviderCapability>,
     #[cfg(any(target_os = "windows", target_os = "linux"))]
     manual_text: String,
+}
+
+pub(crate) struct AppSettings {
+    pub(crate) playback: PlaybackPreferences,
+    pub(crate) playback_store: PlaybackPreferencesStore,
+    pub(crate) model_provider: InferenceProviderId,
+    pub(crate) model_store: ModelPreferencesStore,
+    pub(crate) provider_capabilities: Vec<ProviderCapability>,
+    pub(crate) open_panel: bool,
 }
 
 impl PetApp {
     pub fn new(
         creation_context: &eframe::CreationContext<'_>,
-        commands: mpsc::SyncSender<WorkerCommand>,
-        statuses: mpsc::Receiver<AppStatus>,
-        playback: PlaybackController,
-        selected_voice: VoiceSettings,
-        playback_preferences: PlaybackPreferences,
-        playback_preferences_store: PlaybackPreferencesStore,
+        worker: WorkerHandle,
+        voice_catalog: Arc<dyn VoiceCatalog>,
+        settings: AppSettings,
     ) -> Self {
+        let WorkerHandle {
+            commands,
+            statuses,
+            selected_voice,
+            playback,
+            previews,
+        } = worker;
+        let AppSettings {
+            playback: playback_preferences,
+            playback_store: playback_preferences_store,
+            model_provider,
+            model_store: model_preferences_store,
+            provider_capabilities,
+            open_panel,
+        } = settings;
         configure_interface(&creation_context.egui_ctx);
         let mut platform = PlatformBridge::new();
         platform
             .set_automatic_clipboard_fallback(playback_preferences.automatic_clipboard_fallback);
         let mist = MistRenderer::new(&creation_context.egui_ctx)
             .expect("the embedded living-mist texture should decode");
-        let (tray, tray_error) = match TrayAdapter::new(&selected_voice) {
+        let (tray, tray_error) = match TrayAdapter::new(&selected_voice, voice_catalog.voices()) {
             Ok(tray) => (Some(tray), None),
             Err(error) => (None, Some(format!("Menu-bar setup failed: {error:#}"))),
         };
         let last_platform_error = platform.registration_error().map(str::to_owned);
-        let panel_open = tray_error.is_some();
+        let panel_open = open_panel || tray_error.is_some();
         let app = Self {
             commands,
             statuses,
             playback,
+            previews,
             status: AppStatus::CheckingModel,
             platform,
             mist,
@@ -130,6 +164,7 @@ impl PetApp {
             tray_error,
             last_platform_error,
             selected_voice,
+            voice_catalog,
             voices_ready: false,
             voice_preview: VoicePreviewActivity::Idle,
             panel_open,
@@ -142,6 +177,11 @@ impl PetApp {
             queue_playback_started: false,
             playback_preferences,
             playback_preferences_store,
+            settings_section: SettingsSection::default(),
+            model_provider: model_provider.clone(),
+            active_model_provider: model_provider,
+            model_preferences_store,
+            provider_capabilities,
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             manual_text: String::new(),
         };
@@ -241,8 +281,8 @@ impl PetApp {
     fn enqueue(&mut self, command: WorkerCommand) -> bool {
         if let Err(error) = self.commands.try_send(command) {
             let message = match error {
-                TrySendError::Full(_) => "The speech queue is full. Try again in a moment.",
-                TrySendError::Disconnected(_) => "The speech worker stopped unexpectedly.",
+                WorkerSendError::Full => "The speech queue is full. Try again in a moment.",
+                WorkerSendError::Disconnected => "The speech worker stopped unexpectedly.",
             };
             self.set_error(message);
             false
@@ -405,29 +445,36 @@ impl PetApp {
     }
 
     fn select_voice(&mut self, voice_id: &str) {
-        let Some(settings) = VoiceSettings::from_voice_id(voice_id) else {
-            self.set_error(format!("Unknown Kokoro voice: {voice_id}"));
+        let Some(mut settings) = self.voice_catalog.settings(voice_id) else {
+            self.set_error(format!("Unknown voice: {voice_id}"));
             return;
         };
+        settings.speed = self.playback_preferences.speed.multiplier();
         self.enqueue_voice_command(settings.clone(), WorkerCommand::SelectVoice(settings));
     }
 
     fn preview_voice(&mut self, voice_id: &str) {
-        if self.voice_preview != VoicePreviewActivity::Idle
-            || !self.voices_ready
-            || self.speech_queue.active_id().is_some()
-        {
+        if !self.voices_ready || self.speech_queue.active_id().is_some() {
             return;
         }
-        let (settings, command) = match voice_preview_command(voice_id) {
-            Ok(command) => command,
+        let mut settings = match voice_preview_settings(self.voice_catalog.as_ref(), voice_id) {
+            Ok(settings) => settings,
             Err(error) => {
                 self.set_error(error);
                 return;
             }
         };
-        if self.enqueue_voice_command(settings, command) {
+        settings.speed = self.playback_preferences.speed.multiplier();
+        let replacing = self.voice_preview != VoicePreviewActivity::Idle;
+        if replacing {
+            self.playback.cancel(PlaybackToken::PREVIEW);
+        } else if !self.playback.register(PlaybackToken::PREVIEW) {
+            return;
+        }
+        if self.enqueue_preview(settings) {
             self.voice_preview = VoicePreviewActivity::Pending;
+        } else if !replacing {
+            self.playback.finish_session(PlaybackToken::PREVIEW);
         }
     }
 
@@ -440,6 +487,18 @@ impl PetApp {
         }
         if !queued {
             return false;
+        }
+        self.selected_voice = settings;
+        true
+    }
+
+    fn enqueue_preview(&mut self, settings: VoiceSettings) -> bool {
+        if self.previews.request(&settings).is_err() {
+            self.set_error("The speech worker stopped unexpectedly.");
+            return false;
+        }
+        if let Some(tray) = &self.tray {
+            tray.select_voice(settings.voice_id.as_str());
         }
         self.selected_voice = settings;
         true
@@ -537,8 +596,13 @@ impl PetApp {
         let rect = self.mist_rect(ui, mist_size);
         let response = ui.interact(rect, ui.id().with("living-mist"), Sense::click_and_drag());
         let selected = self.selected_voice.voice_id.as_str();
-        let profile = voice_profile(selected).unwrap_or(&VOICE_CATALOG[0]);
-        let seed = selected_voice_index(selected) as f32 * 0.83;
+        let profile = self.voice_catalog.profile(selected).unwrap_or_else(|| {
+            self.voice_catalog
+                .voices()
+                .first()
+                .expect("catalog is not empty")
+        });
+        let seed = selected_voice_index(self.voice_catalog.as_ref(), selected) as f32 * 0.83;
         self.mist
             .paint(ui, rect, time, presentation, profile.palette, seed);
 
@@ -594,7 +658,16 @@ impl PetApp {
 
         let items = self.speech_queue.items().to_vec();
         let selected = self.selected_voice.voice_id.as_str();
-        let palette = voice_profile(selected).unwrap_or(&VOICE_CATALOG[0]).palette;
+        let palette = self
+            .voice_catalog
+            .profile(selected)
+            .unwrap_or_else(|| {
+                self.voice_catalog
+                    .voices()
+                    .first()
+                    .expect("catalog is not empty")
+            })
+            .palette;
         let auto_play = self.playback_preferences.auto_play_queue;
         context.show_viewport_immediate(viewport_id, builder, move |ui, _class| {
             let response = queue_tray::show(ui, &items, queue_tray::TOP_GAP, palette, auto_play);
@@ -623,7 +696,15 @@ impl PetApp {
         );
 
         let selected_voice = self.selected_voice.voice_id.as_str();
-        let profile = voice_profile(selected_voice).unwrap_or(&VOICE_CATALOG[0]);
+        let profile = self
+            .voice_catalog
+            .profile(selected_voice)
+            .unwrap_or_else(|| {
+                self.voice_catalog
+                    .voices()
+                    .first()
+                    .expect("catalog is not empty")
+            });
         let accent = palette_color(profile.palette.primary);
         let preview = Rect::from_min_size(outer.min + Vec2::new(18.0, 16.0), Vec2::splat(142.0));
         self.mist.paint(
@@ -632,7 +713,7 @@ impl PetApp {
             time,
             presentation,
             profile.palette,
-            selected_voice_index(selected_voice) as f32 * 0.83,
+            selected_voice_index(self.voice_catalog.as_ref(), selected_voice) as f32 * 0.83,
         );
 
         let copy = copy_for_status(
@@ -677,7 +758,7 @@ impl PetApp {
             TEXT_SECONDARY,
             outer.right() - 26.0 - copy_left,
         );
-        detail.wrap.max_rows = 3;
+        detail.wrap.max_rows = 2;
         detail.wrap.overflow_character = Some('…');
         let detail = painter.layout_job(detail);
         painter.galley(
@@ -704,9 +785,35 @@ impl PetApp {
             self.panel_open = false;
         }
 
+        if copy.action != PrimaryAction::None {
+            let (label, enabled) = match (&self.status, copy.action) {
+                (AppStatus::Downloading, _) => ("Gathering voices…", false),
+                (_, PrimaryAction::InstallVoices) => ("Download voices · ~338 MiB", true),
+                (_, PrimaryAction::OpenAccessibility) => ("Open Accessibility", true),
+                _ => ("Continue", false),
+            };
+            let response = ui.put(
+                Rect::from_min_size(
+                    Pos2::new(outer.right() - 216.0, outer.top() + 126.0),
+                    Vec2::new(184.0, 32.0),
+                ),
+                Button::new(RichText::new(label).size(11.5).strong().color(TEXT_PRIMARY))
+                    .fill(if enabled {
+                        with_alpha(accent, 180)
+                    } else {
+                        Color32::from_white_alpha(10)
+                    })
+                    .stroke(Stroke::new(1.0, Color32::from_white_alpha(25)))
+                    .corner_radius(12.0),
+            );
+            if enabled && response.clicked() {
+                self.perform_action(copy.action);
+            }
+        }
+
         let drag_rect = Rect::from_min_max(
-            Pos2::new(outer.left() + 10.0, outer.top() + 8.0),
-            Pos2::new(outer.right() - 48.0, outer.top() + 158.0),
+            Pos2::new(outer.left() + 10.0, outer.top() + 6.0),
+            Pos2::new(outer.right() - 48.0, outer.top() + 26.0),
         );
         if ui
             .interact(drag_rect, ui.id().with("settings-drag"), Sense::drag())
@@ -715,121 +822,156 @@ impl PetApp {
             context.send_viewport_cmd(egui::ViewportCommand::StartDrag);
         }
 
-        let gallery_mode = gallery_mode(
-            &self.status,
-            self.voices_ready,
-            self.voice_preview,
-            self.speech_queue.active_id().is_none(),
+        let body = Rect::from_min_max(
+            Pos2::new(outer.left() + 18.0, outer.top() + 178.0),
+            Pos2::new(outer.right() - 18.0, outer.bottom() - 18.0),
         );
-        let gallery = voice_gallery::show(
-            ui,
-            &self.mist,
-            outer,
-            time,
-            self.selected_voice.voice_id.as_str(),
-            gallery_mode,
+        let sidebar = Rect::from_min_max(body.min, Pos2::new(body.left() + 148.0, body.bottom()));
+        let content = Rect::from_min_max(
+            Pos2::new(sidebar.right() + 26.0, body.top() + 4.0),
+            Pos2::new(body.right() - 6.0, body.bottom() - 4.0),
         );
-        if let Some(voice) = gallery.preview_voice {
-            self.preview_voice(voice);
-        }
-
-        let footer_top = gallery.bottom;
         painter.line_segment(
             [
-                Pos2::new(outer.left() + 25.0, footer_top),
-                Pos2::new(outer.right() - 25.0, footer_top),
+                Pos2::new(sidebar.right() + 12.0, body.top() + 4.0),
+                Pos2::new(sidebar.right() + 12.0, body.bottom() - 4.0),
             ],
-            Stroke::new(1.0, Color32::from_white_alpha(16)),
+            Stroke::new(1.0, Color32::from_white_alpha(15)),
         );
-        let preferences_before = self.playback_preferences;
-        ui.put(
-            Rect::from_min_size(
-                Pos2::new(outer.left() + 24.0, footer_top + 10.0),
-                Vec2::new(320.0, 24.0),
-            ),
-            egui::Checkbox::new(
-                &mut self.playback_preferences.auto_play_queue,
-                "Play new queue items automatically",
-            ),
-        )
-        .on_hover_text("Turn this off to click each floating queue bubble before it speaks.");
-        ui.put(
-            Rect::from_min_size(
-                Pos2::new(outer.left() + 24.0, footer_top + 37.0),
-                Vec2::new(320.0, 24.0),
-            ),
-            egui::Checkbox::new(
-                &mut self.playback_preferences.automatic_clipboard_fallback,
-                "Use Copy when selection access fails",
-            ),
-        )
-        .on_hover_text(
-            "After speaking, Mist clears the copied value only if its fingerprint and available platform change token still match. This is best effort; disable it for clipboard-sensitive workflows.",
-        );
-        ui.put(
-            Rect::from_min_size(
-                Pos2::new(outer.left() + 24.0, footer_top + 64.0),
-                Vec2::new(320.0, 24.0),
-            ),
-            egui::Checkbox::new(
-                &mut self.playback_preferences.streaming_playback,
-                "Stream speech as it is generated",
-            ),
-        )
-        .on_hover_text(
-            "Enabled by default so long selections begin speaking after the first Kokoro chunk is ready.",
-        );
-        if self.playback_preferences != preferences_before {
-            let streaming_changed = self.playback_preferences.streaming_playback
-                != preferences_before.streaming_playback;
-            self.persist_playback_preferences();
-            if streaming_changed {
-                self.enqueue(WorkerCommand::SetStreaming(
-                    self.playback_preferences.streaming_playback,
-                ));
-            }
+        if let Some(section) = settings::sidebar(ui, sidebar, self.settings_section, accent) {
+            self.settings_section = section;
         }
 
-        let button = Rect::from_min_size(
-            Pos2::new(outer.right() - 218.0, footer_top + 17.0),
-            Vec2::new(191.0, 44.0),
-        );
-        let (label, action, enabled) = match (&self.status, copy.action) {
-            (AppStatus::Downloading, _) => ("Gathering voices…", PrimaryAction::None, false),
-            (_, PrimaryAction::InstallVoices) => (
-                "Download voices · ~96 MB",
-                PrimaryAction::InstallVoices,
-                true,
+        let preferences_before = self.playback_preferences;
+        let settings_action = match self.settings_section {
+            SettingsSection::Voices => {
+                let gallery_mode = gallery_mode(
+                    &self.status,
+                    self.voices_ready,
+                    self.voice_preview,
+                    self.speech_queue.active_id().is_none(),
+                );
+                let language = self
+                    .voice_catalog
+                    .language_for(self.selected_voice.voice_id.as_str())
+                    .unwrap_or_else(|| {
+                        self.voice_catalog
+                            .languages()
+                            .first()
+                            .expect("catalog is not empty")
+                            .id
+                    });
+                if let Some(language) = settings::voice_language(
+                    ui,
+                    content,
+                    self.voice_catalog.as_ref(),
+                    language,
+                    accent,
+                ) {
+                    match language_voice_id(self.voice_catalog.as_ref(), language) {
+                        Ok(default_voice) => {
+                            if should_preview_language(
+                                self.voices_ready,
+                                self.speech_queue.active_id().is_none(),
+                            ) {
+                                self.preview_voice(&default_voice);
+                            } else {
+                                self.select_voice(&default_voice);
+                            }
+                        }
+                        Err(error) => self.set_error(error),
+                    }
+                }
+                let language = self
+                    .voice_catalog
+                    .language_for(self.selected_voice.voice_id.as_str())
+                    .unwrap_or(language);
+                let language_name = self
+                    .voice_catalog
+                    .languages()
+                    .iter()
+                    .find(|profile| profile.id == language)
+                    .map(|profile| profile.display_name)
+                    .unwrap_or(language.as_str());
+                let gallery = voice_gallery::show(
+                    ui,
+                    &self.mist,
+                    Rect::from_min_max(
+                        Pos2::new(content.left(), content.top() + settings::VOICE_LIST_OFFSET),
+                        content.max,
+                    ),
+                    voice_gallery::GalleryContent {
+                        time,
+                        selected_voice: self.selected_voice.voice_id.as_str(),
+                        voices: self.voice_catalog.voices(),
+                        language,
+                        language_name,
+                        mode: gallery_mode,
+                    },
+                );
+                if let Some(voice) = gallery.select_voice {
+                    self.preview_voice(&voice);
+                }
+                None
+            }
+            SettingsSection::Playback => {
+                settings::playback(ui, content, &mut self.playback_preferences, accent)
+            }
+            SettingsSection::Privacy => settings::privacy(
+                ui,
+                content,
+                &mut self.playback_preferences,
+                cfg!(target_os = "macos"),
+                accent,
             ),
-            (_, PrimaryAction::OpenAccessibility) => {
-                ("Open Accessibility", PrimaryAction::OpenAccessibility, true)
+            SettingsSection::Model => {
+                if let Some(provider) = settings::model(
+                    ui,
+                    content,
+                    &self.provider_capabilities,
+                    &self.model_provider,
+                    &self.active_model_provider,
+                    self.model_provider != self.active_model_provider,
+                    accent,
+                ) {
+                    if let Err(error) = self.model_preferences_store.save(&provider) {
+                        self.set_error(format!("Could not save model settings: {error:#}"));
+                    } else {
+                        self.model_provider = provider;
+                    }
+                }
+                None
             }
-            _ => ("Let it float", PrimaryAction::None, true),
         };
-        let response = ui.put(
-            button,
-            Button::new(RichText::new(label).size(12.0).strong().color(TEXT_PRIMARY))
-                .fill(if enabled {
-                    with_alpha(accent, 190)
-                } else {
-                    Color32::from_white_alpha(10)
-                })
-                .stroke(Stroke::new(1.0, Color32::from_white_alpha(25)))
-                .corner_radius(14.0),
-        );
-        if enabled && response.clicked() {
-            if action == PrimaryAction::None {
-                self.panel_open = false;
-            } else {
-                self.perform_action(action);
+        if self.playback_preferences != preferences_before {
+            self.persist_playback_preferences();
+            self.selected_voice.speed = self.playback_preferences.speed.multiplier();
+            self.enqueue(WorkerCommand::ConfigurePlayback(self.playback_preferences));
+        }
+        match settings_action {
+            Some(SettingsAction::PlayClipboard) => {
+                if let Err(error) = self.platform.request_clipboard_text() {
+                    self.set_error(error);
+                }
             }
+            Some(SettingsAction::OpenAccessibility) => {
+                self.perform_action(PrimaryAction::OpenAccessibility);
+            }
+            None => {}
         }
     }
 
     fn context_menu(&mut self, ui: &mut egui::Ui, context: &egui::Context) {
         ui.set_min_width(238.0);
-        let profile =
-            voice_profile(self.selected_voice.voice_id.as_str()).unwrap_or(&VOICE_CATALOG[0]);
+        let profile = self
+            .voice_catalog
+            .profile(self.selected_voice.voice_id.as_str())
+            .unwrap_or_else(|| {
+                self.voice_catalog
+                    .voices()
+                    .first()
+                    .expect("catalog is not empty")
+            });
         ui.label(RichText::new("MIST").small().color(TEXT_MUTED));
         ui.strong(format!("{} mist", profile.display_name));
         ui.label(
@@ -838,7 +980,7 @@ impl PetApp {
                 .color(TEXT_SECONDARY),
         );
         ui.separator();
-        if ui.button("Voice settings…").clicked() {
+        if ui.button("Settings…").clicked() {
             self.panel_open = true;
             ui.close();
         }
@@ -974,8 +1116,9 @@ impl Drop for PetApp {
     }
 }
 
-fn selected_voice_index(selected: &str) -> usize {
-    VOICE_CATALOG
+fn selected_voice_index(catalog: &dyn VoiceCatalog, selected: &str) -> usize {
+    catalog
+        .voices()
         .iter()
         .position(|voice| voice.id == selected)
         .unwrap_or(0)
@@ -1081,15 +1224,36 @@ fn voice_preview_available(
     queue_idle: bool,
 ) -> bool {
     voices_ready
-        && preview == VoicePreviewActivity::Idle
         && queue_idle
-        && matches!(status, AppStatus::Ready)
+        && match preview {
+            VoicePreviewActivity::Idle => matches!(status, AppStatus::Ready),
+            VoicePreviewActivity::Pending | VoicePreviewActivity::Active => matches!(
+                status,
+                AppStatus::Ready
+                    | AppStatus::Loading
+                    | AppStatus::Synthesizing { .. }
+                    | AppStatus::Speaking { .. }
+            ),
+        }
 }
 
-fn voice_preview_command(voice_id: &str) -> Result<(VoiceSettings, WorkerCommand), String> {
-    let settings = VoiceSettings::from_voice_id(voice_id)
-        .ok_or_else(|| format!("Unknown Kokoro voice: {voice_id}"))?;
-    Ok((settings.clone(), WorkerCommand::PreviewVoice(settings)))
+fn voice_preview_settings(
+    catalog: &dyn VoiceCatalog,
+    voice_id: &str,
+) -> Result<VoiceSettings, String> {
+    catalog
+        .settings(voice_id)
+        .ok_or_else(|| format!("Unknown voice: {voice_id}"))
+}
+
+fn language_voice_id(
+    catalog: &dyn VoiceCatalog,
+    language: ::mist::LanguageId,
+) -> Result<String, &'static str> {
+    catalog
+        .default_voice_for(language)
+        .map(str::to_owned)
+        .ok_or("The active speech model has no voice for that language")
 }
 
 fn queue_worker_available(
@@ -1104,28 +1268,29 @@ fn queue_worker_available(
         && matches!(status, AppStatus::Ready | AppStatus::Error(_))
 }
 
+fn should_preview_language(voices_ready: bool, queue_idle: bool) -> bool {
+    voices_ready && queue_idle
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ::mist::adapters::kokoro_catalog::KokoroVoiceCatalog;
 
     #[test]
     fn voice_card_action_dispatches_preview_for_the_exact_voice() {
-        let (settings, command) = voice_preview_command("bf_emma").unwrap();
-
+        let catalog = KokoroVoiceCatalog;
+        let settings = voice_preview_settings(&catalog, "bf_emma").unwrap();
         assert_eq!(settings.voice_id.as_str(), "bf_emma");
-        let WorkerCommand::PreviewVoice(preview) = command else {
-            panic!("voice cards must dispatch the preview path");
-        };
-        assert_eq!(preview.voice_id.as_str(), "bf_emma");
     }
 
     #[test]
-    fn pending_preview_disables_cards_until_its_terminal_status() {
+    fn active_preview_keeps_cards_available_for_immediate_replacement() {
         let pending = VoicePreviewActivity::Pending;
 
         assert_eq!(
             gallery_mode(&AppStatus::Ready, true, pending, true),
-            voice_gallery::GalleryMode::Busy
+            voice_gallery::GalleryMode::Available
         );
         assert_eq!(pending.after_status(&AppStatus::Ready), pending);
         let active = pending.after_status(&AppStatus::Synthesizing {
@@ -1133,6 +1298,10 @@ mod tests {
             inference_policy: "CPU".to_owned(),
         });
         assert_eq!(active, VoicePreviewActivity::Active);
+        assert_eq!(
+            gallery_mode(&AppStatus::Ready, true, active, true),
+            voice_gallery::GalleryMode::Available
+        );
         assert_eq!(
             active.after_status(&AppStatus::Ready),
             VoicePreviewActivity::Idle
@@ -1150,6 +1319,13 @@ mod tests {
             ),
             voice_gallery::GalleryMode::DownloadRequired
         );
+    }
+
+    #[test]
+    fn language_change_persists_without_preview_while_queue_owns_playback() {
+        assert!(!should_preview_language(true, false));
+        assert!(should_preview_language(true, true));
+        assert!(!should_preview_language(false, true));
     }
 
     #[test]
@@ -1201,8 +1377,8 @@ mod tests {
 
     #[test]
     fn failed_voice_enqueue_restores_the_authoritative_tray_selection() {
-        let current = VoiceSettings::from_voice_id("af_heart").unwrap();
-        let requested = VoiceSettings::from_voice_id("af_bella").unwrap();
+        let current = VoiceSettings::new("af_heart").unwrap();
+        let requested = VoiceSettings::new("af_bella").unwrap();
 
         assert_eq!(
             authoritative_voice_after_enqueue(&current, &requested, false)

@@ -2,7 +2,7 @@ use std::{fs, path::PathBuf};
 
 use anyhow::{Context, Result};
 
-use crate::domain::PlaybackPreferences;
+use crate::domain::{PlaybackMode, PlaybackPreferences, PlaybackSpeed};
 
 #[derive(Clone, Debug)]
 pub struct PlaybackPreferencesStore {
@@ -25,17 +25,24 @@ impl PlaybackPreferencesStore {
         let Some(automatic_clipboard_fallback) = lines.next().and_then(parse_bool) else {
             return PlaybackPreferences::default();
         };
-        let streaming_playback = match lines.next() {
+        let mode = match lines.next() {
             Some(value) => match parse_bool(value) {
-                Some(value) => value,
+                Some(true) => PlaybackMode::RealTime,
+                Some(false) => PlaybackMode::CompleteAudio,
                 None => return PlaybackPreferences::default(),
             },
-            None => true,
+            None => PlaybackMode::RealTime,
         };
+        let speed = lines
+            .next()
+            .and_then(|value| value.parse::<u16>().ok())
+            .and_then(PlaybackSpeed::from_percent)
+            .unwrap_or_default();
         PlaybackPreferences {
             auto_play_queue,
             automatic_clipboard_fallback,
-            streaming_playback,
+            mode,
+            speed,
         }
     }
 
@@ -47,10 +54,11 @@ impl PlaybackPreferencesStore {
         fs::write(
             &temporary,
             format!(
-                "{}\n{}\n{}\n",
+                "{}\n{}\n{}\n{}\n",
                 preferences.auto_play_queue,
                 preferences.automatic_clipboard_fallback,
-                preferences.streaming_playback
+                preferences.mode.streams_audio(),
+                preferences.speed.percent(),
             ),
         )
         .with_context(|| format!("could not write {}", temporary.display()))?;
@@ -89,7 +97,8 @@ mod tests {
         let preferences = PlaybackPreferences {
             auto_play_queue: false,
             automatic_clipboard_fallback: false,
-            streaming_playback: false,
+            mode: PlaybackMode::CompleteAudio,
+            speed: PlaybackSpeed::from_percent(125).unwrap(),
         };
         store.save(preferences).unwrap();
 
@@ -111,8 +120,20 @@ mod tests {
             PlaybackPreferences {
                 auto_play_queue: false,
                 automatic_clipboard_fallback: false,
-                streaming_playback: true,
+                mode: PlaybackMode::RealTime,
+                speed: PlaybackSpeed::default(),
             }
         );
+    }
+
+    #[test]
+    fn legacy_streaming_preference_gains_normal_speed() {
+        let temporary = tempfile::tempdir().unwrap();
+        let store = PlaybackPreferencesStore::at(temporary.path());
+
+        fs::write(store.path(), "true\ntrue\nfalse\n").unwrap();
+
+        assert_eq!(store.load().mode, PlaybackMode::CompleteAudio);
+        assert_eq!(store.load().speed, PlaybackSpeed::default());
     }
 }

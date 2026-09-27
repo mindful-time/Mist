@@ -1,12 +1,10 @@
 #[cfg(target_os = "macos")]
-use crate::adapters::macos_selection::{capture_selected_text, frontmost_application_pid};
+use crate::adapters::macos_selection::frontmost_application_pid;
 #[cfg(target_os = "macos")]
 use crate::adapters::macos_shortcut::{self, MacShortcutMessage};
-#[cfg(target_os = "windows")]
-use crate::adapters::windows_selection::capture_selected_text;
 #[cfg(target_os = "linux")]
 use crate::adapters::{
-    linux_selection::{capture_selected_text, is_wayland_session},
+    linux_selection::is_wayland_session,
     wayland_shortcut::{self, WaylandShortcutMessage},
 };
 use crate::{
@@ -15,6 +13,7 @@ use crate::{
     },
     domain::{SelectedText, SelectionCaptureError},
 };
+use anyhow::Context;
 use std::sync::{
     Arc,
     atomic::{AtomicU8, Ordering},
@@ -25,10 +24,8 @@ const NATIVE_CAPTURE_TIMEOUT: std::time::Duration = std::time::Duration::from_se
 const FALLBACK_CAPTURE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(4);
 type CaptureMessage = (u64, Result<CapturedSelection, String>);
 
-#[cfg(target_os = "macos")]
-type SelectionTarget = i32;
-#[cfg(not(target_os = "macos"))]
-type SelectionTarget = ();
+#[derive(Clone, Copy, Debug)]
+struct SelectionTarget(Option<i32>);
 
 const CAPTURE_NATIVE: u8 = 0;
 const CAPTURE_FALLBACK: u8 = 1;
@@ -429,22 +426,31 @@ fn capture(request: CaptureRequest, control: &CaptureControl) -> anyhow::Result<
 #[cfg(target_os = "macos")]
 fn current_selection_target() -> Result<SelectionTarget, String> {
     frontmost_application_pid()
+        .map(|pid| SelectionTarget(Some(pid)))
         .map_err(|error| format!("Could not identify the selected app: {error:#}"))
 }
 
 #[cfg(not(target_os = "macos"))]
 fn current_selection_target() -> Result<SelectionTarget, String> {
-    Ok(())
+    Ok(SelectionTarget(None))
 }
 
 #[cfg(target_os = "macos")]
 fn capture_native_selected_text(target: SelectionTarget) -> anyhow::Result<SelectedText> {
-    capture_selected_text(target)
+    let pid = target
+        .0
+        .context("the macOS selection target has no process identifier")?;
+    crate::adapters::macos_selection::capture_selected_text(pid)
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
 fn capture_native_selected_text(_target: SelectionTarget) -> anyhow::Result<SelectedText> {
-    capture_selected_text()
+    crate::adapters::windows_selection::capture_selected_text()
+}
+
+#[cfg(target_os = "linux")]
+fn capture_native_selected_text(_target: SelectionTarget) -> anyhow::Result<SelectedText> {
+    crate::adapters::linux_selection::capture_selected_text()
 }
 
 fn allows_clipboard_fallback(error: &anyhow::Error) -> bool {

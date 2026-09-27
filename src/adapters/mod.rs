@@ -1,5 +1,6 @@
 pub mod clipboard_fallback;
 pub mod kokoro;
+pub mod kokoro_catalog;
 pub mod playback_preferences;
 pub mod system_audio;
 pub mod voice_preferences;
@@ -12,6 +13,7 @@ pub mod macos_selection;
 pub mod macos_service;
 #[cfg(target_os = "macos")]
 pub mod macos_shortcut;
+pub mod model_preferences;
 #[cfg(target_os = "linux")]
 pub mod wayland_shortcut;
 #[cfg(target_os = "windows")]

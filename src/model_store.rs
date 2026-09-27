@@ -10,60 +10,13 @@ use sha2::{Digest, Sha256};
 
 use crate::ports::ModelProvisioner;
 
-pub const MODEL_REVISION: &str = "1939ad2a8e416c0acfeecc08a694d14ef25f2231";
-pub const MODEL_URL: &str = "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/onnx/model_quantized.onnx?download=true";
-const MIN_MODEL_BYTES: u64 = 80 * 1024 * 1024;
-const MIN_VOICE_BYTES: u64 = 500 * 1024;
-const MODEL_SHA256: &str = "fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478";
-
-pub struct VoiceArtifact {
-    pub id: &'static str,
-    pub url: &'static str,
-    pub sha256: &'static str,
-}
-
-pub const VOICE_ARTIFACTS: &[VoiceArtifact] = &[
-    VoiceArtifact {
-        id: "af_heart",
-        url: "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/voices/af_heart.bin?download=true",
-        sha256: "d583ccff3cdca2f7fae535cb998ac07e9fcb90f09737b9a41fa2734ec44a8f0b",
-    },
-    VoiceArtifact {
-        id: "af_bella",
-        url: "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/voices/af_bella.bin?download=true",
-        sha256: "f69d836209b78eb8c66e75e3cda491e26ea838a3674257e9d4e5703cbaf55c8b",
-    },
-    VoiceArtifact {
-        id: "af_nicole",
-        url: "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/voices/af_nicole.bin?download=true",
-        sha256: "cd2191ab31b914ed7b318416b0e4440fdf392ddad9106a060819aa600a64f59a",
-    },
-    VoiceArtifact {
-        id: "af_sarah",
-        url: "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/voices/af_sarah.bin?download=true",
-        sha256: "4409fbc125afabacc615d94db5398d847006a737b0247d6892b7a9a0007a2f0a",
-    },
-    VoiceArtifact {
-        id: "am_adam",
-        url: "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/voices/am_adam.bin?download=true",
-        sha256: "162b035ed91cfc48b6046982184c645f72edcdd1b82843347f605d7bf7b15716",
-    },
-    VoiceArtifact {
-        id: "am_michael",
-        url: "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/voices/am_michael.bin?download=true",
-        sha256: "1d1f21dd8da39c30705cd4c75d039d265e9bc4a2a93ed09bc9e1b1225eb95ba1",
-    },
-    VoiceArtifact {
-        id: "bf_emma",
-        url: "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/voices/bf_emma.bin?download=true",
-        sha256: "669fe0647f9dd04fcab92f1439a40eeb4c8b4ab1f82e4996fe3d918ce4a63b73",
-    },
-    VoiceArtifact {
-        id: "bm_daniel",
-        url: "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/voices/bm_daniel.bin?download=true",
-        sha256: "6b3194bbceffb746733cbc22c8f593dd44e401a71d53895a2dca891bc595a1e8",
-    },
-];
+pub const MODEL_REVISION: &str = "d9d564ee264fcd95459552767c8c713ed385c999";
+pub const MODEL_URL: &str = "https://media.githubusercontent.com/media/8b-is/kokoro-tiny/d9d564ee264fcd95459552767c8c713ed385c999/models/0.onnx";
+pub const VOICES_URL: &str = "https://media.githubusercontent.com/media/8b-is/kokoro-tiny/d9d564ee264fcd95459552767c8c713ed385c999/models/0.bin";
+const MIN_MODEL_BYTES: u64 = 300 * 1024 * 1024;
+const MIN_VOICES_BYTES: u64 = 25 * 1024 * 1024;
+const MODEL_SHA256: &str = "7d5df8ecf7d4b1878015a32686053fd0eebe2bc377234608764cc0ef3636a6c5";
+const VOICES_SHA256: &str = "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d";
 
 #[derive(Clone, Debug)]
 pub struct ModelStore {
@@ -78,8 +31,8 @@ impl ModelStore {
             return Ok(Self::at(root));
         }
 
-        // Keep the established data directory so the Mist rename never forces
-        // users to download the 96 MB Kokoro bundle again.
+        // Keep the established data directory so the Mist rename preserves
+        // the stable application identity and model location.
         let directories = ProjectDirs::from("dev", "Akshobhya", "SelectToSpeak")
             .context("could not locate the platform application data directory")?;
         Ok(Self::at(directories.data_dir().join("models")))
@@ -94,65 +47,28 @@ impl ModelStore {
     }
 
     pub fn model_path(&self) -> PathBuf {
-        self.root.join("model_quantized.onnx")
-    }
-
-    pub fn voice_path(&self) -> PathBuf {
-        self.voice_path_for("af_heart")
+        self.root.join("kokoro-v1.0.onnx")
     }
 
     pub fn voices_path(&self) -> PathBuf {
-        self.root.join("voices")
-    }
-
-    pub fn voice_path_for(&self, voice_id: &str) -> PathBuf {
-        self.voices_path().join(format!("{voice_id}.bin"))
+        self.root.join("kokoro-voices-v1.0.npz")
     }
 
     pub fn is_ready(&self) -> bool {
         artifact_is_valid(&self.model_path(), MIN_MODEL_BYTES, MODEL_SHA256)
-            && VOICE_ARTIFACTS.iter().all(|voice| {
-                artifact_is_valid(
-                    &self.voice_path_for(voice.id),
-                    MIN_VOICE_BYTES,
-                    voice.sha256,
-                )
-            })
+            && artifact_is_valid(&self.voices_path(), MIN_VOICES_BYTES, VOICES_SHA256)
     }
 
     pub fn install(&self) -> Result<()> {
         fs::create_dir_all(&self.root)
             .with_context(|| format!("could not create {}", self.root.display()))?;
-        fs::create_dir_all(self.voices_path())
-            .with_context(|| format!("could not create {}", self.voices_path().display()))?;
         download(MODEL_URL, &self.model_path(), MIN_MODEL_BYTES, MODEL_SHA256)?;
-        self.migrate_legacy_default_voice()?;
-        for voice in VOICE_ARTIFACTS {
-            download(
-                voice.url,
-                &self.voice_path_for(voice.id),
-                MIN_VOICE_BYTES,
-                voice.sha256,
-            )?;
-        }
-        Ok(())
-    }
-
-    fn migrate_legacy_default_voice(&self) -> Result<()> {
-        let legacy = self.root.join("af_heart.bin");
-        let default = &VOICE_ARTIFACTS[0];
-        let destination = self.voice_path_for(default.id);
-        if !artifact_is_valid(&destination, MIN_VOICE_BYTES, default.sha256)
-            && artifact_is_valid(&legacy, MIN_VOICE_BYTES, default.sha256)
-        {
-            fs::copy(&legacy, &destination).with_context(|| {
-                format!(
-                    "could not migrate {} to {}",
-                    legacy.display(),
-                    destination.display()
-                )
-            })?;
-        }
+        download(
+            VOICES_URL,
+            &self.voices_path(),
+            MIN_VOICES_BYTES,
+            VOICES_SHA256,
+        )?;
         Ok(())
     }
 }
@@ -250,9 +166,8 @@ mod tests {
     fn undersized_artifacts_are_not_ready() {
         let temporary = tempfile::tempdir().unwrap();
         let store = ModelStore::at(temporary.path());
-        fs::create_dir_all(store.voices_path()).unwrap();
         fs::write(store.model_path(), b"not a model").unwrap();
-        fs::write(store.voice_path(), b"not a voice").unwrap();
+        fs::write(store.voices_path(), b"not voices").unwrap();
         assert!(!store.is_ready());
     }
 
@@ -270,20 +185,17 @@ mod tests {
     #[test]
     fn download_urls_are_pinned_to_the_verified_revision() {
         assert!(MODEL_URL.contains(MODEL_REVISION));
-        assert!(
-            VOICE_ARTIFACTS
-                .iter()
-                .all(|voice| voice.url.contains(MODEL_REVISION))
-        );
+        assert!(VOICES_URL.contains(MODEL_REVISION));
     }
 
     #[test]
-    fn downloadable_voices_match_the_product_catalog() {
-        let catalog_ids: Vec<_> = crate::domain::VOICE_CATALOG
-            .iter()
-            .map(|voice| voice.id)
-            .collect();
-        let artifact_ids: Vec<_> = VOICE_ARTIFACTS.iter().map(|voice| voice.id).collect();
-        assert_eq!(artifact_ids, catalog_ids);
+    fn multilingual_bundle_has_one_verified_model_and_voice_pack() {
+        assert_minimum_bundle_size(MIN_MODEL_BYTES, MIN_VOICES_BYTES);
+        assert_ne!(MODEL_SHA256, VOICES_SHA256);
+    }
+
+    fn assert_minimum_bundle_size(model_bytes: u64, voices_bytes: u64) {
+        assert!(model_bytes >= 300 * 1024 * 1024);
+        assert!(voices_bytes >= 25 * 1024 * 1024);
     }
 }

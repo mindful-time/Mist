@@ -1,20 +1,23 @@
 use std::{
-    sync::mpsc::{self, Receiver, Sender, SyncSender},
+    path::{Path, PathBuf},
+    sync::{
+        Arc, Mutex,
+        mpsc::{self, Receiver, Sender, SyncSender, TrySendError},
+    },
     thread,
 };
 
 use anyhow::{Context, Result};
 
 use crate::{
-    InstallModel, PlaybackController, PlaybackStopped, PlaybackToken, SpeakSelection,
+    PlaybackController, PlaybackPreferences, PlaybackStopped, PlaybackToken, SpeakSelection,
     VoiceSettings,
     adapters::{
-        kokoro::KokoroSynthesizer, playback_preferences::PlaybackPreferencesStore,
-        system_audio::SystemAudioPlayer, voice_preferences::VoicePreferencesStore,
+        playback_preferences::PlaybackPreferencesStore, system_audio::SystemAudioPlayer,
+        voice_preferences::VoicePreferencesStore,
     },
-    application::VOICE_PREVIEW_TEXT,
     domain::{AudioFeatures, SelectedText},
-    model_store::ModelStore,
+    ports::{DynSpeechSynthesizer, ModelProvisioner, SpeechEngineFactory, VoiceCatalog},
 };
 
 #[derive(Clone, Debug)]
@@ -25,8 +28,34 @@ pub enum WorkerCommand {
     },
     InstallModel,
     SelectVoice(VoiceSettings),
-    PreviewVoice(VoiceSettings),
-    SetStreaming(bool),
+    ConfigurePlayback(PlaybackPreferences),
+}
+
+#[derive(Clone, Debug)]
+enum WorkerMessage {
+    Command(WorkerCommand),
+    PreviewWake,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WorkerSendError {
+    Full,
+    Disconnected,
+}
+
+#[derive(Clone, Debug)]
+pub struct WorkerCommands {
+    sender: SyncSender<WorkerMessage>,
+}
+
+impl WorkerCommands {
+    pub fn try_send(&self, command: WorkerCommand) -> Result<(), WorkerSendError> {
+        match self.sender.try_send(WorkerMessage::Command(command)) {
+            Ok(()) => Ok(()),
+            Err(TrySendError::Full(_)) => Err(WorkerSendError::Full),
+            Err(TrySendError::Disconnected(_)) => Err(WorkerSendError::Disconnected),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -49,70 +78,152 @@ pub enum AppStatus {
 }
 
 struct SpeechSession {
-    speaker: SpeakSelection<KokoroSynthesizer, SystemAudioPlayer>,
+    speaker: SpeakSelection<DynSpeechSynthesizer, SystemAudioPlayer>,
     inference_policy: String,
 }
 
 struct SpeechEnvironment<'a> {
-    store: &'a ModelStore,
+    data_root: &'a Path,
+    engine_factory: &'a dyn SpeechEngineFactory,
+    catalog: &'a dyn VoiceCatalog,
     statuses: &'a Sender<AppStatus>,
     playback: &'a PlaybackController,
-    streaming_playback: bool,
+    playback_preferences: PlaybackPreferences,
 }
 
 pub struct WorkerHandle {
-    pub commands: SyncSender<WorkerCommand>,
+    pub commands: WorkerCommands,
     pub statuses: Receiver<AppStatus>,
     pub selected_voice: VoiceSettings,
     pub playback: PlaybackController,
+    pub previews: PreviewDispatcher,
 }
 
-pub fn spawn(store: ModelStore) -> WorkerHandle {
+struct WorkerRuntime {
+    commands: Receiver<WorkerMessage>,
+    statuses: Sender<AppStatus>,
+    data_root: PathBuf,
+    models: Arc<dyn ModelProvisioner>,
+    preferences: VoicePreferencesStore,
+    selected_voice: VoiceSettings,
+    playback_preferences: PlaybackPreferences,
+    playback: PlaybackController,
+    preview_requests: PreviewRequests,
+    engine_factory: Arc<dyn SpeechEngineFactory>,
+    catalog: Arc<dyn VoiceCatalog>,
+}
+
+/// Latest-wins coordination for voice-card previews.
+///
+/// Preview synthesis and playback run synchronously on the speech worker. The
+/// UI uses this shared slot plus the out-of-band playback controller so rapid
+/// card changes cancel the current sample and stale queued samples are skipped.
+#[derive(Clone, Debug, Default)]
+pub struct PreviewRequests {
+    latest: Arc<Mutex<Option<VoiceSettings>>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct PreviewDispatcher {
+    sender: SyncSender<WorkerMessage>,
+    requests: PreviewRequests,
+}
+
+impl PreviewDispatcher {
+    fn new(sender: SyncSender<WorkerMessage>, requests: PreviewRequests) -> Self {
+        Self { sender, requests }
+    }
+
+    /// Replaces any pending sample and wakes the worker. A full channel is
+    /// already carrying a wake-up, so the coalesced latest voice remains valid.
+    pub fn request(&self, voice: &VoiceSettings) -> Result<(), WorkerSendError> {
+        self.requests.request(voice);
+        match self.sender.try_send(WorkerMessage::PreviewWake) {
+            Ok(()) | Err(TrySendError::Full(_)) => Ok(()),
+            Err(TrySendError::Disconnected(_)) => Err(WorkerSendError::Disconnected),
+        }
+    }
+}
+
+impl PreviewRequests {
+    pub fn request(&self, voice: &VoiceSettings) {
+        *self.latest.lock().expect("preview requests were poisoned") = Some(voice.clone());
+    }
+
+    fn take_latest(&self) -> Option<VoiceSettings> {
+        self.latest
+            .lock()
+            .expect("preview requests were poisoned")
+            .take()
+    }
+}
+
+pub fn spawn(
+    data_root: PathBuf,
+    models: Arc<dyn ModelProvisioner>,
+    engine_factory: Arc<dyn SpeechEngineFactory>,
+    catalog: Arc<dyn VoiceCatalog>,
+) -> WorkerHandle {
     let (command_tx, command_rx) = mpsc::sync_channel(8);
     let (status_tx, status_rx) = mpsc::channel();
 
-    let preferences = VoicePreferencesStore::at(store.root());
-    let streaming_playback = PlaybackPreferencesStore::at(store.root())
-        .load()
-        .streaming_playback;
-    let selected_voice = preferences.load();
+    let preferences = VoicePreferencesStore::at(&data_root);
+    let playback_preferences = PlaybackPreferencesStore::at(&data_root).load();
+    let mut selected_voice = preferences.load(catalog.as_ref());
+    selected_voice.speed = playback_preferences.speed.multiplier();
     let worker_voice = selected_voice.clone();
     let playback = PlaybackController::default();
     let worker_playback = playback.clone();
+    let preview_requests = PreviewRequests::default();
+    let worker_preview_requests = preview_requests.clone();
+    let commands = WorkerCommands {
+        sender: command_tx.clone(),
+    };
+    let previews = PreviewDispatcher::new(command_tx, preview_requests);
     thread::Builder::new()
-        .name("kokoro-speech-worker".to_owned())
+        .name("mist-speech-worker".to_owned())
         .spawn(move || {
-            run(
-                command_rx,
-                status_tx,
-                store,
+            run(WorkerRuntime {
+                commands: command_rx,
+                statuses: status_tx,
+                data_root,
+                models,
                 preferences,
-                worker_voice,
-                streaming_playback,
-                worker_playback,
-            )
+                selected_voice: worker_voice,
+                playback_preferences,
+                playback: worker_playback,
+                preview_requests: worker_preview_requests,
+                engine_factory,
+                catalog,
+            })
         })
         .expect("speech worker thread should start");
 
     WorkerHandle {
-        commands: command_tx,
+        commands,
         statuses: status_rx,
         selected_voice,
         playback,
+        previews,
     }
 }
 
-fn run(
-    commands: Receiver<WorkerCommand>,
-    statuses: Sender<AppStatus>,
-    store: ModelStore,
-    preferences: VoicePreferencesStore,
-    mut selected_voice: VoiceSettings,
-    mut streaming_playback: bool,
-    playback: PlaybackController,
-) {
+fn run(runtime: WorkerRuntime) {
+    let WorkerRuntime {
+        commands,
+        statuses,
+        data_root,
+        models,
+        preferences,
+        mut selected_voice,
+        mut playback_preferences,
+        playback,
+        preview_requests,
+        engine_factory,
+        catalog,
+    } = runtime;
     let mut session: Option<SpeechSession> = None;
-    let mut model_ready = store.is_ready();
+    let mut model_ready = models.is_ready();
     send_status(
         &statuses,
         if model_ready {
@@ -122,10 +233,46 @@ fn run(
         },
     );
 
-    while let Ok(command) = commands.recv() {
+    loop {
+        if let Some(voice) = preview_requests.take_latest() {
+            // A cancelled request may never have reached the worker. Reset its
+            // shared preview session before starting the coalesced latest one.
+            playback.finish_session(PlaybackToken::PREVIEW);
+            let result = select_voice(
+                voice.clone(),
+                &preferences,
+                &mut selected_voice,
+                &mut session,
+            );
+            let result = if result.is_err() || !model_ready {
+                result
+            } else {
+                preview_voice(
+                    voice,
+                    SpeechEnvironment {
+                        data_root: &data_root,
+                        engine_factory: engine_factory.as_ref(),
+                        catalog: catalog.as_ref(),
+                        statuses: &statuses,
+                        playback: &playback,
+                        playback_preferences,
+                    },
+                    &mut session,
+                )
+            };
+            send_result_status(&statuses, model_ready, result);
+            continue;
+        }
+
+        let Ok(message) = commands.recv() else {
+            break;
+        };
+        let WorkerMessage::Command(command) = message else {
+            continue;
+        };
         let result = match command {
             WorkerCommand::InstallModel => {
-                let result = install_model(&store, &statuses);
+                let result = install_model(models.as_ref(), &statuses);
                 if result.is_ok() {
                     model_ready = true;
                 }
@@ -134,32 +281,12 @@ fn run(
             WorkerCommand::SelectVoice(voice) => {
                 select_voice(voice, &preferences, &mut selected_voice, &mut session)
             }
-            WorkerCommand::PreviewVoice(voice) => {
-                let result = select_voice(
-                    voice.clone(),
-                    &preferences,
-                    &mut selected_voice,
-                    &mut session,
-                );
-                if result.is_err() || !model_ready {
-                    result
-                } else {
-                    preview_voice(
-                        voice,
-                        SpeechEnvironment {
-                            store: &store,
-                            statuses: &statuses,
-                            playback: &playback,
-                            streaming_playback,
-                        },
-                        &mut session,
-                    )
-                }
-            }
-            WorkerCommand::SetStreaming(enabled) => {
-                streaming_playback = enabled;
+            WorkerCommand::ConfigurePlayback(preferences) => {
+                playback_preferences = preferences;
+                selected_voice.speed = preferences.speed.multiplier();
                 if let Some(session) = session.as_mut() {
-                    session.speaker.set_streaming_playback(enabled);
+                    session.speaker.set_playback_mode(preferences.mode);
+                    session.speaker.set_voice(selected_voice.clone());
                 }
                 Ok(())
             }
@@ -173,27 +300,19 @@ fn run(
                     text,
                     &selected_voice,
                     SpeechEnvironment {
-                        store: &store,
+                        data_root: &data_root,
+                        engine_factory: engine_factory.as_ref(),
+                        catalog: catalog.as_ref(),
                         statuses: &statuses,
                         playback: &playback,
-                        streaming_playback,
+                        playback_preferences,
                     },
                     &mut session,
                 )
             }
         };
 
-        match result {
-            Ok(()) => send_status(
-                &statuses,
-                if model_ready {
-                    AppStatus::Ready
-                } else {
-                    AppStatus::MissingModel
-                },
-            ),
-            Err(error) => send_status(&statuses, AppStatus::Error(format!("{error:#}"))),
-        }
+        send_result_status(&statuses, model_ready, result);
     }
 }
 
@@ -211,11 +330,9 @@ fn select_voice(
     Ok(())
 }
 
-fn install_model(store: &ModelStore, statuses: &Sender<AppStatus>) -> Result<()> {
+fn install_model(models: &dyn ModelProvisioner, statuses: &Sender<AppStatus>) -> Result<()> {
     send_status(statuses, AppStatus::Downloading);
-    InstallModel::new(store.clone())
-        .execute()
-        .context("Kokoro setup failed")
+    models.install().context("speech model setup failed")
 }
 
 fn speak(
@@ -241,9 +358,18 @@ fn preview_voice(
     environment: SpeechEnvironment<'_>,
     session: &mut Option<SpeechSession>,
 ) -> Result<()> {
-    let preview = SelectedText::new(VOICE_PREVIEW_TEXT)
-        .expect("the built-in voice preview copy must remain valid")
-        .preview(32);
+    let language = environment
+        .catalog
+        .language_for(voice.voice_id.as_str())
+        .context("the selected voice is not present in the active catalog")?;
+    let sample = SelectedText::new(
+        environment
+            .catalog
+            .preview_text(language)
+            .context("the active catalog has no preview for this language")?,
+    )
+    .expect("the built-in voice preview copy must remain valid");
+    let preview = sample.preview(32);
     let session_voice = voice.clone();
     run_speech(
         preview,
@@ -251,7 +377,9 @@ fn preview_voice(
         environment,
         PlaybackToken::PREVIEW,
         session,
-        move |speaker, on_playback| speaker.preview_voice_with_playback_cues(voice, on_playback),
+        move |speaker, on_playback| {
+            speaker.preview_voice_with_playback_cues(voice, sample, on_playback)
+        },
     )
 }
 
@@ -262,7 +390,7 @@ fn run_speech(
     token: PlaybackToken,
     session: &mut Option<SpeechSession>,
     execute: impl FnOnce(
-        &mut SpeakSelection<KokoroSynthesizer, SystemAudioPlayer>,
+        &mut SpeakSelection<DynSpeechSynthesizer, SystemAudioPlayer>,
         &mut dyn FnMut(AudioFeatures),
     ) -> Result<()>,
 ) -> Result<()> {
@@ -274,10 +402,11 @@ fn run_speech(
     let result = (|| {
         let session = ensure_session(
             voice,
-            environment.store,
+            environment.data_root,
+            environment.engine_factory,
             environment.statuses,
             environment.playback,
-            environment.streaming_playback,
+            environment.playback_preferences.mode,
             session,
         )?;
         let inference_policy = session.inference_policy.clone();
@@ -308,20 +437,21 @@ fn run_speech(
 
 fn ensure_session<'a>(
     voice: &VoiceSettings,
-    store: &ModelStore,
+    data_root: &Path,
+    engine_factory: &dyn SpeechEngineFactory,
     statuses: &Sender<AppStatus>,
     playback: &PlaybackController,
-    streaming_playback: bool,
+    playback_mode: crate::PlaybackMode,
     session: &'a mut Option<SpeechSession>,
 ) -> Result<&'a mut SpeechSession> {
     if session.is_none() {
         send_status(statuses, AppStatus::Loading);
-        let synthesizer = KokoroSynthesizer::load(&store.model_path(), &store.voices_path())?;
-        let inference_policy = synthesizer.inference_policy_label().to_owned();
-        let audio_cache = store.root().join("audio-cache");
+        let engine = engine_factory.load()?;
+        let inference_policy = engine.inference_policy;
+        let audio_cache = data_root.join("audio-cache");
         let player = SystemAudioPlayer::new(&audio_cache, playback.clone())?;
-        let mut speaker = SpeakSelection::new(synthesizer, player, voice.clone());
-        speaker.set_streaming_playback(streaming_playback);
+        let mut speaker = SpeakSelection::new(engine.synthesizer, player, voice.clone());
+        speaker.set_playback_mode(playback_mode);
         *session = Some(SpeechSession {
             speaker,
             inference_policy,
@@ -343,36 +473,66 @@ fn send_status(statuses: &Sender<AppStatus>, status: AppStatus) {
     let _ = statuses.send(status);
 }
 
+fn send_result_status(statuses: &Sender<AppStatus>, model_ready: bool, result: Result<()>) {
+    match result {
+        Ok(()) => send_status(
+            statuses,
+            if model_ready {
+                AppStatus::Ready
+            } else {
+                AppStatus::MissingModel
+            },
+        ),
+        Err(error) => send_status(statuses, AppStatus::Error(format!("{error:#}"))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::{kokoro::KokoroEngineFactory, kokoro_catalog::KokoroVoiceCatalog};
+    use crate::model_store::ModelStore;
+
+    fn test_worker(store: ModelStore) -> WorkerHandle {
+        let factory = KokoroEngineFactory::new(store.model_path(), store.voices_path());
+        spawn(
+            store.root().to_owned(),
+            Arc::new(store),
+            Arc::new(factory),
+            Arc::new(KokoroVoiceCatalog),
+        )
+    }
 
     #[test]
     fn selected_voice_is_persisted_by_the_worker() {
         let temporary = tempfile::tempdir().unwrap();
         let store = ModelStore::at(temporary.path());
-        let handle = spawn(store.clone());
-        assert_eq!(handle.selected_voice, VoiceSettings::default());
+        let catalog = KokoroVoiceCatalog;
+        let handle = test_worker(store.clone());
+        assert_eq!(handle.selected_voice, catalog.default_settings());
         assert_eq!(handle.statuses.recv().unwrap(), AppStatus::MissingModel);
 
-        let voice = VoiceSettings::from_voice_id("af_bella").unwrap();
+        let voice = catalog.settings("af_bella").unwrap();
         handle
             .commands
-            .send(WorkerCommand::SelectVoice(voice.clone()))
+            .try_send(WorkerCommand::SelectVoice(voice.clone()))
             .unwrap();
         assert_eq!(handle.statuses.recv().unwrap(), AppStatus::MissingModel);
-        assert_eq!(VoicePreferencesStore::at(store.root()).load(), voice);
+        assert_eq!(
+            VoicePreferencesStore::at(store.root()).load(&catalog),
+            voice
+        );
     }
 
     #[test]
     fn speaking_before_setup_keeps_onboarding_actionable() {
         let temporary = tempfile::tempdir().unwrap();
-        let handle = spawn(ModelStore::at(temporary.path()));
+        let handle = test_worker(ModelStore::at(temporary.path()));
         assert_eq!(handle.statuses.recv().unwrap(), AppStatus::MissingModel);
 
         handle
             .commands
-            .send(WorkerCommand::Speak {
+            .try_send(WorkerCommand::Speak {
                 token: PlaybackToken::PREVIEW,
                 text: SelectedText::new("Not installed yet").unwrap(),
             })
@@ -385,16 +545,67 @@ mod tests {
     fn previewing_before_setup_selects_the_clicked_voice() {
         let temporary = tempfile::tempdir().unwrap();
         let store = ModelStore::at(temporary.path());
-        let handle = spawn(store.clone());
+        let catalog = KokoroVoiceCatalog;
+        let handle = test_worker(store.clone());
         assert_eq!(handle.statuses.recv().unwrap(), AppStatus::MissingModel);
 
-        let voice = VoiceSettings::from_voice_id("bm_daniel").unwrap();
-        handle
-            .commands
-            .send(WorkerCommand::PreviewVoice(voice.clone()))
+        let voice = catalog.settings("bm_daniel").unwrap();
+        handle.previews.request(&voice).unwrap();
+
+        assert_eq!(handle.statuses.recv().unwrap(), AppStatus::MissingModel);
+        assert_eq!(
+            VoicePreferencesStore::at(store.root()).load(&catalog),
+            voice
+        );
+    }
+
+    #[test]
+    fn voice_preview_requests_coalesce_to_the_latest_voice() {
+        let requests = PreviewRequests::default();
+        let catalog = KokoroVoiceCatalog;
+        let first = catalog.settings("af_bella").unwrap();
+        let latest = catalog.settings("bf_emma").unwrap();
+
+        requests.request(&first);
+        requests.request(&latest);
+
+        assert_eq!(requests.take_latest(), Some(latest));
+        assert_eq!(requests.take_latest(), None);
+    }
+
+    #[test]
+    fn full_worker_channel_keeps_the_coalesced_latest_preview_pending() {
+        let (sender, _receiver) = mpsc::sync_channel(1);
+        sender
+            .try_send(WorkerMessage::Command(WorkerCommand::ConfigurePlayback(
+                PlaybackPreferences::default(),
+            )))
             .unwrap();
+        let requests = PreviewRequests::default();
+        let previews = PreviewDispatcher::new(sender, requests.clone());
+        let voice = VoiceSettings::new("latest-voice").unwrap();
 
-        assert_eq!(handle.statuses.recv().unwrap(), AppStatus::MissingModel);
-        assert_eq!(VoicePreferencesStore::at(store.root()).load(), voice);
+        assert_eq!(previews.request(&voice), Ok(()));
+        assert_eq!(requests.take_latest(), Some(voice));
+    }
+
+    #[test]
+    fn stale_preview_releases_a_cancelled_pre_start_session_for_its_replacement() {
+        let playback = PlaybackController::default();
+        let requests = PreviewRequests::default();
+        let catalog = KokoroVoiceCatalog;
+        let stale = catalog.settings("af_bella").unwrap();
+        let latest = catalog.settings("bf_emma").unwrap();
+
+        assert!(playback.register(PlaybackToken::PREVIEW));
+        requests.request(&stale);
+        requests.request(&latest);
+        assert_eq!(requests.take_latest(), Some(latest));
+        assert!(playback.cancel(PlaybackToken::PREVIEW));
+        assert_eq!(playback.phase(), crate::PlaybackPhase::Cancelled);
+
+        playback.finish_session(PlaybackToken::PREVIEW);
+        assert_eq!(playback.phase(), crate::PlaybackPhase::Idle);
+        assert!(playback.register(PlaybackToken::PREVIEW));
     }
 }

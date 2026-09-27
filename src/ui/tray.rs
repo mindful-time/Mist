@@ -1,4 +1,4 @@
-use ::mist::{VOICE_CATALOG, VoiceSettings, worker::AppStatus};
+use ::mist::{VoiceProfile, VoiceSettings, worker::AppStatus};
 use anyhow::{Context, Result};
 use tray_icon::{
     Icon, TrayIcon, TrayIconBuilder,
@@ -16,19 +16,19 @@ pub(super) struct TrayAdapter {
     icon: TrayIcon,
     heading: MenuItem,
     settings: MenuItem,
-    voices: Vec<(&'static str, CheckMenuItem)>,
+    voices: Vec<(String, CheckMenuItem)>,
     accessibility: Option<MenuItem>,
     quit: MenuItem,
 }
 
 impl TrayAdapter {
-    pub(super) fn new(selected: &VoiceSettings) -> Result<Self> {
+    pub(super) fn new(selected: &VoiceSettings, catalog: &[VoiceProfile]) -> Result<Self> {
         let menu = Menu::new();
         let heading = MenuItem::new("Mist · waking up", false, None);
-        let settings = MenuItem::new("Voice settings…", true, None);
+        let settings = MenuItem::new("Settings…", true, None);
         let voices_menu = Submenu::new("Voice", true);
-        let mut voices = Vec::with_capacity(VOICE_CATALOG.len());
-        for voice in VOICE_CATALOG {
+        let mut voices = Vec::with_capacity(catalog.len());
+        for voice in catalog {
             let item = CheckMenuItem::new(
                 format!("{} · {}", voice.display_name, voice.character),
                 true,
@@ -38,7 +38,7 @@ impl TrayAdapter {
             voices_menu
                 .append(&item)
                 .context("could not add a voice to the tray menu")?;
-            voices.push((voice.id, item));
+            voices.push((voice.id.to_owned(), item));
         }
         #[cfg(target_os = "macos")]
         let accessibility = Some(MenuItem::new("Accessibility settings…", true, None));
@@ -61,7 +61,7 @@ impl TrayAdapter {
 
         let icon = mist_icon()?;
         let mut builder = TrayIconBuilder::new()
-            .with_tooltip("Mist · local Kokoro voice")
+            .with_tooltip("Mist · local speech")
             .with_menu(Box::new(menu))
             .with_icon(icon);
         #[cfg(target_os = "macos")]
@@ -104,7 +104,7 @@ impl TrayAdapter {
         self.voices
             .iter()
             .find(|(_, item)| event.id == *item.id())
-            .map(|(voice, _)| TrayAction::SelectVoice((*voice).to_owned()))
+            .map(|(voice, _)| TrayAction::SelectVoice(voice.clone()))
     }
 
     pub(super) fn select_voice(&self, selected: &str) {
@@ -113,7 +113,7 @@ impl TrayAdapter {
         for (_, item) in &self.voices {
             item.set_checked(false);
         }
-        if let Some((_, item)) = self.voices.iter().find(|(voice, _)| *voice == selected) {
+        if let Some((_, item)) = self.voices.iter().find(|(voice, _)| voice == selected) {
             item.set_checked(true);
         }
     }
@@ -157,11 +157,12 @@ fn mist_icon() -> Result<Icon> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use ::mist::{adapters::kokoro_catalog::KokoroVoiceCatalog, ports::VoiceCatalog};
 
     #[test]
     fn voice_catalog_resolves_exactly_one_native_check_item() {
-        let checked = VOICE_CATALOG
+        let checked = KokoroVoiceCatalog
+            .voices()
             .iter()
             .filter(|voice| voice.id == "af_bella")
             .count();

@@ -300,7 +300,7 @@ mod tests {
         });
 
         let mut child = Command::new("/bin/sleep").arg("5").spawn().unwrap();
-        let audio = Audio::kokoro(vec![0.1; 24_000]);
+        let audio = Audio::new(vec![0.1; 24_000], 24_000);
         let mut samples = 0;
         let error =
             monitor_playback(&mut child, &audio, &mut |_| samples += 1, &control).unwrap_err();
@@ -351,7 +351,7 @@ mod tests {
             latency
         });
 
-        let audio = Audio::kokoro(vec![0.1; 24_000]);
+        let audio = Audio::new(vec![0.1; 24_000], 24_000);
         let mut sent_sample = false;
         let error = monitor_playback(
             &mut child,
