@@ -40,16 +40,18 @@ Speech is generated locally with
 [Kokoro-82M](https://huggingface.co/spaces/hexgrad/Kokoro-TTS); selected text is
 never sent to a server. Long selections are synthesized sentence by sentence,
 so playback starts after the first audio chunk instead of waiting for the whole
-selection. Streaming is enabled by default and is persisted as a playback
-setting; disable **Stream speech as it is generated** only when whole-selection
-buffering is preferred.
+selection. The persisted Playback page calls this default **Real-time** mode;
+choose **Complete audio** when whole-selection buffering is preferred. Playback
+speed is also persisted from 0.5×–3× and applies to every language and voice.
 
-The first launch presents eight distinct voice mists and a **Download voices**
-action. That fetches the quantized Kokoro v1.0 ONNX model (~92 MB) plus the
-curated English voice catalog (~4 MB) from the Apache-2.0 Hugging Face release
-into your user application-data directory. Every artifact is pinned to one
-model revision and SHA-256 verified before use. The chosen voice persists and
-can be changed from the menu bar/tray without restarting Kokoro.
+The first launch presents Kokoro's 54 voices across nine language families:
+American and British English, Spanish, French, Hindi, Italian, Japanese,
+Brazilian Portuguese, and Mandarin. **Download voices** fetches the full
+multilingual Kokoro v1.0 ONNX model (~311 MiB) and combined voice pack
+(~27 MiB) into your user application-data directory. Both artifacts are pinned
+to one revision and SHA-256 verified before use. The chosen voice—and therefore
+its language—persists. Selecting another voice immediately cancels the current
+sample and starts the new preview; it never waits behind stale preview audio.
 
 ## Build and run
 
@@ -71,16 +73,25 @@ make hooks
 ```
 
 Every commit then runs Rust formatting, `cargo check`, strict Clippy, all tests,
-an OSV dependency scan, and a staged Gitleaks scan. Install
+coverage-backed CRAP analysis, the pinned
+[`mindful-time/smells`](https://github.com/mindful-time/smells) v0.5.0
+staged-code policy, an OSV dependency scan, and a staged Gitleaks scan. CRAP
+scores above 5 warn; new or regressed scores above 10 block against the reviewed
+baseline. Install
 [OSV-Scanner](https://google.github.io/osv-scanner/installation/) and
-[Gitleaks](https://github.com/gitleaks/gitleaks#installing) before committing.
-Run the same gate directly with `make quality`; run a full-history secret scan
-with `make security`.
+[Gitleaks](https://github.com/gitleaks/gitleaks#installing) before committing;
+Smells is isolated and executed with `uvx`; CRAP uses `cargo-llvm-cov` and
+`cargo-crap 0.5.0`. Run the same gate directly with `make quality`, CRAP alone
+with `make crap`, the complete repository smell analysis with `make smells`,
+and a full-history secret scan with `make security`. The committed policies
+use the current repository measurements as required upper bounds, so new
+growth fails while existing review findings remain visible in its report.
 
-The pre-push release hook checks that `VERSION`, `Cargo.toml`, `Cargo.lock`, and
-the macOS bundle metadata resolve consistently. Mist is currently prepared as
-SemVer release `0.5.0`; future releases must bump the tracked version files
-together.
+The pre-push hook repeats the commit gate, scans the full repository with
+Smells v0.5.0, performs the full-history secret scan, and checks that `VERSION`,
+`Cargo.toml`, `Cargo.lock`, and the macOS bundle metadata resolve consistently.
+Mist is currently prepared as SemVer release `0.5.0`; future releases must bump
+the tracked version files together.
 
 ### macOS app bundle
 
@@ -170,24 +181,20 @@ Set `MIST_MODEL_DIR` to use a different model directory. The legacy
 
 ### Inference acceleration
 
-The Rust Kokoro adapter selects a native ONNX Runtime backend automatically:
+The current Rust Kokoro adapter selects a native ONNX Runtime backend
+automatically:
 
-- macOS probes CoreML, then falls back to CPU.
-- Windows probes CUDA, then DirectML, then CPU.
+- macOS uses CPU for the multilingual runtime.
+- Windows probes CUDA, then falls back to CPU.
 - Linux probes CUDA, then CPU.
 
-The settings panel displays the automatic backend policy while preparing and
-playing speech; labels such as `CoreML → CPU` show the fallback order rather
-than claiming which provider ultimately accepted every graph node. Set
-`KOKORO_ORT_PROVIDER=cpu`, `coreml`, `cuda`, or `directml` to override that
-policy when troubleshooting; explicit accelerators are labeled as requested.
-The ONNX Runtime provider probe is the hardware detection step, so the app does
-not maintain a second, potentially inconsistent GPU detector.
-
-Kokoro can also run through MLX on Apple Silicon, but this app deliberately uses
-CoreML instead. CoreML is available to the native Rust/ONNX pipeline and keeps
-the same application architecture on macOS, Windows, and Linux; an MLX backend
-would require a separate Apple-only runtime and model package.
+The Model page uses friendly capability labels—Recommended, Standard,
+Accelerated, Graphics acceleration, and Apple optimized—while retaining the
+actual runtime in secondary detail. CUDA is enabled only on Windows/Linux when
+a usable NVIDIA device is detected. WebGPU and MLX remain disabled because the
+current Kokoro adapter does not integrate them; Apple Silicon or Metal support
+alone is not reported as working acceleration. The research and validation
+gates are recorded in `docs/INFERENCE_BACKEND_RESEARCH.md`.
 
 ## Architecture
 
@@ -202,40 +209,45 @@ macOS Accessibility + Service / Windows UIA / Linux selection
                 /                \
     SpeechSynthesizer port    AudioPlayer port ← playback control
               |                     |
-         Kokoro ONNX        macOS / Windows / Linux
+      selected engine        macOS / Windows / Linux
+       factory port
+              |
+   Kokoro adapter today
+
+  VoiceCatalog port ← UI / preferences / preview copy
+         |
+  Kokoro catalog today
 ```
 
-- `domain.rs`: selected text, ordered speech queue, the voice catalog, mist
-  palettes, and audio values.
-- `application.rs`: the `SpeakSelection` use-case.
-- `playback.rs`: token-scoped, thread-safe pause/resume/cancel coordination.
-- `ports.rs`: speech synthesis, model provisioning, and playback interfaces.
-- `adapters/macos_selection.rs`: macOS Accessibility selection adapter.
-- `adapters/macos_service.rs`: optional incoming macOS Services adapter.
-- `adapters/windows_selection.rs`: Windows UI Automation selection adapter.
-- `adapters/linux_selection.rs`: Linux X11/Wayland selection adapter.
-- `adapters/wayland_shortcut.rs`: Wayland GlobalShortcuts portal adapter.
-- `platform.rs`: shared native-event and selection-capture coordinator.
-- `adapters/kokoro.rs`: outgoing streaming Kokoro/ONNX adapter with native
-  accelerator detection.
-- `adapters/system_audio.rs`: outgoing macOS/Windows/Linux audio adapter.
-- `adapters/voice_preferences.rs`: validated, persistent voice-selection
-  adapter.
-- `adapters/clipboard_fallback.rs`: optional Copy fallback with fingerprint and
-  platform-token-checked best-effort cleanup.
-- `adapters/playback_preferences.rs`: automatic-play, clipboard fallback, and
-  streaming settings.
-- `ui/mist.rs`: the embedded, audio-reactive mist renderer.
-- `ui/tray.rs`: the cross-platform menu-bar/system-tray adapter.
-- `ui/voice_gallery.rs`: the accessible onboarding and settings voice gallery.
-- `ui/queue_tray.rs`: bounded floating queue bubbles beneath the mist.
-- `ui.rs` and `worker.rs`: the floating surface and background command seam.
+- `core/domain/*`: selected text, speech queue, model-neutral voice/language,
+  playback, inference, and audio values.
+- `core/application/*`: speech, model-installation, and token-scoped playback
+  use cases.
+- `core/ports/*`: core-owned speech, catalog, audio, and provisioning
+  interfaces.
+- `adapters/inbound/desktop/*`: desktop input orchestration and the complete
+  mist/queue/settings/tray UI primary adapter.
+- `adapters/inbound/os/*`: macOS Accessibility/Services, Windows UI Automation,
+  and Linux X11/Wayland integrations.
+- `adapters/inbound/selection/clipboard.rs`: optional, identity-checked Copy
+  fallback.
+- `adapters/outbound/speech/kokoro/*`: Kokoro/ONNX engine plus its language and
+  voice catalog.
+- `adapters/outbound/audio/*`, `persistence/*`, and `provisioning/*`: system
+  audio, filesystem preferences, and verified model artifacts.
+- `runtime/worker.rs`: long-lived desktop orchestration outside the core.
+- `main.rs`: composition root.
 
-The core has no AppKit, ONNX, filesystem, or process knowledge and is covered by
-unit tests using in-memory port fakes.
+The core has no Kokoro catalog, AppKit, ONNX, filesystem, or process knowledge
+and is covered by unit tests using in-memory port fakes. `main.rs` is the
+composition root: replacing Kokoro means supplying another `VoiceCatalog`,
+`SpeechEngineFactory`, and `ModelProvisioner`; queue, UI, playback, and
+selection use-cases remain unchanged.
+The complete package map and dependency rule live in
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Scope
 
-This version is intentionally English-first. Additional languages,
-launch-at-login, graphical installers, and production signing/notarization
-remain outside the current scope.
+Launch-at-login, graphical installers, and production signing/notarization
+remain outside the current scope. Native selection behavior still requires
+release testing on each supported OS even when cross-target compilation passes.

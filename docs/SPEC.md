@@ -40,7 +40,12 @@ text-to-speech model.
   voice has a stable, recognisable color palette.
 - Setup, permission failures, and actionable errors may temporarily expand into
   an accessible panel because the user must be able to recover without a
-  terminal.
+  terminal. Settings owns a left rail for Voices, Playback, Privacy, and Model.
+  Language accordions contain their voice galleries on the Voices page so the
+  two related decisions stay together. At most one language is expanded, and
+  the open section can be collapsed without changing the selected voice.
+  Accessibility recovery appears only in Privacy; it never traps the settings
+  panel open. First-run model setup remains discoverable from Voices.
 - A native macOS menu-bar / Windows and Linux system-tray menu provides voice
   selection, settings, status, and quit actions while keeping controls off the
   floating desktop surface. Voice choices behave as one exclusive group, so
@@ -72,30 +77,44 @@ text-to-speech model.
 
 ## Speech
 
-- Use the Apache-2.0 Kokoro-82M v1.0 ONNX model referenced by the user's
-  Hugging Face Space.
+- The shipped adapter uses the Apache-2.0 Kokoro-82M v1.0 ONNX model referenced
+  by the user's Hugging Face Space. The application boundary remains
+  model-neutral so a later speech engine can replace Kokoro without changing
+  selection, queue, playback, or UI use-cases.
 - Synthesis happens on-device. Selected text is not sent to a speech service.
 - The default voice is `af_heart` at normal speed. Onboarding presents the
-  supported voice catalog as visual mist choices, and the selected voice is
-  persisted in the platform application-data directory.
+  adapter-provided voice catalog as visual mist choices, and the selected voice
+  is persisted in the platform application-data directory. The Kokoro adapter
+  exposes all 54 voices across American/British English, Spanish, French,
+  Hindi, Italian, Japanese, Brazilian Portuguese, and Mandarin.
 - Activating a voice card selects that voice and immediately streams a short
-  local preview through the same Kokoro and system-audio path used for selected
-  text. While a preview or selection is speaking, additional card activations
-  are disabled so stale previews do not queue behind it.
+  local preview through the same speech-engine and system-audio path used for
+  selected text. Voice cards remain available during a preview: activating a
+  different card cancels the current token-scoped playback, drops stale queued
+  preview requests, and starts the newest sample. Queue speech still protects
+  itself from an unrelated preview.
 - Changing voice affects subsequent speech without restarting the app.
 - Selecting a voice from the native menu updates the one exclusive choice and,
   when the app is ready, immediately plays its preview without opening voice
   settings.
 - Long selections are synthesized and played as ordered sentence chunks. The
   UI distinguishes generation of the first chunk from audible playback.
-  Streaming is enabled by default and exposed as a persisted playback setting;
-  disabling it buffers the full generated selection before audio starts.
-- Hardware selection is automatic through ONNX Runtime provider probing:
-  CoreML then CPU on macOS; CUDA then DirectML then CPU on Windows; CUDA then
-  CPU on Linux. The UI displays that fallback order without claiming that a
-  preferred provider was the resolved provider.
+  The persisted Playback page calls these modes **Real-time** and **Complete
+  audio**. Real-time is the default and begins after the first sentence chunk;
+  Complete audio buffers the full generated selection before audio starts. A
+  persisted 0.5×–3× speed setting applies across languages and voices.
+- The current multilingual runtime uses CPU on macOS and CUDA with CPU fallback
+  on Windows/Linux. CUDA is enabled only when an NVIDIA device is detected.
+  WebGPU and MLX remain disabled when the shipped adapter cannot run them; the
+  UI uses friendly Recommended, Standard, Accelerated, and Apple-optimized
+  labels with the technical runtime in secondary detail. It never equates
+  hardware branding with runtime support or claims unmeasured speed.
+- The Model restart notice occupies header space and cannot intersect a
+  provider row in the expanded settings viewport.
 - The first-run model download is explicit and stored in the user's application
-  data directory rather than committed to the source repository.
+  data directory rather than committed to the source repository. The pinned,
+  checksum-verified multilingual bundle is approximately 311 MiB for the model
+  and 27 MiB for the combined voice pack.
 
 ## Architecture
 
@@ -103,8 +122,20 @@ text-to-speech model.
   architecture.
 - Domain and application code must not import GUI, OS, network, filesystem,
   ONNX, or audio-device libraries.
-- OS selection, system tray, preferences, Kokoro inference, model download, and
+- OS selection, system tray, preferences, speech inference, model download, and
   audio playback are adapters behind the application boundary.
+- Primary adapters are packaged under `adapters/inbound` by desktop, selection,
+  and operating-system capability. The complete desktop UI belongs to the
+  inbound desktop adapter rather than at the source root. Secondary adapters
+  are packaged under `adapters/outbound` by speech, audio, persistence, and
+  provisioning capability.
+- Core code is packaged under `core/domain`, `core/application`, and
+  `core/ports`; each layer is subdivided by capability instead of accumulating
+  unrelated implementations in a single file.
+- Voice IDs, model-specific defaults, localized preview copy, and engine
+  construction belong to `VoiceCatalog`, `SpeechEngineFactory`, and
+  `ModelProvisioner` outbound ports. Kokoro-specific catalog data and runtime
+  construction must not appear in domain, application, worker, or UI logic.
 - Primary selection capture must not modify or reconstruct the user's regular
   clipboard. Clipboard mutation belongs only to the explicit, configurable
   fallback adapter. Cleanup must check the captured value and any available
@@ -124,17 +155,23 @@ text-to-speech model.
 - Domain and application use-cases have unit tests with in-memory adapters.
 - The native target passes `cargo check`, `cargo test`, and clippy with warnings
   denied.
-- Repository hooks run formatting, check, strict Clippy, tests, OSV dependency
-  scanning, and staged-secret scanning before commits. The pre-push release
-  hook keeps the package and native bundle SemVer metadata synchronized.
+- Repository hooks run formatting, check, strict Clippy, tests, coverage-backed
+  CRAP analysis, the pinned Smells v0.5.0 policy, OSV dependency scanning, and
+  staged-secret scanning before commits. CRAP scores above 5 emit warnings;
+  new or regressed scores above 10 block against the reviewed committed
+  baseline. The pre-push hook adds a full-repository Smells scan and
+  full-history secret scan, then keeps package and native bundle SemVer
+  metadata synchronized. Handwritten platform FFI remains in scanned Rust
+  source rather than being hidden by policy exclusions.
 - A macOS `.app` bundle advertises the text Service through `Info.plist`.
 - The bundled mist texture is embedded in the executable so packaged builds
   cannot silently omit it.
 - After onboarding, the floating surface renders only mist. The tray/menu-bar
   menu can reopen voice settings, and setup or error panels remain keyboard and
   screen-reader legible.
-- Every voice card exposes a keyboard-focusable “Preview and select” action,
-  includes a visible play cue, and routes the exact card voice to Kokoro.
+- Every voice card exposes a keyboard-focusable selection action and routes the
+  exact card voice to the active speech adapter. A second activation can replace
+  a playing preview immediately.
 - Playback-synchronised, time-windowed loudness and brightness reach
   presentation state only after the platform audio player has actually
   started.
@@ -150,5 +187,6 @@ text-to-speech model.
 
 ## Deferred
 
-Additional languages, launch at login, production signing/notarization, and
-graphical installers are outside this version.
+Launch at login, production signing/notarization, graphical installers, and
+native end-to-end validation on hardware not available to this macOS build
+machine are outside this version.
