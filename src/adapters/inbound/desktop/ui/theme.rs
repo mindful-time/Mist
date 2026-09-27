@@ -4,6 +4,11 @@ use std::{fs, sync::Arc};
 
 use eframe::egui::{self, Color32, FontData, FontDefinitions, FontFamily, Vec2};
 
+const BUNDLED_DEVANAGARI: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/assets/fonts/NotoSansDevanagariUI-Regular.ttf"
+));
+
 pub(super) const PANEL_BACKGROUND: Color32 = Color32::from_rgba_premultiplied(14, 16, 23, 248);
 pub(super) const PANEL_SURFACE: Color32 = Color32::from_rgba_premultiplied(7, 7, 7, 7);
 pub(super) const TEXT_PRIMARY: Color32 = Color32::from_rgb(245, 246, 250);
@@ -94,14 +99,19 @@ fn load_system_fonts() -> Vec<(String, FontData)> {
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     let candidates: [(&str, &str); 0] = [];
 
-    candidates
+    let mut loaded: Vec<_> = candidates
         .into_iter()
         .filter_map(|(name, path)| {
             fs::read(path)
                 .ok()
                 .map(|bytes| (name.to_owned(), FontData::from_owned(bytes)))
         })
-        .collect()
+        .collect();
+    loaded.push((
+        "bundled-devanagari".to_owned(),
+        FontData::from_static(BUNDLED_DEVANAGARI),
+    ));
+    loaded
 }
 
 #[cfg(test)]
@@ -110,6 +120,24 @@ mod tests {
     use skrifa::{FontRef, MetadataProvider};
 
     use super::*;
+
+    fn font_covers(data: &FontData, character: char) -> bool {
+        FontRef::from_index(data.font.as_ref(), data.index)
+            .ok()
+            .is_some_and(|font| font.charmap().map(character).is_some())
+    }
+
+    #[test]
+    fn bundled_fallback_covers_the_hindi_sample() {
+        let font = FontData::from_static(BUNDLED_DEVANAGARI);
+
+        for character in "मिस्ट बोलता है"
+            .chars()
+            .filter(|character| !character.is_whitespace())
+        {
+            assert!(font_covers(&font, character));
+        }
+    }
 
     #[test]
     fn configured_interface_covers_every_supported_writing_system() {
@@ -129,11 +157,9 @@ mod tests {
                 .chars()
                 .filter(|character| !character.is_whitespace())
             {
-                let covered = system_fonts.iter().any(|(_, data)| {
-                    FontRef::from_index(data.font.as_ref(), data.index)
-                        .ok()
-                        .is_some_and(|font| font.charmap().map(character).is_some())
-                });
+                let covered = system_fonts
+                    .iter()
+                    .any(|(_, data)| font_covers(data, character));
                 assert!(covered, "configured UI fonts do not cover {character:?}");
             }
         }

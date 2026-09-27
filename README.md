@@ -52,6 +52,9 @@ multilingual Kokoro v1.0 ONNX model (~311 MiB) and combined voice pack
 to one revision and SHA-256 verified before use. The chosen voice—and therefore
 its language—persists. Selecting another voice immediately cancels the current
 sample and starts the new preview; it never waits behind stale preview audio.
+Mist embeds the OFL-licensed Noto Sans Devanagari UI fallback so Hindi text does
+not depend on an optional operating-system font. The remaining scripts use the
+native macOS/Windows fonts or the Linux packages listed below.
 
 ## Build and run
 
