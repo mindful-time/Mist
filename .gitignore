@@ -3,6 +3,7 @@
 /.cargo-home/
 /.DS_Store
 *.wav
+!third_party/kokoro-micro/assets/fallback.wav
 *.download
 smells-findings.log
 smells-report.json
