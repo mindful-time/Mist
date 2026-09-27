@@ -120,11 +120,11 @@ pub enum AppStatus {
     Loading,
     Synthesizing {
         text: String,
-        inference_policy: String,
+        runtime_backend: String,
     },
     Speaking {
         text: String,
-        inference_policy: String,
+        runtime_backend: String,
         features: AudioFeatures,
     },
     Error(String),
@@ -132,7 +132,7 @@ pub enum AppStatus {
 
 struct SpeechSession {
     speaker: SpeakSelection<DynSpeechSynthesizer, SystemAudioPlayer>,
-    inference_policy: String,
+    runtime_backend: String,
 }
 
 struct SpeechEnvironment<'a> {
@@ -478,12 +478,12 @@ fn run_speech(
             environment.playback_preferences.mode,
             session,
         )?;
-        let inference_policy = session.inference_policy.clone();
+        let runtime_backend = session.runtime_backend.clone();
         send_status(
             environment.statuses,
             AppStatus::Synthesizing {
                 text: preview.clone(),
-                inference_policy: inference_policy.clone(),
+                runtime_backend: runtime_backend.clone(),
             },
         );
         execute(&mut session.speaker, &mut |features| {
@@ -491,7 +491,7 @@ fn run_speech(
                 environment.statuses,
                 AppStatus::Speaking {
                     text: preview.clone(),
-                    inference_policy: inference_policy.clone(),
+                    runtime_backend: runtime_backend.clone(),
                     features,
                 },
             );
@@ -516,14 +516,14 @@ fn ensure_session<'a>(
     if session.is_none() {
         send_status(statuses, AppStatus::Loading);
         let engine = engine_factory.load()?;
-        let inference_policy = engine.inference_policy;
+        let runtime_backend = engine.runtime_backend;
         let audio_cache = data_root.join("audio-cache");
         let player = SystemAudioPlayer::new(&audio_cache, playback.clone())?;
         let mut speaker = SpeakSelection::new(engine.synthesizer, player, voice.clone());
         speaker.set_playback_mode(playback_mode);
         *session = Some(SpeechSession {
             speaker,
-            inference_policy,
+            runtime_backend,
         });
     }
 

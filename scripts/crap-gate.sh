@@ -44,6 +44,7 @@ fi
 cargo llvm-cov --locked --lcov --output-path "$coverage_report"
 cargo crap \
     --lcov "$coverage_report" \
+    --exclude 'third_party/**' \
     --threshold "$warning_threshold" \
     --format json \
     --sort file \
@@ -53,6 +54,7 @@ if [ "$update_baseline" = true ]; then
     mkdir -p "$(dirname -- "$baseline_report")"
     cargo crap \
         --lcov "$coverage_report" \
+        --exclude 'third_party/**' \
         --threshold "$warning_threshold" \
         --format json \
         --sort file \
@@ -69,6 +71,7 @@ fi
 
 cargo crap \
     --lcov "$coverage_report" \
+    --exclude 'third_party/**' \
     --threshold "$blocking_threshold" \
     --baseline "$baseline_report" \
     --format json \
@@ -96,6 +99,7 @@ fi
 # threshold, even when no function crosses the blocking threshold.
 cargo crap \
     --lcov "$coverage_report" \
+    --exclude 'third_party/**' \
     --threshold "$warning_threshold" \
     --format github >&2
 

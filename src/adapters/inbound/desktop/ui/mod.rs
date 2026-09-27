@@ -1293,7 +1293,7 @@ mod tests {
         assert_eq!(pending.after_status(&AppStatus::Ready), pending);
         let active = pending.after_status(&AppStatus::Synthesizing {
             text: "preview".to_owned(),
-            inference_policy: "CPU".to_owned(),
+            runtime_backend: "CPU".to_owned(),
         });
         assert_eq!(active, VoicePreviewActivity::Active);
         assert_eq!(
@@ -1341,7 +1341,7 @@ mod tests {
     fn tray_voice_selection_does_not_queue_preview_while_speaking() {
         let speaking = AppStatus::Speaking {
             text: "Already speaking".to_owned(),
-            inference_policy: "CoreML → CPU".to_owned(),
+            runtime_backend: "CoreMLExecutionProvider (device 0)".to_owned(),
             features: crate::AudioFeatures {
                 energy: 120,
                 brightness: 96,

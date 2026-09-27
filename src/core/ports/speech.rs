@@ -42,7 +42,9 @@ impl SpeechSynthesizer for DynSpeechSynthesizer {
 /// A model-neutral speech engine selected by the composition root.
 pub struct LoadedSpeechEngine {
     pub synthesizer: DynSpeechSynthesizer,
-    pub inference_policy: String,
+    /// Backend reported by the loaded model session, not merely the user's
+    /// requested policy. Adapters own the provider-specific wording.
+    pub runtime_backend: String,
 }
 
 /// Driven port for constructing the selected speech-model adapter.

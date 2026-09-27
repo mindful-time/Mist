@@ -18,7 +18,8 @@
     "__pycache__",
     "coverage",
     "node_modules",
-    "target"
+    "target",
+    "third_party"
   ],
   "limits": {
     "maximum_files": 10000,

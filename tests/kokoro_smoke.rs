@@ -15,6 +15,12 @@ fn local_kokoro_model_produces_audio() {
 
     let mut synthesizer =
         KokoroSynthesizer::load(&store.model_path(), &store.voices_path()).expect("load Kokoro");
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    assert_eq!(
+        synthesizer.runtime_backend_label(),
+        "CoreMLExecutionProvider (device 0)",
+        "Apple Silicon must try the packaged Core ML provider before CPU"
+    );
     let catalog = KokoroVoiceCatalog;
     for (voice, sample) in [
         ("af_heart", "Hello from Mist."),

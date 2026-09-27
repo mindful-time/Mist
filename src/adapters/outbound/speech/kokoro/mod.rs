@@ -25,7 +25,6 @@ use crate::{
 /// Kokoro v1.0 ONNX adapter. The runtime and model stay warm between selections.
 pub struct KokoroSynthesizer {
     tts: TtsEngine,
-    inference_policy: InferencePolicy,
 }
 
 /// Composition adapter that hides Kokoro construction from the worker and
@@ -49,10 +48,10 @@ impl KokoroEngineFactory {
 impl SpeechEngineFactory for KokoroEngineFactory {
     fn load(&self) -> Result<LoadedSpeechEngine> {
         let synthesizer = KokoroSynthesizer::load(&self.model_path, &self.voices_path)?;
-        let inference_policy = synthesizer.inference_policy_label().to_owned();
+        let runtime_backend = synthesizer.runtime_backend_label();
         Ok(LoadedSpeechEngine {
             synthesizer: DynSpeechSynthesizer::new(synthesizer),
-            inference_policy,
+            runtime_backend,
         })
     }
 }
@@ -62,11 +61,7 @@ pub fn provider_capabilities() -> Vec<ProviderCapability> {
 }
 
 pub fn configure_inference_provider(provider: &InferenceProviderId) {
-    let requested = match provider.as_str() {
-        "cpu" => Some("cpu"),
-        "cuda" => Some("cuda"),
-        _ => None,
-    };
+    let requested = provider_environment_value(provider.as_str());
     // SAFETY: main calls this once during single-threaded process startup,
     // before eframe, the speech worker, or ONNX Runtime creates any threads.
     unsafe {
@@ -75,6 +70,15 @@ pub fn configure_inference_provider(provider: &InferenceProviderId) {
         } else {
             env::remove_var("KOKORO_ORT_PROVIDER");
         }
+    }
+}
+
+fn provider_environment_value(provider: &str) -> Option<&'static str> {
+    match provider {
+        "cpu" => Some("cpu"),
+        "cuda" => Some("cuda"),
+        "coreml" => Some("coreml"),
+        _ => None,
     }
 }
 
@@ -94,7 +98,7 @@ fn capabilities_for(
     cuda_device_present: bool,
 ) -> Vec<ProviderCapability> {
     let auto_detail = match operating_system {
-        "macos" => "Chooses a validated backend · currently ONNX CPU",
+        "macos" => "Chooses Core ML GPU when available, then ONNX CPU",
         "windows" => "Chooses CUDA when validated, then ONNX CPU",
         "linux" => "Chooses CUDA when validated, then ONNX CPU",
         _ => "Chooses a validated backend · currently ONNX CPU",
@@ -135,6 +139,17 @@ fn capabilities_for(
             },
         ),
         provider(
+            "coreml",
+            "Accelerated",
+            ProviderPerformance::Accelerated,
+            operating_system == "macos" && architecture == "aarch64",
+            if operating_system == "macos" && architecture == "aarch64" {
+                "Core ML · Apple GPU with ONNX CPU fallback"
+            } else {
+                "Core ML · requires Apple Silicon macOS"
+            },
+        ),
+        provider(
             "webgpu",
             "Graphics acceleration",
             ProviderPerformance::Accelerated,
@@ -171,28 +186,8 @@ fn provider(
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum InferencePolicy {
-    AutoCpu,
-    CudaAuto,
-    Cpu,
-    CudaRequested,
-}
-
-impl InferencePolicy {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::AutoCpu => "CPU",
-            Self::CudaAuto => "CUDA → CPU",
-            Self::Cpu => "CPU",
-            Self::CudaRequested => "CUDA requested",
-        }
-    }
-}
-
 impl KokoroSynthesizer {
     pub fn load(model_path: &Path, voice_path: &Path) -> Result<Self> {
-        let inference_policy = detect_inference_policy();
         let runtime = Builder::new_multi_thread()
             .enable_all()
             .build()
@@ -208,14 +203,11 @@ impl KokoroSynthesizer {
             .map_err(anyhow::Error::msg)
             .with_context(|| format!("could not load Kokoro model at {}", model_path.display()))?;
 
-        Ok(Self {
-            tts,
-            inference_policy,
-        })
+        Ok(Self { tts })
     }
 
-    pub fn inference_policy_label(&self) -> &'static str {
-        self.inference_policy.label()
+    pub fn runtime_backend_label(&self) -> String {
+        self.tts.backend().to_string()
     }
 }
 
@@ -287,15 +279,23 @@ impl SpeechSynthesizer for KokoroSynthesizer {
 }
 
 fn requested_device() -> Device {
-    match env::var("KOKORO_ORT_PROVIDER")
-        .unwrap_or_else(|_| "auto".to_owned())
+    requested_device_for(
+        env::consts::OS,
+        env::var("KOKORO_ORT_PROVIDER").ok().as_deref(),
+    )
+}
+
+/// Maps adapter-owned provider preferences to the model runtime's portable
+/// device contract. `Auto` always tries compiled accelerators before CPU.
+fn requested_device_for(_operating_system: &str, requested_provider: Option<&str>) -> Device {
+    match requested_provider
+        .unwrap_or("auto")
         .to_ascii_lowercase()
         .as_str()
     {
         "cpu" => Device::Cpu,
-        "cuda" => Device::Gpu,
-        _ if matches!(env::consts::OS, "windows" | "linux") => Device::Auto,
-        _ => Device::Cpu,
+        "cuda" | "coreml" => Device::Gpu,
+        _ => Device::Auto,
     }
 }
 
@@ -324,60 +324,49 @@ fn speech_chunks(text: &str) -> Vec<String> {
     chunks
 }
 
-fn detect_inference_policy() -> InferencePolicy {
-    policy_for(
-        env::consts::OS,
-        env::var("KOKORO_ORT_PROVIDER").ok().as_deref(),
-    )
-}
-
-/// Mirrors the providers compiled into the multilingual Kokoro runtime.
-fn policy_for(operating_system: &str, requested_provider: Option<&str>) -> InferencePolicy {
-    let requested_provider = requested_provider.unwrap_or("auto").to_ascii_lowercase();
-    match (operating_system, requested_provider.as_str()) {
-        (_, "cpu") => return InferencePolicy::Cpu,
-        ("windows" | "linux", "cuda") => return InferencePolicy::CudaRequested,
-        _ => {}
-    }
-
-    match operating_system {
-        "windows" | "linux" => InferencePolicy::CudaAuto,
-        _ => InferencePolicy::AutoCpu,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn automatic_policy_matches_the_loader_provider_order() {
-        assert_eq!(policy_for("macos", Some("auto")), InferencePolicy::AutoCpu);
-        assert_eq!(policy_for("linux", None), InferencePolicy::CudaAuto);
-        assert_eq!(policy_for("windows", None), InferencePolicy::CudaAuto);
+    fn automatic_device_tries_acceleration_before_cpu_on_every_platform() {
+        for operating_system in ["macos", "windows", "linux"] {
+            assert_eq!(
+                requested_device_for(operating_system, Some("auto")),
+                Device::Auto
+            );
+        }
     }
 
     #[test]
     fn explicit_cpu_override_wins_on_every_platform() {
         for operating_system in ["macos", "windows", "linux"] {
             assert_eq!(
-                policy_for(operating_system, Some("CPU")),
-                InferencePolicy::Cpu
+                requested_device_for(operating_system, Some("CPU")),
+                Device::Cpu
             );
         }
     }
 
     #[test]
-    fn explicit_accelerator_override_is_labeled_as_requested() {
-        assert_eq!(
-            policy_for("linux", Some("cuda")),
-            InferencePolicy::CudaRequested
-        );
+    fn explicit_accelerator_requires_the_compiled_gpu_provider() {
+        assert_eq!(requested_device_for("linux", Some("cuda")), Device::Gpu);
+        assert_eq!(requested_device_for("macos", Some("coreml")), Device::Gpu);
+    }
+
+    #[test]
+    fn provider_preferences_translate_only_supported_explicit_overrides() {
+        assert_eq!(provider_environment_value("cpu"), Some("cpu"));
+        assert_eq!(provider_environment_value("cuda"), Some("cuda"));
+        assert_eq!(provider_environment_value("coreml"), Some("coreml"));
+        assert_eq!(provider_environment_value("auto"), None);
+        assert_eq!(provider_environment_value("webgpu"), None);
     }
 
     #[test]
     fn capability_matrix_disables_backends_the_device_cannot_run() {
         let mac = capabilities_for("macos", "aarch64", false);
+        assert!(capability(&mac, "coreml").available);
         assert!(!capability(&mac, "cuda").available);
         assert!(!capability(&mac, "webgpu").available);
         assert!(!capability(&mac, "mlx").available);

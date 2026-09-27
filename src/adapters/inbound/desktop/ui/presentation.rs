@@ -168,21 +168,21 @@ pub(super) fn copy_for_status(
         },
         AppStatus::Synthesizing {
             text,
-            inference_policy,
+            runtime_backend,
         } => StatusCopy {
             eyebrow: "FORMING SPEECH",
             title: "The first words are taking shape",
-            detail: format!("“{text}” · {inference_policy}"),
+            detail: format!("“{text}” · {runtime_backend}"),
             action: PrimaryAction::None,
         },
         AppStatus::Speaking {
             text,
-            inference_policy,
+            runtime_backend,
             ..
         } => StatusCopy {
             eyebrow: "SPEAKING",
             title: "The mist is alive",
-            detail: format!("“{text}” · local playback · {inference_policy}"),
+            detail: format!("“{text}” · local playback · {runtime_backend}"),
             action: PrimaryAction::None,
         },
         AppStatus::Error(message) => StatusCopy {
@@ -238,7 +238,7 @@ mod tests {
         let presentation = mist_for_status(
             &AppStatus::Speaking {
                 text: "Hello".to_owned(),
-                inference_policy: "CoreML → CPU".to_owned(),
+                runtime_backend: "CoreMLExecutionProvider (device 0)".to_owned(),
                 features: features(147, 83),
             },
             false,
@@ -253,7 +253,7 @@ mod tests {
         let presentation = mist_for_status(
             &AppStatus::Speaking {
                 text: "Hello".to_owned(),
-                inference_policy: "CoreML → CPU".to_owned(),
+                runtime_backend: "CoreMLExecutionProvider (device 0)".to_owned(),
                 features: features(96, 120),
             },
             false,
@@ -278,7 +278,7 @@ mod tests {
         let presentation = mist_for_status(
             &AppStatus::Synthesizing {
                 text: "A long selection…".to_owned(),
-                inference_policy: "CoreML → CPU".to_owned(),
+                runtime_backend: "CoreMLExecutionProvider (device 0)".to_owned(),
             },
             false,
             None,
@@ -295,7 +295,7 @@ mod tests {
         let loud = mist_for_status(
             &AppStatus::Speaking {
                 text: "Hello".to_owned(),
-                inference_policy: "CoreML → CPU".to_owned(),
+                runtime_backend: "CoreMLExecutionProvider (device 0)".to_owned(),
                 features: features(255, 220),
             },
             false,
