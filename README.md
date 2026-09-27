@@ -18,10 +18,14 @@ Voice selection, status, settings, and quit live in the macOS menu bar or the
 Windows/Linux system tray; setup and recoverable errors open a focused panel
 only when needed.
 
-Every captured selection appears as a small floating queue bubble beneath the
-mist. New items play automatically by default; turn off **Play new queue items
-automatically** to click each bubble yourself. Completed items disappear. When
-Mist used automatic Copy, it clears that temporary clipboard value after
+Every captured selection appears in a compact Spotlight-style pill beneath the
+mist. Drag the pill to move the whole floating surface; its separate round
+control pauses or resumes active speech and plays waiting items, while the ×
+control deletes that exact item. Deleting active speech stops its platform
+audio session before the next item starts. New items play automatically by
+default; turn off **Play new queue items automatically** to start each item
+yourself. Completed items disappear. When Mist used automatic Copy, it clears
+that temporary clipboard value after
 playback only if it still matches. macOS and Windows also require the clipboard
 change token to match; Linux uses a content fingerprint. Operating systems do
 not provide Mist with one portable atomic compare-and-clear operation, so this
@@ -167,7 +171,7 @@ macOS Accessibility + Service / Windows UIA / Linux selection
                        |
              SpeakSelection use-case
                 /                \
-    SpeechSynthesizer port    AudioPlayer port
+    SpeechSynthesizer port    AudioPlayer port ← playback control
               |                     |
          Kokoro ONNX        macOS / Windows / Linux
 ```
@@ -175,6 +179,7 @@ macOS Accessibility + Service / Windows UIA / Linux selection
 - `domain.rs`: selected text, ordered speech queue, the voice catalog, mist
   palettes, and audio values.
 - `application.rs`: the `SpeakSelection` use-case.
+- `playback.rs`: token-scoped, thread-safe pause/resume/cancel coordination.
 - `ports.rs`: speech synthesis, model provisioning, and playback interfaces.
 - `adapters/macos_selection.rs`: macOS Accessibility selection adapter.
 - `adapters/macos_service.rs`: optional incoming macOS Services adapter.
@@ -202,5 +207,5 @@ unit tests using in-memory port fakes.
 ## Scope
 
 This version is intentionally English-first. Additional languages,
-launch-at-login, interruption, graphical installers, and production
-signing/notarization remain outside the current scope.
+launch-at-login, graphical installers, and production signing/notarization
+remain outside the current scope.

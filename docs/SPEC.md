@@ -44,10 +44,16 @@ text-to-speech model.
   selecting one voice can never leave a second voice marked as selected.
 - Captured text appears in a compact floating bubble queue directly beneath the
   mist. The queue is bounded, shows only short previews, and expands downward
-  so the mist keeps its desktop position.
+  so the mist keeps its desktop position. Each row is a small frosted pill with
+  separate circular playback and delete controls. Dragging the pill moves the
+  whole floating surface without stealing control clicks.
 - Queue playback is automatic by default. A persisted setting switches to
   click-to-play without changing queue order. Successful playback removes the
-  item; failed items remain available for an explicit retry.
+  item; failed items remain available for an explicit retry. Active playback
+  can be paused and resumed. Deleting a waiting item removes only that item;
+  deleting the active item stops its system player, releases any temporary
+  clipboard lease, and waits for the worker cancellation acknowledgement
+  before starting the next item.
 - Direct OS selection capture runs first. A persisted, default-on setting may
   send the platform Copy shortcut only when direct capture fails. Mist clears
   that temporary clipboard value after playback only when both its content and
@@ -97,6 +103,9 @@ text-to-speech model.
   preservation guarantees the OS does not provide.
 - Slow model loading, synthesis, download, and playback must not block the pet's
   UI event loop.
+- Playback control uses an out-of-band, token-scoped application handle because
+  synchronous platform playback blocks the speech worker. OS process pause and
+  termination remain inside the audio adapter.
 
 ## Acceptance checks
 
@@ -117,7 +126,8 @@ text-to-speech model.
 - **Ctrl+Space** is requested on every OS. Wayland displays the gesture actually
   granted by the compositor, and unsupported portal capabilities fail visibly.
 - Every successful hotkey capture enters the visible queue before playback.
-  Automatic and click-to-play modes persist across launches.
+  Automatic and click-to-play modes persist across launches. Queue pills remain
+  draggable and expose keyboard-accessible play/pause and delete controls.
 - Failures classified by the platform adapter as permission or protected
   content never trigger automatic Copy fallback.
 - The repository documents build and usage instructions for macOS, Windows, and
@@ -125,5 +135,5 @@ text-to-speech model.
 
 ## Deferred
 
-Additional languages, launch at login, interrupting current speech, production
-signing/notarization, and graphical installers are outside this version.
+Additional languages, launch at login, production signing/notarization, and
+graphical installers are outside this version.

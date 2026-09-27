@@ -13,7 +13,8 @@ use std::{
 };
 
 use ::mist::{
-    PlaybackPreferences, QueueItemId, SpeechQueue, VOICE_CATALOG, VoiceSettings,
+    PlaybackController, PlaybackPhase, PlaybackPreferences, PlaybackToken, QueueItemId,
+    QueueItemState, SpeechQueue, VOICE_CATALOG, VoiceSettings,
     adapters::{
         clipboard_fallback::ClipboardLease, playback_preferences::PlaybackPreferencesStore,
     },
@@ -29,6 +30,7 @@ use eframe::egui::{
 use self::{
     mist::MistRenderer,
     presentation::{MistSmoother, PrimaryAction, copy_for_status, mist_for_status},
+    queue_tray::{QueueAction, QueueTrayResponse},
     system_settings::open_accessibility_settings,
     theme::{
         PANEL_BACKGROUND, TEXT_MUTED, TEXT_PRIMARY, TEXT_SECONDARY, configure_interface,
@@ -39,7 +41,7 @@ use self::{
 
 pub(crate) const MIST_WINDOW: Vec2 = Vec2::new(164.0, 164.0);
 const SPEAKING_MIST_WINDOW: Vec2 = Vec2::new(232.0, 232.0);
-const QUEUE_WINDOW_WIDTH: f32 = 300.0;
+const QUEUE_WINDOW_WIDTH: f32 = 282.0;
 const CONTEXT_MENU_WINDOW: Vec2 = Vec2::new(280.0, 420.0);
 const PANEL_WINDOW: Vec2 = Vec2::new(600.0, 680.0);
 
@@ -91,6 +93,7 @@ impl ViewportMode {
 pub struct PetApp {
     commands: mpsc::SyncSender<WorkerCommand>,
     statuses: mpsc::Receiver<AppStatus>,
+    playback: PlaybackController,
     status: AppStatus,
     platform: PlatformBridge,
     mist: MistRenderer,
@@ -119,6 +122,7 @@ impl PetApp {
         creation_context: &eframe::CreationContext<'_>,
         commands: mpsc::SyncSender<WorkerCommand>,
         statuses: mpsc::Receiver<AppStatus>,
+        playback: PlaybackController,
         selected_voice: VoiceSettings,
         playback_preferences: PlaybackPreferences,
         playback_preferences_store: PlaybackPreferencesStore,
@@ -138,6 +142,7 @@ impl PetApp {
         let app = Self {
             commands,
             statuses,
+            playback,
             status: AppStatus::CheckingModel,
             platform,
             mist,
@@ -292,9 +297,12 @@ impl PetApp {
     }
 
     fn worker_available_for_queue(&self) -> bool {
-        self.voices_ready
-            && self.voice_preview == VoicePreviewActivity::Idle
-            && matches!(self.status, AppStatus::Ready | AppStatus::Error(_))
+        queue_worker_available(
+            &self.status,
+            self.voices_ready,
+            self.voice_preview,
+            self.playback.phase(),
+        )
     }
 
     fn maybe_start_automatic_queue(&mut self) {
@@ -318,9 +326,56 @@ impl PetApp {
         }
     }
 
+    fn pause_queue_item(&mut self, id: QueueItemId) {
+        if self.playback.pause(PlaybackToken::queue_item(id)) {
+            self.speech_queue.pause(id);
+        }
+    }
+
+    fn resume_queue_item(&mut self, id: QueueItemId) {
+        if self.playback.resume(PlaybackToken::queue_item(id)) {
+            self.speech_queue.resume(id);
+        }
+    }
+
+    fn delete_queue_item(&mut self, id: QueueItemId) {
+        let was_active = self.speech_queue.active_id() == Some(id);
+        if was_active {
+            self.playback.cancel(PlaybackToken::queue_item(id));
+            self.queue_playback_started = false;
+        }
+        if self.speech_queue.remove(id).is_none() {
+            return;
+        }
+        if let Some(error) = self.clear_clipboard_lease(id) {
+            self.set_error(error);
+        }
+        self.maybe_start_automatic_queue();
+    }
+
+    fn handle_queue_action(&mut self, action: QueueAction) {
+        match action {
+            QueueAction::Play(id) => self.play_queue_item(id),
+            QueueAction::Pause(id) => self.pause_queue_item(id),
+            QueueAction::Resume(id) => self.resume_queue_item(id),
+            QueueAction::Delete(id) => self.delete_queue_item(id),
+        }
+    }
+
     fn dispatch_queue_item(&mut self, id: QueueItemId, text: ::mist::SelectedText) {
         self.queue_playback_started = false;
-        if !self.enqueue(WorkerCommand::Speak(text)) {
+        let token = PlaybackToken::queue_item(id);
+        if !self.playback.register(token) {
+            self.speech_queue.fail(id);
+            if let Some(error) = self.clear_clipboard_lease(id) {
+                self.set_error(error);
+                return;
+            }
+            self.set_error("The audio player is still finishing the previous queue item.");
+            return;
+        }
+        if !self.enqueue(WorkerCommand::Speak { token, text }) {
+            self.playback.finish_session(token);
             self.speech_queue.fail(id);
             if let Some(error) = self.clear_clipboard_lease(id) {
                 self.set_error(error);
@@ -492,7 +547,7 @@ impl PetApp {
         ui: &mut egui::Ui,
         time: f32,
         presentation: presentation::MistPresentation,
-    ) -> (bool, Option<QueueItemId>) {
+    ) -> (bool, QueueTrayResponse) {
         let context = ui.ctx().clone();
         let mist_size = if presentation.activity == presentation::MistActivity::Speaking {
             SPEAKING_MIST_WINDOW
@@ -507,8 +562,8 @@ impl PetApp {
         self.mist
             .paint(ui, rect, time, presentation, profile.palette, seed);
 
-        let queue_action = if self.speech_queue.items().is_empty() {
-            None
+        let queue_response = if self.speech_queue.items().is_empty() {
+            QueueTrayResponse::default()
         } else {
             queue_tray::show(
                 ui,
@@ -519,11 +574,11 @@ impl PetApp {
             )
         };
 
-        if response.drag_started() {
+        if response.drag_started() || queue_response.drag_started {
             context.send_viewport_cmd(egui::ViewportCommand::StartDrag);
         }
         response.context_menu(|ui| self.context_menu(ui, &context));
-        (response.context_menu_opened(), queue_action)
+        (response.context_menu_opened(), queue_response)
     }
 
     fn paint_panel(
@@ -816,11 +871,23 @@ impl eframe::App for PetApp {
             .tray_error
             .as_deref()
             .or_else(|| self.platform.registration_error());
-        let presentation = mist_for_status(
+        let mut presentation = mist_for_status(
             &self.status,
             self.platform.accessibility_required(),
             shell_error,
         );
+        if self
+            .speech_queue
+            .items()
+            .iter()
+            .any(|item| item.state == QueueItemState::Paused)
+        {
+            presentation.activity = presentation::MistActivity::Idle;
+            presentation.features = ::mist::AudioFeatures {
+                energy: 10,
+                brightness: 16,
+            };
+        }
         let panel_visible = self.panel_open
             || required_panel_visible(
                 presentation.requires_panel,
@@ -829,14 +896,14 @@ impl eframe::App for PetApp {
             );
         let time = context.input(|input| input.time as f32);
         let presentation = self.mist_smoother.update(presentation, time);
-        let (context_menu_visible, queue_action) = if panel_visible {
+        let (context_menu_visible, queue_response) = if panel_visible {
             self.paint_panel(ui, time, presentation);
-            (false, None)
+            (false, QueueTrayResponse::default())
         } else {
             self.paint_mist_only(ui, time, presentation)
         };
-        if let Some(id) = queue_action {
-            self.play_queue_item(id);
+        if let Some(action) = queue_response.action {
+            self.handle_queue_action(action);
         }
         let mode = viewport_mode(
             panel_visible,
@@ -976,6 +1043,18 @@ fn voice_preview_command(voice_id: &str) -> Result<(VoiceSettings, WorkerCommand
     Ok((settings.clone(), WorkerCommand::PreviewVoice(settings)))
 }
 
+fn queue_worker_available(
+    status: &AppStatus,
+    voices_ready: bool,
+    preview: VoicePreviewActivity,
+    playback: PlaybackPhase,
+) -> bool {
+    voices_ready
+        && preview == VoicePreviewActivity::Idle
+        && playback == PlaybackPhase::Idle
+        && matches!(status, AppStatus::Ready | AppStatus::Error(_))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1052,6 +1131,22 @@ mod tests {
             true,
             VoicePreviewActivity::Idle,
             false,
+        ));
+    }
+
+    #[test]
+    fn cancelled_item_must_acknowledge_before_the_next_item_starts() {
+        assert!(!queue_worker_available(
+            &AppStatus::Ready,
+            true,
+            VoicePreviewActivity::Idle,
+            PlaybackPhase::Cancelled,
+        ));
+        assert!(queue_worker_available(
+            &AppStatus::Ready,
+            true,
+            VoicePreviewActivity::Idle,
+            PlaybackPhase::Idle,
         ));
     }
 

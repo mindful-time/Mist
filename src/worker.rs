@@ -6,7 +6,8 @@ use std::{
 use anyhow::{Context, Result};
 
 use crate::{
-    InstallModel, SpeakSelection, VoiceSettings,
+    InstallModel, PlaybackController, PlaybackStopped, PlaybackToken, SpeakSelection,
+    VoiceSettings,
     adapters::{
         kokoro::KokoroSynthesizer, system_audio::SystemAudioPlayer,
         voice_preferences::VoicePreferencesStore,
@@ -18,7 +19,10 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub enum WorkerCommand {
-    Speak(SelectedText),
+    Speak {
+        token: PlaybackToken,
+        text: SelectedText,
+    },
     InstallModel,
     SelectVoice(VoiceSettings),
     PreviewVoice(VoiceSettings),
@@ -48,10 +52,17 @@ struct SpeechSession {
     inference_policy: String,
 }
 
+struct SpeechEnvironment<'a> {
+    store: &'a ModelStore,
+    statuses: &'a Sender<AppStatus>,
+    playback: &'a PlaybackController,
+}
+
 pub struct WorkerHandle {
     pub commands: SyncSender<WorkerCommand>,
     pub statuses: Receiver<AppStatus>,
     pub selected_voice: VoiceSettings,
+    pub playback: PlaybackController,
 }
 
 pub fn spawn(store: ModelStore) -> WorkerHandle {
@@ -61,15 +72,27 @@ pub fn spawn(store: ModelStore) -> WorkerHandle {
     let preferences = VoicePreferencesStore::at(store.root());
     let selected_voice = preferences.load();
     let worker_voice = selected_voice.clone();
+    let playback = PlaybackController::default();
+    let worker_playback = playback.clone();
     thread::Builder::new()
         .name("kokoro-speech-worker".to_owned())
-        .spawn(move || run(command_rx, status_tx, store, preferences, worker_voice))
+        .spawn(move || {
+            run(
+                command_rx,
+                status_tx,
+                store,
+                preferences,
+                worker_voice,
+                worker_playback,
+            )
+        })
         .expect("speech worker thread should start");
 
     WorkerHandle {
         commands: command_tx,
         statuses: status_rx,
         selected_voice,
+        playback,
     }
 }
 
@@ -79,6 +102,7 @@ fn run(
     store: ModelStore,
     preferences: VoicePreferencesStore,
     mut selected_voice: VoiceSettings,
+    playback: PlaybackController,
 ) {
     let mut session: Option<SpeechSession> = None;
     let mut model_ready = store.is_ready();
@@ -113,15 +137,23 @@ fn run(
                 if result.is_err() || !model_ready {
                     result
                 } else {
-                    preview_voice(voice, &store, &statuses, &mut session)
+                    preview_voice(voice, &store, &statuses, &playback, &mut session)
                 }
             }
-            WorkerCommand::Speak(text) => {
+            WorkerCommand::Speak { token, text } => {
                 if !model_ready {
                     send_status(&statuses, AppStatus::MissingModel);
                     continue;
                 }
-                speak(text, &selected_voice, &store, &statuses, &mut session)
+                speak(
+                    token,
+                    text,
+                    &selected_voice,
+                    &store,
+                    &statuses,
+                    &playback,
+                    &mut session,
+                )
             }
         };
 
@@ -161,18 +193,25 @@ fn install_model(store: &ModelStore, statuses: &Sender<AppStatus>) -> Result<()>
 }
 
 fn speak(
+    token: PlaybackToken,
     text: SelectedText,
     selected_voice: &VoiceSettings,
     store: &ModelStore,
     statuses: &Sender<AppStatus>,
+    playback: &PlaybackController,
     session: &mut Option<SpeechSession>,
 ) -> Result<()> {
     let preview = text.preview(32);
+    let environment = SpeechEnvironment {
+        store,
+        statuses,
+        playback,
+    };
     run_speech(
         preview,
         selected_voice,
-        store,
-        statuses,
+        environment,
+        token,
         session,
         move |speaker, on_playback| speaker.execute_with_playback_cues(text, on_playback),
     )
@@ -182,17 +221,23 @@ fn preview_voice(
     voice: VoiceSettings,
     store: &ModelStore,
     statuses: &Sender<AppStatus>,
+    playback: &PlaybackController,
     session: &mut Option<SpeechSession>,
 ) -> Result<()> {
     let preview = SelectedText::new(VOICE_PREVIEW_TEXT)
         .expect("the built-in voice preview copy must remain valid")
         .preview(32);
     let session_voice = voice.clone();
+    let environment = SpeechEnvironment {
+        store,
+        statuses,
+        playback,
+    };
     run_speech(
         preview,
         &session_voice,
-        store,
-        statuses,
+        environment,
+        PlaybackToken::PREVIEW,
         session,
         move |speaker, on_playback| speaker.preview_voice_with_playback_cues(voice, on_playback),
     )
@@ -201,39 +246,58 @@ fn preview_voice(
 fn run_speech(
     preview: String,
     voice: &VoiceSettings,
-    store: &ModelStore,
-    statuses: &Sender<AppStatus>,
+    environment: SpeechEnvironment<'_>,
+    token: PlaybackToken,
     session: &mut Option<SpeechSession>,
     execute: impl FnOnce(
         &mut SpeakSelection<KokoroSynthesizer, SystemAudioPlayer>,
         &mut dyn FnMut(AudioFeatures),
     ) -> Result<()>,
 ) -> Result<()> {
-    let session = ensure_session(voice, store, statuses, session)?;
-    let inference_policy = session.inference_policy.clone();
-    send_status(
-        statuses,
-        AppStatus::Synthesizing {
-            text: preview.clone(),
-            inference_policy: inference_policy.clone(),
-        },
-    );
-    execute(&mut session.speaker, &mut |features| {
+    if let Err(error) = environment.playback.begin_session(token) {
+        environment.playback.finish_session(token);
+        debug_assert_eq!(error, PlaybackStopped);
+        return Ok(());
+    }
+    let result = (|| {
+        let session = ensure_session(
+            voice,
+            environment.store,
+            environment.statuses,
+            environment.playback,
+            session,
+        )?;
+        let inference_policy = session.inference_policy.clone();
         send_status(
-            statuses,
-            AppStatus::Speaking {
+            environment.statuses,
+            AppStatus::Synthesizing {
                 text: preview.clone(),
                 inference_policy: inference_policy.clone(),
-                features,
             },
         );
-    })
+        execute(&mut session.speaker, &mut |features| {
+            send_status(
+                environment.statuses,
+                AppStatus::Speaking {
+                    text: preview.clone(),
+                    inference_policy: inference_policy.clone(),
+                    features,
+                },
+            );
+        })
+    })();
+    environment.playback.finish_session(token);
+    match result {
+        Err(error) if playback_was_stopped(&error) => Ok(()),
+        result => result,
+    }
 }
 
 fn ensure_session<'a>(
     voice: &VoiceSettings,
     store: &ModelStore,
     statuses: &Sender<AppStatus>,
+    playback: &PlaybackController,
     session: &'a mut Option<SpeechSession>,
 ) -> Result<&'a mut SpeechSession> {
     if session.is_none() {
@@ -241,7 +305,7 @@ fn ensure_session<'a>(
         let synthesizer = KokoroSynthesizer::load(&store.model_path(), &store.voices_path())?;
         let inference_policy = synthesizer.inference_policy_label().to_owned();
         let audio_cache = store.root().join("audio-cache");
-        let player = SystemAudioPlayer::new(&audio_cache)?;
+        let player = SystemAudioPlayer::new(&audio_cache, playback.clone())?;
         *session = Some(SpeechSession {
             speaker: SpeakSelection::new(synthesizer, player, voice.clone()),
             inference_policy,
@@ -251,6 +315,12 @@ fn ensure_session<'a>(
     session
         .as_mut()
         .context("speech engine was not initialized")
+}
+
+fn playback_was_stopped(error: &anyhow::Error) -> bool {
+    error
+        .chain()
+        .any(|cause| cause.downcast_ref::<PlaybackStopped>().is_some())
 }
 
 fn send_status(statuses: &Sender<AppStatus>, status: AppStatus) {
@@ -286,9 +356,10 @@ mod tests {
 
         handle
             .commands
-            .send(WorkerCommand::Speak(
-                SelectedText::new("Not installed yet").unwrap(),
-            ))
+            .send(WorkerCommand::Speak {
+                token: PlaybackToken::PREVIEW,
+                text: SelectedText::new("Not installed yet").unwrap(),
+            })
             .unwrap();
 
         assert_eq!(handle.statuses.recv().unwrap(), AppStatus::MissingModel);

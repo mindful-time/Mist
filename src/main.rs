@@ -9,7 +9,7 @@ fn main() -> eframe::Result {
     use std::env;
 
     use mist::{
-        SelectedText, SpeakSelection,
+        PlaybackController, SelectedText, SpeakSelection,
         adapters::{
             kokoro::KokoroSynthesizer, playback_preferences::PlaybackPreferencesStore,
             system_audio::SystemAudioPlayer, voice_preferences::VoicePreferencesStore,
@@ -35,8 +35,11 @@ fn main() -> eframe::Result {
         let voice = VoicePreferencesStore::at(store.root()).load();
         let synthesizer = KokoroSynthesizer::load(&store.model_path(), &store.voices_path())
             .expect("Kokoro is not ready; run --install-model first");
-        let player = SystemAudioPlayer::new(&store.root().join("audio-cache"))
-            .expect("could not create the audio cache");
+        let player = SystemAudioPlayer::new(
+            &store.root().join("audio-cache"),
+            PlaybackController::default(),
+        )
+        .expect("could not create the audio cache");
         SpeakSelection::new(synthesizer, player, voice)
             .execute(text)
             .expect("could not speak the text");
@@ -49,6 +52,7 @@ fn main() -> eframe::Result {
         commands,
         statuses,
         selected_voice,
+        playback,
     } = worker::spawn(store);
     let native_options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
@@ -72,6 +76,7 @@ fn main() -> eframe::Result {
                 creation_context,
                 commands,
                 statuses,
+                playback,
                 selected_voice,
                 playback_preferences,
                 playback_preferences_store,

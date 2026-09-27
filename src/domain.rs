@@ -75,6 +75,7 @@ pub enum QueueItemState {
     Waiting,
     Preparing,
     Playing,
+    Paused,
     Failed,
 }
 
@@ -126,7 +127,7 @@ impl SpeechQueue {
             .find(|item| {
                 matches!(
                     item.state,
-                    QueueItemState::Preparing | QueueItemState::Playing
+                    QueueItemState::Preparing | QueueItemState::Playing | QueueItemState::Paused
                 )
             })
             .map(|item| item.id)
@@ -162,12 +163,41 @@ impl SpeechQueue {
         true
     }
 
+    pub fn pause(&mut self, id: QueueItemId) -> bool {
+        let Some(item) = self
+            .items
+            .iter_mut()
+            .find(|item| item.id == id && item.state == QueueItemState::Playing)
+        else {
+            return false;
+        };
+        item.state = QueueItemState::Paused;
+        true
+    }
+
+    pub fn resume(&mut self, id: QueueItemId) -> bool {
+        let Some(item) = self
+            .items
+            .iter_mut()
+            .find(|item| item.id == id && item.state == QueueItemState::Paused)
+        else {
+            return false;
+        };
+        item.state = QueueItemState::Playing;
+        true
+    }
+
+    pub fn remove(&mut self, id: QueueItemId) -> Option<QueuedSpeech> {
+        let position = self.items.iter().position(|item| item.id == id)?;
+        Some(self.items.remove(position))
+    }
+
     pub fn complete(&mut self, id: QueueItemId) -> Option<QueuedSpeech> {
         let position = self.items.iter().position(|item| {
             item.id == id
                 && matches!(
                     item.state,
-                    QueueItemState::Preparing | QueueItemState::Playing
+                    QueueItemState::Preparing | QueueItemState::Playing | QueueItemState::Paused
                 )
         })?;
         Some(self.items.remove(position))
@@ -178,7 +208,7 @@ impl SpeechQueue {
             item.id == id
                 && matches!(
                     item.state,
-                    QueueItemState::Preparing | QueueItemState::Playing
+                    QueueItemState::Preparing | QueueItemState::Playing | QueueItemState::Paused
                 )
         }) else {
             return false;
@@ -466,6 +496,40 @@ mod tests {
         assert!(queue.fail(second));
         assert_eq!(queue.items()[1].state, QueueItemState::Failed);
         assert_eq!(queue.start(second).map(|item| item.id), Some(second));
+    }
+
+    #[test]
+    fn speech_queue_pauses_and_resumes_only_the_playing_item() {
+        let mut queue = SpeechQueue::default();
+        let item = queue
+            .push(SelectedText::new("Pause this selection").unwrap())
+            .unwrap();
+
+        assert!(!queue.pause(item));
+        queue.start(item).unwrap();
+        assert!(queue.mark_playing(item));
+        assert!(queue.pause(item));
+        assert_eq!(queue.active_id(), Some(item));
+        assert_eq!(queue.items()[0].state, QueueItemState::Paused);
+        assert!(queue.resume(item));
+        assert_eq!(queue.items()[0].state, QueueItemState::Playing);
+    }
+
+    #[test]
+    fn speech_queue_removes_waiting_and_active_items_by_identity() {
+        let mut queue = SpeechQueue::default();
+        let waiting = queue
+            .push(SelectedText::new("Remove while waiting").unwrap())
+            .unwrap();
+        let active = queue
+            .push(SelectedText::new("Remove while active").unwrap())
+            .unwrap();
+
+        assert_eq!(queue.remove(waiting).unwrap().id, waiting);
+        queue.start(active).unwrap();
+        assert_eq!(queue.remove(active).unwrap().id, active);
+        assert!(queue.items().is_empty());
+        assert!(queue.remove(active).is_none());
     }
 
     #[test]

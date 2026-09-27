@@ -3,6 +3,7 @@ pub mod application;
 pub mod domain;
 pub mod model_store;
 pub mod platform;
+pub mod playback;
 pub mod ports;
 pub mod worker;
 
@@ -12,4 +13,5 @@ pub use domain::{
     QueueItemState, QueuedSpeech, SelectedText, SelectionCaptureError, SelectionError, SpeechQueue,
     VOICE_CATALOG, VoiceId, VoiceProfile, VoiceSettings, voice_profile,
 };
+pub use playback::{PlaybackController, PlaybackPhase, PlaybackStopped, PlaybackToken};
 pub use ports::{AudioPlayer, ModelProvisioner, SpeechSynthesizer};
