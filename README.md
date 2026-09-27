@@ -151,7 +151,10 @@ cargo build --release
 ### Linux
 
 The pet supports X11 and Wayland. Install the normal desktop build dependencies
-for winit plus one audio command: `pw-play`, `paplay`, `aplay`, or `ffplay`.
+for winit, DejaVu Sans, Noto Core, and Noto CJK fonts, plus one audio command:
+`pw-play`, `paplay`, `aplay`, or `ffplay`. On Debian/Ubuntu, the font packages
+are `fonts-dejavu-core fonts-noto-core fonts-noto-cjk`. Mist loads these fonts
+locally so English, Japanese, Mandarin, and Hindi labels render correctly.
 
 ```sh
 make install-linux
