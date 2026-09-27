@@ -5,15 +5,15 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleDisplayName</key>
-    <string>Select to Speak</string>
+    <string>Mist</string>
     <key>CFBundleExecutable</key>
-    <string>select-to-speak</string>
+    <string>mist</string>
     <key>CFBundleIdentifier</key>
     <string>dev.akshobhya.select-to-speak</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>Select to Speak</string>
+    <string>Mist</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -32,12 +32,12 @@
             <key>NSMenuItem</key>
             <dict>
                 <key>default</key>
-                <string>Speak Selection with Kokoro</string>
+                <string>Speak Selection with Mist</string>
             </dict>
             <key>NSMessage</key>
             <string>speakSelection</string>
             <key>NSPortName</key>
-            <string>Select to Speak</string>
+            <string>Mist</string>
             <key>NSSendTypes</key>
             <array>
                 <string>public.utf8-plain-text</string>
@@ -45,7 +45,7 @@
             <key>NSServiceCategory</key>
             <string>public.text</string>
             <key>NSServiceDescription</key>
-            <string>Speak selected text locally with Kokoro TTS.</string>
+            <string>Speak selected text locally with Mist and Kokoro TTS.</string>
         </dict>
     </array>
 </dict>

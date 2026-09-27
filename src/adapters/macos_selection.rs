@@ -53,9 +53,7 @@ pub fn is_accessibility_trusted() -> bool {
 /// element without touching the user's clipboard.
 pub fn capture_selected_text() -> anyhow::Result<SelectedText> {
     if !is_accessibility_trusted() {
-        bail!(
-            "Allow Select to Speak in System Settings → Privacy & Security → Accessibility, then try again"
-        );
+        bail!("Allow Mist in System Settings → Privacy & Security → Accessibility, then try again");
     }
 
     // SAFETY: The create function returns an owned Core Foundation object.

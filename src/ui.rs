@@ -10,20 +10,20 @@ use std::{
     time::Duration,
 };
 
-use eframe::egui::{
-    self, Align2, Button, Color32, FontId, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, Vec2,
-    WidgetInfo, WidgetType, text::LayoutJob,
-};
-use select_to_speak::{
+use ::mist::{
     VOICE_CATALOG, VoiceSettings,
     platform::{PlatformBridge, PlatformEvent},
     voice_profile,
     worker::{AppStatus, WorkerCommand},
 };
+use eframe::egui::{
+    self, Align2, Button, Color32, FontId, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, Vec2,
+    WidgetInfo, WidgetType, text::LayoutJob,
+};
 
 use self::{
     mist::MistRenderer,
-    presentation::{PrimaryAction, copy_for_status, mist_for_status},
+    presentation::{MistSmoother, PrimaryAction, copy_for_status, mist_for_status},
     system_settings::open_accessibility_settings,
     theme::{
         PANEL_BACKGROUND, TEXT_MUTED, TEXT_PRIMARY, TEXT_SECONDARY, configure_interface,
@@ -32,7 +32,7 @@ use self::{
     tray::{TrayAction, TrayAdapter},
 };
 
-const MIST_WINDOW: Vec2 = Vec2::new(248.0, 248.0);
+pub(crate) const MIST_WINDOW: Vec2 = Vec2::new(300.0, 300.0);
 const PANEL_WINDOW: Vec2 = Vec2::new(600.0, 680.0);
 
 pub struct PetApp {
@@ -41,6 +41,7 @@ pub struct PetApp {
     status: AppStatus,
     platform: PlatformBridge,
     mist: MistRenderer,
+    mist_smoother: MistSmoother,
     tray: Option<TrayAdapter>,
     tray_error: Option<String>,
     last_platform_error: Option<String>,
@@ -76,6 +77,7 @@ impl PetApp {
             status: AppStatus::CheckingModel,
             platform,
             mist,
+            mist_smoother: MistSmoother::default(),
             tray,
             tray_error,
             last_platform_error,
@@ -179,11 +181,14 @@ impl PetApp {
     }
 
     fn enqueue_voice_command(&mut self, settings: VoiceSettings, command: WorkerCommand) -> bool {
-        if !self.enqueue(command) {
-            return false;
-        }
+        let queued = self.enqueue(command);
+        let authoritative =
+            authoritative_voice_after_enqueue(&self.selected_voice, &settings, queued);
         if let Some(tray) = &self.tray {
-            tray.select_voice(settings.voice_id.as_str());
+            tray.select_voice(authoritative.voice_id.as_str());
+        }
+        if !queued {
+            return false;
         }
         self.selected_voice = settings;
         true
@@ -210,7 +215,13 @@ impl PetApp {
                 self.panel_open = true;
                 context.send_viewport_cmd(egui::ViewportCommand::Focus);
             }
-            Some(TrayAction::SelectVoice(voice)) => self.select_voice(&voice),
+            Some(TrayAction::SelectVoice(voice)) => {
+                if voice_preview_available(&self.status, self.voices_ready, self.voice_preview) {
+                    self.preview_voice(&voice);
+                } else {
+                    self.select_voice(&voice);
+                }
+            }
             Some(TrayAction::OpenAccessibility) => {
                 self.perform_action(PrimaryAction::OpenAccessibility)
             }
@@ -238,7 +249,7 @@ impl PetApp {
         presentation: presentation::MistPresentation,
     ) {
         let context = ui.ctx().clone();
-        let rect = ui.max_rect().shrink(7.0);
+        let rect = ui.max_rect().shrink(2.0);
         let response = ui.interact(rect, ui.id().with("living-mist"), Sense::click_and_drag());
         let selected = self.selected_voice.voice_id.as_str();
         let profile = voice_profile(selected).unwrap_or(&VOICE_CATALOG[0]);
@@ -438,7 +449,7 @@ impl PetApp {
         ui.set_min_width(238.0);
         let profile =
             voice_profile(self.selected_voice.voice_id.as_str()).unwrap_or(&VOICE_CATALOG[0]);
-        ui.label(RichText::new("SELECT TO SPEAK").small().color(TEXT_MUTED));
+        ui.label(RichText::new("MIST").small().color(TEXT_MUTED));
         ui.strong(format!("{} mist", profile.display_name));
         ui.label(
             RichText::new(self.platform.usage_hint())
@@ -466,7 +477,7 @@ impl PetApp {
                         .desired_width(210.0),
                 );
                 if ui.button("Speak").clicked() {
-                    match select_to_speak::SelectedText::new(&self.manual_text) {
+                    match ::mist::SelectedText::new(&self.manual_text) {
                         Ok(text) => {
                             self.enqueue(WorkerCommand::Speak(text));
                         }
@@ -483,7 +494,7 @@ impl PetApp {
             ui.close();
         }
         ui.separator();
-        if ui.button("Quit Select to Speak").clicked() {
+        if ui.button("Quit Mist").clicked() {
             context.send_viewport_cmd(egui::ViewportCommand::Close);
         }
     }
@@ -506,7 +517,7 @@ impl eframe::App for PetApp {
         }
         self.sync_platform_status();
         let refresh = match self.status {
-            AppStatus::Speaking { .. } => 16,
+            AppStatus::Ready | AppStatus::Speaking { .. } => 16,
             AppStatus::CheckingModel
             | AppStatus::Downloading
             | AppStatus::Loading
@@ -530,6 +541,7 @@ impl eframe::App for PetApp {
         let panel_visible = self.panel_open || presentation.requires_panel;
         self.sync_window_size(&context, panel_visible);
         let time = context.input(|input| input.time as f32);
+        let presentation = self.mist_smoother.update(presentation, time);
         if panel_visible {
             self.paint_panel(ui, time, presentation);
         } else {
@@ -547,6 +559,14 @@ fn selected_voice_index(selected: &str) -> usize {
         .iter()
         .position(|voice| voice.id == selected)
         .unwrap_or(0)
+}
+
+fn authoritative_voice_after_enqueue<'a>(
+    current: &'a VoiceSettings,
+    requested: &'a VoiceSettings,
+    queued: bool,
+) -> &'a VoiceSettings {
+    if queued { requested } else { current }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -575,6 +595,9 @@ fn gallery_mode(
     voices_ready: bool,
     preview: VoicePreviewActivity,
 ) -> voice_gallery::GalleryMode {
+    if voice_preview_available(status, voices_ready, preview) {
+        return voice_gallery::GalleryMode::Available;
+    }
     if preview != VoicePreviewActivity::Idle {
         return voice_gallery::GalleryMode::Busy;
     }
@@ -586,11 +609,17 @@ fn gallery_mode(
         AppStatus::Loading | AppStatus::Synthesizing { .. } | AppStatus::Speaking { .. } => {
             voice_gallery::GalleryMode::Busy
         }
-        AppStatus::Ready | AppStatus::Error(_) if voices_ready => {
-            voice_gallery::GalleryMode::Available
-        }
+        AppStatus::Ready | AppStatus::Error(_) if voices_ready => voice_gallery::GalleryMode::Busy,
         AppStatus::Ready | AppStatus::Error(_) => voice_gallery::GalleryMode::DownloadRequired,
     }
+}
+
+fn voice_preview_available(
+    status: &AppStatus,
+    voices_ready: bool,
+    preview: VoicePreviewActivity,
+) -> bool {
+    voices_ready && preview == VoicePreviewActivity::Idle && matches!(status, AppStatus::Ready)
 }
 
 fn voice_preview_command(voice_id: &str) -> Result<(VoiceSettings, WorkerCommand), String> {
@@ -639,6 +668,48 @@ mod tests {
         assert_eq!(
             gallery_mode(&AppStatus::MissingModel, false, VoicePreviewActivity::Idle,),
             voice_gallery::GalleryMode::DownloadRequired
+        );
+    }
+
+    #[test]
+    fn tray_voice_selection_does_not_queue_preview_while_speaking() {
+        let speaking = AppStatus::Speaking {
+            text: "Already speaking".to_owned(),
+            inference_policy: "CoreML → CPU".to_owned(),
+            features: ::mist::AudioFeatures {
+                energy: 120,
+                brightness: 96,
+            },
+        };
+
+        assert!(!voice_preview_available(
+            &speaking,
+            true,
+            VoicePreviewActivity::Idle
+        ));
+        assert!(voice_preview_available(
+            &AppStatus::Ready,
+            true,
+            VoicePreviewActivity::Idle
+        ));
+    }
+
+    #[test]
+    fn failed_voice_enqueue_restores_the_authoritative_tray_selection() {
+        let current = VoiceSettings::from_voice_id("af_heart").unwrap();
+        let requested = VoiceSettings::from_voice_id("af_bella").unwrap();
+
+        assert_eq!(
+            authoritative_voice_after_enqueue(&current, &requested, false)
+                .voice_id
+                .as_str(),
+            "af_heart"
+        );
+        assert_eq!(
+            authoritative_voice_after_enqueue(&current, &requested, true)
+                .voice_id
+                .as_str(),
+            "af_bella"
         );
     }
 }

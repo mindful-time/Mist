@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=Select to Speak
+Name=Mist
 Comment=Speak selected text locally with Kokoro
-Exec=select-to-speak
+Exec=mist
 Terminal=false
 Categories=Accessibility;Utility;

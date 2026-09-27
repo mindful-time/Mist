@@ -1,8 +1,8 @@
+use ::mist::VOICE_CATALOG;
 use eframe::egui::{
     Align2, Button, Color32, Direction, FontId, Layout, Pos2, Rect, RichText, Stroke, StrokeKind,
     UiBuilder, Vec2,
 };
-use select_to_speak::VOICE_CATALOG;
 
 use super::{
     mist::MistRenderer,

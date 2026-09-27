@@ -2272,6 +2272,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "mist"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arboard",
+ "ashpd",
+ "core-foundation 0.10.1",
+ "directories",
+ "eframe",
+ "futures-util",
+ "global-hotkey",
+ "hound",
+ "image",
+ "kokoro-en",
+ "objc2 0.6.4",
+ "objc2-app-kit 0.3.2",
+ "objc2-foundation 0.3.2",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tray-icon",
+ "uiautomation",
+ "ureq",
+ "wl-clipboard-rs",
+ "x11-clipboard",
+]
+
+[[package]]
 name = "moxcms"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3499,35 +3528,6 @@ checksum = "6ce2691df843ecc5d231c0b14ece2acc3efb62c0a398c7e1d875f3983ce020e3"
 dependencies = [
  "core-foundation-sys",
  "libc",
-]
-
-[[package]]
-name = "select-to-speak"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arboard",
- "ashpd",
- "core-foundation 0.10.1",
- "directories",
- "eframe",
- "futures-util",
- "global-hotkey",
- "hound",
- "image",
- "kokoro-en",
- "objc2 0.6.4",
- "objc2-app-kit 0.3.2",
- "objc2-foundation 0.3.2",
- "sha2",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "tray-icon",
- "uiautomation",
- "ureq",
- "wl-clipboard-rs",
- "x11-clipboard",
 ]
 
 [[package]]

@@ -1,4 +1,4 @@
-use select_to_speak::{
+use mist::{
     SelectedText, SpeechSynthesizer, VoiceSettings, adapters::kokoro::KokoroSynthesizer,
     model_store::ModelStore,
 };
@@ -6,13 +6,10 @@ use select_to_speak::{
 /// Optional end-to-end model check. It is ignored in normal CI because the
 /// Kokoro model is downloaded data, not a repository fixture.
 #[test]
-#[ignore = "requires SELECT_TO_SPEAK_MODEL_DIR with downloaded Kokoro files"]
+#[ignore = "requires MIST_MODEL_DIR with downloaded Kokoro files"]
 fn local_kokoro_model_produces_audio() {
     let store = ModelStore::discover().expect("model store");
-    assert!(
-        store.is_ready(),
-        "run select-to-speak --install-model first"
-    );
+    assert!(store.is_ready(), "run mist --install-model first");
 
     let mut synthesizer =
         KokoroSynthesizer::load(&store.model_path(), &store.voices_path()).expect("load Kokoro");

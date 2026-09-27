@@ -1,8 +1,8 @@
+use ::mist::MistPalette;
 use anyhow::{Context, Result};
 use eframe::egui::{
     self, Color32, Mesh, Pos2, Rect, Shape, TextureHandle, TextureOptions, Vec2, epaint::Vertex,
 };
-use select_to_speak::MistPalette;
 
 use super::{
     presentation::{MistActivity, MistPresentation},
@@ -13,9 +13,15 @@ pub(super) struct MistRenderer {
     texture: TextureHandle,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct MistMotion {
+    breath: f32,
+    turbulence: f32,
+}
+
 impl MistRenderer {
     pub(super) fn new(context: &egui::Context) -> Result<Self> {
-        let decoded = image::load_from_memory(include_bytes!("../../assets/mist.png"))
+        let decoded = image::load_from_memory(include_bytes!("../../assets/mist-v2.png"))
             .context("the embedded mist texture is invalid")?
             .into_rgba8();
         let size = [decoded.width() as usize, decoded.height() as usize];
@@ -35,54 +41,49 @@ impl MistRenderer {
     ) {
         let painter = ui.painter();
         let center = rect.center();
-        let energy = (f32::from(presentation.features.energy) / 255.0).sqrt();
+        let reactivity = audio_reactivity(presentation.features.energy);
         let brightness = f32::from(presentation.features.brightness) / 255.0;
-        let (speed, breath, turbulence) = match presentation.activity {
-            MistActivity::Idle => (0.16, 0.035, 0.35),
-            MistActivity::Busy => (0.55, 0.055, 0.75),
-            MistActivity::Speaking => (
-                1.2 + energy * 1.7 + brightness * 0.7,
-                0.08 + energy * 0.16,
-                0.8 + brightness * 0.7,
-            ),
-            MistActivity::Attention => (0.38, 0.06, 0.55),
-        };
-        let phase = time * speed + voice_seed;
-        let breathing = 1.0 + phase.sin() * breath;
+        let motion = motion_for(presentation.activity, reactivity, brightness);
+        // Phase is deliberately independent of audio energy. Multiplying the
+        // absolute clock by a changing frequency caused visible phase jumps.
+        let phase = time * 0.14 + voice_seed;
+        let breathing = 1.0 + (phase * 0.83).sin() * motion.breath;
         let primary = palette_color(palette.primary);
         let secondary = palette_color(palette.secondary);
         let glow = palette_color(palette.glow);
 
-        for (radius, alpha) in [(0.43, 9), (0.33, 12), (0.22, 16)] {
-            painter.circle_filled(
-                center,
-                rect.width().min(rect.height()) * radius * (1.0 + energy * 0.08),
-                with_alpha(glow, alpha),
-            );
-        }
-
-        let span = rect.width().min(rect.height()) * 0.88;
+        let span = rect.width().min(rect.height()) * 1.02;
         let layers = [
-            (1.03, 0.0, 58, primary),
-            (0.91, 1.8, 44, secondary),
-            (0.76, 3.7, 36, glow),
-            (0.63, 5.4, 29, primary),
+            (1.0, 0.0, 72u8, primary),
+            (0.9, 1.8, 46, secondary),
+            (0.78, 3.7, 30, glow),
+            (0.67, 5.4, 22, primary),
         ];
         for (index, (scale, offset, alpha, color)) in layers.into_iter().enumerate() {
             let layer_phase = phase * (1.0 + index as f32 * 0.12) + offset;
+            // Keep wave frequency constant. Audio only changes the eased
+            // amplitude, so brightness updates can never jump wave phase.
+            let voice_phase = time * (0.88 + index as f32 * 0.08) + offset;
+            let voice_wave = voice_phase.sin();
             let drift = Vec2::new(
-                layer_phase.cos() * span * 0.035 * turbulence,
-                (layer_phase * 0.73).sin() * span * 0.028 * turbulence,
+                layer_phase.cos() * span * 0.035 * motion.turbulence
+                    + voice_wave * span * reactivity * 0.045,
+                (layer_phase * 0.73).sin() * span * 0.028 * motion.turbulence
+                    + voice_phase.cos() * span * reactivity * 0.032,
             );
-            let voice_wave = (phase * (1.4 + voice_seed * 0.03) + offset).sin();
             let size = span
                 * scale
                 * breathing
-                * (1.0 + voice_wave * energy * (0.035 + index as f32 * 0.008));
+                * (1.0
+                    + reactivity * 0.045
+                    + voice_wave * reactivity * 0.105 * (1.0 + index as f32 * 0.11));
             let angle = layer_phase
-                * (0.055 + index as f32 * 0.012)
-                * if index % 2 == 0 { 1.0 } else { -1.0 };
-            let opacity = alpha + (energy * 42.0) as u8;
+                * (0.045 + index as f32 * 0.009)
+                * if index % 2 == 0 { 1.0 } else { -1.0 }
+                + voice_wave * reactivity * (0.035 + index as f32 * 0.006);
+            let opacity = (f32::from(alpha) + reactivity * 72.0)
+                .round()
+                .clamp(0.0, 255.0) as u8;
             painter.add(textured_quad(
                 self.texture.id(),
                 center + drift,
@@ -90,15 +91,6 @@ impl MistRenderer {
                 angle,
                 with_alpha(color, opacity),
             ));
-        }
-
-        if presentation.activity == MistActivity::Speaking {
-            let pulse = (phase * 2.6).sin().mul_add(0.5, 0.5);
-            painter.circle_stroke(
-                center,
-                span * (0.28 + energy * 0.1 + pulse * 0.018),
-                egui::Stroke::new(0.7, with_alpha(glow, (18.0 + energy * 45.0) as u8)),
-            );
         }
     }
 
@@ -116,7 +108,7 @@ impl MistRenderer {
             time,
             MistPresentation {
                 activity: MistActivity::Idle,
-                features: select_to_speak::AudioFeatures {
+                features: ::mist::AudioFeatures {
                     energy: 12,
                     brightness: 20,
                 },
@@ -125,6 +117,33 @@ impl MistRenderer {
             palette,
             seed,
         );
+    }
+}
+
+fn audio_reactivity(energy: u8) -> f32 {
+    ((f32::from(energy) - 8.0) / 247.0).clamp(0.0, 1.0).sqrt()
+}
+
+fn motion_for(activity: MistActivity, reactivity: f32, brightness: f32) -> MistMotion {
+    let breath = 0.032 + reactivity * 0.11;
+    let color_flow = brightness * 0.12 + reactivity * 0.18;
+    match activity {
+        MistActivity::Idle => MistMotion {
+            breath,
+            turbulence: 0.5 + color_flow,
+        },
+        MistActivity::Busy => MistMotion {
+            breath: breath + 0.012,
+            turbulence: 0.64 + color_flow,
+        },
+        MistActivity::Speaking => MistMotion {
+            breath,
+            turbulence: 0.72 + color_flow,
+        },
+        MistActivity::Attention => MistMotion {
+            breath: breath + 0.008,
+            turbulence: 0.58 + color_flow,
+        },
     }
 }
 
@@ -160,4 +179,19 @@ fn textured_quad(
 
 fn with_alpha(color: Color32, alpha: u8) -> Color32 {
     Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), alpha)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn audio_reactivity_is_quiet_at_idle_and_strong_for_voice() {
+        let idle = audio_reactivity(10);
+        let speaking = audio_reactivity(220);
+
+        assert!(idle < 0.1);
+        assert!(speaking > 0.9);
+        assert!(speaking > idle * 10.0);
+    }
 }

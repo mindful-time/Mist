@@ -72,10 +72,14 @@ pub struct ModelStore {
 
 impl ModelStore {
     pub fn discover() -> Result<Self> {
-        if let Some(root) = env::var_os("SELECT_TO_SPEAK_MODEL_DIR") {
+        if let Some(root) =
+            env::var_os("MIST_MODEL_DIR").or_else(|| env::var_os("SELECT_TO_SPEAK_MODEL_DIR"))
+        {
             return Ok(Self::at(root));
         }
 
+        // Keep the established data directory so the Mist rename never forces
+        // users to download the 96 MB Kokoro bundle again.
         let directories = ProjectDirs::from("dev", "Akshobhya", "SelectToSpeak")
             .context("could not locate the platform application data directory")?;
         Ok(Self::at(directories.data_dir().join("models")))

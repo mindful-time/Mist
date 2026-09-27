@@ -1,5 +1,5 @@
+use ::mist::{VOICE_CATALOG, VoiceSettings, worker::AppStatus};
 use anyhow::{Context, Result};
-use select_to_speak::{VOICE_CATALOG, VoiceSettings, worker::AppStatus};
 use tray_icon::{
     Icon, TrayIcon, TrayIconBuilder,
     menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
@@ -24,7 +24,7 @@ pub(super) struct TrayAdapter {
 impl TrayAdapter {
     pub(super) fn new(selected: &VoiceSettings) -> Result<Self> {
         let menu = Menu::new();
-        let heading = MenuItem::new("Select to Speak · waking up", false, None);
+        let heading = MenuItem::new("Mist · waking up", false, None);
         let settings = MenuItem::new("Voice settings…", true, None);
         let voices_menu = Submenu::new("Voice", true);
         let mut voices = Vec::with_capacity(VOICE_CATALOG.len());
@@ -32,7 +32,7 @@ impl TrayAdapter {
             let item = CheckMenuItem::new(
                 format!("{} · {}", voice.display_name, voice.character),
                 true,
-                selected.voice_id.as_str() == voice.id,
+                voice.id == selected.voice_id.as_str(),
                 None,
             );
             voices_menu
@@ -44,7 +44,7 @@ impl TrayAdapter {
         let accessibility = Some(MenuItem::new("Accessibility settings…", true, None));
         #[cfg(not(target_os = "macos"))]
         let accessibility: Option<MenuItem> = None;
-        let quit = MenuItem::new("Quit Select to Speak", true, None);
+        let quit = MenuItem::new("Quit Mist", true, None);
         menu.append_items(&[
             &heading,
             &PredefinedMenuItem::separator(),
@@ -61,7 +61,7 @@ impl TrayAdapter {
 
         let icon = mist_icon()?;
         let mut builder = TrayIconBuilder::new()
-            .with_tooltip("Select to Speak · local Kokoro voice")
+            .with_tooltip("Mist · local Kokoro voice")
             .with_menu(Box::new(menu))
             .with_icon(icon);
         #[cfg(target_os = "macos")]
@@ -108,8 +108,13 @@ impl TrayAdapter {
     }
 
     pub(super) fn select_voice(&self, selected: &str) {
-        for (voice, item) in &self.voices {
-            item.set_checked(*voice == selected);
+        // Native check items toggle themselves before the menu event arrives.
+        // Clear every item first, then apply the single authoritative choice.
+        for (_, item) in &self.voices {
+            item.set_checked(false);
+        }
+        if let Some((_, item)) = self.voices.iter().find(|(voice, _)| *voice == selected) {
+            item.set_checked(true);
         }
     }
 
@@ -124,22 +129,18 @@ impl TrayAdapter {
             AppStatus::Speaking { .. } => "speaking",
             AppStatus::Error(_) => "needs attention",
         };
-        self.heading.set_text(format!("Select to Speak · {state}"));
-        let _ = self
-            .icon
-            .set_tooltip(Some(format!("Select to Speak · {state}")));
+        self.heading.set_text(format!("Mist · {state}"));
+        let _ = self.icon.set_tooltip(Some(format!("Mist · {state}")));
     }
 
     pub(super) fn set_warning(&self, message: &str) {
-        self.heading.set_text("Select to Speak · needs attention");
-        let _ = self
-            .icon
-            .set_tooltip(Some(format!("Select to Speak · {message}")));
+        self.heading.set_text("Mist · needs attention");
+        let _ = self.icon.set_tooltip(Some(format!("Mist · {message}")));
     }
 }
 
 fn mist_icon() -> Result<Icon> {
-    let image = image::load_from_memory(include_bytes!("../../assets/mist.png"))
+    let image = image::load_from_memory(include_bytes!("../../assets/mist-v2.png"))
         .context("the embedded mist texture is invalid")?
         .into_rgba8();
     let mut pixels = image::imageops::resize(&image, 32, 32, image::imageops::FilterType::Lanczos3);
@@ -152,4 +153,19 @@ fn mist_icon() -> Result<Icon> {
         pixel[2] = 255;
     }
     Icon::from_rgba(pixels.into_raw(), 32, 32).context("could not create the tray icon")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn voice_catalog_resolves_exactly_one_native_check_item() {
+        let checked = VOICE_CATALOG
+            .iter()
+            .filter(|voice| voice.id == "af_bella")
+            .count();
+
+        assert_eq!(checked, 1);
+    }
 }

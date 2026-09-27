@@ -1,9 +1,9 @@
 [package]
-name = "select-to-speak"
+name = "mist"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.95"
-description = "A tiny cross-platform desktop pet that speaks selected text with Kokoro TTS"
+description = "A cross-platform living mist that speaks selected text with Kokoro TTS"
 license = "MIT"
 
 [dependencies]

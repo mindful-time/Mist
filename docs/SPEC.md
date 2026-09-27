@@ -1,4 +1,4 @@
-# Select to Speak — living mist specification
+# Mist — living desktop voice specification
 
 ## Goal
 
@@ -23,15 +23,21 @@ text-to-speech model.
   retains copied-text/manual-entry fallbacks.
 - During normal operation the draggable, always-on-top surface contains only a
   translucent animated mist: no card, chrome, title, buttons, or permanent
-  copy is visible on the desktop.
+  copy is visible on the desktop. The native window shadow, backing disk,
+  outline, and decorative pulse rings are disabled.
 - The mist changes movement and intensity with speech lifecycle and audio
-  energy. Each voice has a stable, recognisable color palette.
+  energy. Audio features are eased between playback windows so movement never
+  jumps at the 40 ms sampling boundary; when idle, the mist continues a slow,
+  fluid drift. Speaking is visibly more expressive than idle—using stronger
+  expansion, density, and directional flow—without abrupt phase changes. Each
+  voice has a stable, recognisable color palette.
 - Setup, permission failures, and actionable errors may temporarily expand into
   an accessible panel because the user must be able to recover without a
   terminal.
 - A native macOS menu-bar / Windows and Linux system-tray menu provides voice
   selection, settings, status, and quit actions while keeping controls off the
-  floating desktop surface.
+  floating desktop surface. Voice choices behave as one exclusive group, so
+  selecting one voice can never leave a second voice marked as selected.
 
 ## Speech
 
@@ -46,6 +52,9 @@ text-to-speech model.
   text. While a preview or selection is speaking, additional card activations
   are disabled so stale previews do not queue behind it.
 - Changing voice affects subsequent speech without restarting the app.
+- Selecting a voice from the native menu updates the one exclusive choice and,
+  when the app is ready, immediately plays its preview without opening voice
+  settings.
 - Long selections are synthesized and played as ordered sentence chunks. The
   UI distinguishes generation of the first chunk from audible playback.
 - Hardware selection is automatic through ONNX Runtime provider probing:

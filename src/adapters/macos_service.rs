@@ -45,7 +45,7 @@ define_class!(
             };
             if let Err(queue_error) = self.ivars().commands.try_send(WorkerCommand::Speak(text)) {
                 let message = match queue_error {
-                    TrySendError::Full(_) => "Select to Speak is busy; try again in a moment",
+                    TrySendError::Full(_) => "Mist is busy; try again in a moment",
                     TrySendError::Disconnected(_) => "The speech worker is not running",
                 };
                 set_service_error(error, message);

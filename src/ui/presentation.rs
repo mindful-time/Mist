@@ -1,4 +1,4 @@
-use select_to_speak::{AudioFeatures, worker::AppStatus};
+use ::mist::{AudioFeatures, worker::AppStatus};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum MistActivity {
@@ -13,6 +13,55 @@ pub(super) struct MistPresentation {
     pub(super) activity: MistActivity,
     pub(super) features: AudioFeatures,
     pub(super) requires_panel: bool,
+}
+
+#[derive(Debug, Default)]
+pub(super) struct MistSmoother {
+    energy: f32,
+    brightness: f32,
+    last_time: Option<f32>,
+}
+
+impl MistSmoother {
+    pub(super) fn update(&mut self, mut target: MistPresentation, time: f32) -> MistPresentation {
+        let target_energy = f32::from(target.features.energy);
+        let target_brightness = f32::from(target.features.brightness);
+        let Some(last_time) = self.last_time.replace(time) else {
+            self.energy = target_energy;
+            self.brightness = target_brightness;
+            return target;
+        };
+        let delta = (time - last_time).clamp(0.0, 0.05);
+        self.energy = ease(
+            self.energy,
+            target_energy,
+            delta,
+            if target_energy > self.energy {
+                10.0
+            } else {
+                4.0
+            },
+        );
+        self.brightness = ease(
+            self.brightness,
+            target_brightness,
+            delta,
+            if target_brightness > self.brightness {
+                7.0
+            } else {
+                3.4
+            },
+        );
+        target.features = AudioFeatures {
+            energy: self.energy.round().clamp(0.0, 255.0) as u8,
+            brightness: self.brightness.round().clamp(0.0, 255.0) as u8,
+        };
+        target
+    }
+}
+
+fn ease(current: f32, target: f32, delta: f32, response: f32) -> f32 {
+    current + (target - current) * (1.0 - (-response * delta).exp())
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -94,7 +143,7 @@ pub(super) fn copy_for_status(
         return StatusCopy {
             eyebrow: "ONE LAST STEP",
             title: "Let the mist hear your selection",
-            detail: "Enable Select to Speak in Privacy & Security › Accessibility. Audio and selected text stay on this device.".to_owned(),
+            detail: "Enable Mist in Privacy & Security › Accessibility. Audio and selected text stay on this device.".to_owned(),
             action: PrimaryAction::OpenAccessibility,
         };
     }
@@ -241,5 +290,27 @@ mod tests {
             None,
         );
         assert_eq!(presentation.activity, MistActivity::Busy);
+    }
+
+    #[test]
+    fn voice_energy_eases_between_audio_windows() {
+        let mut smoother = MistSmoother::default();
+        let idle = mist_for_status(&AppStatus::Ready, false, None);
+        assert_eq!(smoother.update(idle, 1.0).features.energy, 10);
+
+        let loud = mist_for_status(
+            &AppStatus::Speaking {
+                text: "Hello".to_owned(),
+                inference_policy: "CoreML → CPU".to_owned(),
+                features: features(255, 220),
+            },
+            false,
+            None,
+        );
+        let first_frame = smoother.update(loud, 1.016);
+
+        assert!(first_frame.features.energy > 10);
+        assert!(first_frame.features.energy < 80);
+        assert!(first_frame.features.brightness < 80);
     }
 }

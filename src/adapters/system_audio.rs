@@ -69,9 +69,9 @@ impl SystemAudioPlayer {
                 "-NoProfile",
                 "-NonInteractive",
                 "-Command",
-                "$player = New-Object System.Media.SoundPlayer $env:SELECT_TO_SPEAK_WAV; $player.PlaySync()",
+                "$player = New-Object System.Media.SoundPlayer $env:MIST_WAV; $player.PlaySync()",
             ])
-            .env("SELECT_TO_SPEAK_WAV", &self.output_path)
+            .env("MIST_WAV", &self.output_path)
             .spawn()
             .context("could not start Windows audio playback")
     }

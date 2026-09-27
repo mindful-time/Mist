@@ -1,11 +1,11 @@
-# Select to Speak
+# Mist
 
 A tiny cross-platform living-mist desktop pet that reads selected text with
 Kokoro:
 
 - **macOS / Windows / Linux:** select text anywhere and press **Ctrl+Alt+S**.
 - **macOS native-app alternative:** choose **Services → Speak Selection with
-  Kokoro** from the application or text context menu.
+  Mist** from the application or text context menu.
 - **Windows/Linux fallback:** copy text, right-click the mist, and choose
   **Speak copied text**. Manual text entry is available in that same menu.
 
@@ -45,9 +45,9 @@ Then choose a voice and click **Download voices** in onboarding.
 Requires macOS 13+ and the Xcode Command Line Tools:
 
 ```sh
-SELECT_TO_SPEAK_SIGNING_IDENTITY="Apple Development: Your Name (TEAMID)" \
+MIST_SIGNING_IDENTITY="Apple Development: Your Name (TEAMID)" \
 make install
-open "/Applications/Select to Speak.app"
+open "/Applications/Mist.app"
 ```
 
 The installer requires an Apple Development or Developer ID certificate and
@@ -57,8 +57,8 @@ development install instead, use ad-hoc signing and a separate home-directory
 destination:
 
 ```sh
-SELECT_TO_SPEAK_SIGNING_IDENTITY=- \
-SELECT_TO_SPEAK_INSTALL_DIR="$HOME/Applications" \
+MIST_SIGNING_IDENTITY=- \
+MIST_INSTALL_DIR="$HOME/Applications" \
 make install
 ```
 
@@ -68,7 +68,7 @@ and development copies installed at the same time.
 
 Open the installed app once. macOS asks for Accessibility permission so the
 global shortcut can read selections from applications with custom context
-menus. Enable **Select to Speak** in **System Settings → Privacy & Security →
+menus. Enable **Mist** in **System Settings → Privacy & Security →
 Accessibility**, select text in any application, and press **Ctrl+Alt+S**
 (Control+Option+S on a Mac keyboard).
 
@@ -85,7 +85,7 @@ GNU Windows artifact used by this build.
 ```powershell
 rustup default stable-msvc
 cargo build --release
-.\target\release\select-to-speak.exe
+.\target\release\mist.exe
 ```
 
 ### Linux
@@ -95,7 +95,7 @@ for winit plus one audio command: `pw-play`, `paplay`, `aplay`, or `ffplay`.
 
 ```sh
 make install-linux
-"$HOME/.local/bin/select-to-speak"
+"$HOME/.local/bin/mist"
 ```
 
 The shortcut reads Windows selections through Microsoft UI Automation and Linux
@@ -111,11 +111,12 @@ from the pet menu, or use manual text entry.
 For a terminal smoke test:
 
 ```sh
-select-to-speak --install-model
-select-to-speak --speak "Hello from Kokoro."
+mist --install-model
+mist --speak "Hello from Kokoro."
 ```
 
-Set `SELECT_TO_SPEAK_MODEL_DIR` to use a different model directory.
+Set `MIST_MODEL_DIR` to use a different model directory. The legacy
+`SELECT_TO_SPEAK_MODEL_DIR` name remains accepted for existing installations.
 
 ### Inference acceleration
 
