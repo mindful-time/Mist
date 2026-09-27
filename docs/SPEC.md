@@ -8,8 +8,8 @@ text-to-speech model.
 
 ## Platforms and interaction
 
-- macOS, Windows, and Linux: the primary interaction is **select text anywhere,
-  then press Ctrl+Alt+S**.
+- macOS, Windows, and Linux: the primary interaction is **select text in a
+  supported app, then press Ctrl+Space**.
 - macOS reads the focused accessibility element. The user is prompted once for
   Accessibility permission. The native AppKit Service remains available as an
   additional action in applications that expose macOS Services.
@@ -26,11 +26,13 @@ text-to-speech model.
   copy is visible on the desktop. The native window shadow, backing disk,
   outline, and decorative pulse rings are disabled. Its idle footprint stays
   compact and low-opacity so work remains legible beneath it; speech can make
-  the same surface denser and brighter without expanding into a blocking card.
+  the same surface grow, become denser, and brighten before it returns to the
+  compact footprint after playback, without expanding into a blocking card.
 - The mist changes movement and intensity with speech lifecycle and audio
   energy. Audio features are eased between playback windows so movement never
-  jumps at the 40 ms sampling boundary; when idle, the mist continues a slow,
-  fluid drift. Speaking is visibly more expressive than idle—using stronger
+  jumps at the 40 ms sampling boundary; when idle, the compact mist keeps a
+  clearly visible fluid breath without becoming visually intrusive. Speaking
+  is visibly more expressive than idle—using stronger
   expansion, density, and directional flow—without abrupt phase changes. Each
   voice has a stable, recognisable color palette.
 - Setup, permission failures, and actionable errors may temporarily expand into
@@ -40,6 +42,20 @@ text-to-speech model.
   selection, settings, status, and quit actions while keeping controls off the
   floating desktop surface. Voice choices behave as one exclusive group, so
   selecting one voice can never leave a second voice marked as selected.
+- Captured text appears in a compact floating bubble queue directly beneath the
+  mist. The queue is bounded, shows only short previews, and expands downward
+  so the mist keeps its desktop position.
+- Queue playback is automatic by default. A persisted setting switches to
+  click-to-play without changing queue order. Successful playback removes the
+  item; failed items remain available for an explicit retry.
+- Direct OS selection capture runs first. A persisted, default-on setting may
+  send the platform Copy shortcut only when direct capture fails. Mist clears
+  that temporary clipboard value after playback only when both its content and
+  platform change token, when available, still match. On desktops without a
+  portable change token, cleanup is content-checked. Because the supported OS
+  clipboard APIs do not share an atomic compare-and-clear operation, all
+  automatic cleanup is documented as best effort and the fallback can be
+  disabled for clipboard-sensitive workflows.
 
 ## Speech
 
@@ -75,7 +91,10 @@ text-to-speech model.
 - OS selection, system tray, preferences, Kokoro inference, model download, and
   audio playback are adapters behind the application boundary.
 - Primary selection capture must not modify or reconstruct the user's regular
-  clipboard.
+  clipboard. Clipboard mutation belongs only to the explicit, configurable
+  fallback adapter. Cleanup must check the captured value and any available
+  platform change token immediately before clearing, and must not claim atomic
+  preservation guarantees the OS does not provide.
 - Slow model loading, synthesis, download, and playback must not block the pet's
   UI event loop.
 
@@ -95,8 +114,12 @@ text-to-speech model.
 - Playback-synchronised, time-windowed loudness and brightness reach
   presentation state only after the platform audio player has actually
   started.
-- **Ctrl+Alt+S** is requested on every OS. Wayland displays the gesture actually
+- **Ctrl+Space** is requested on every OS. Wayland displays the gesture actually
   granted by the compositor, and unsupported portal capabilities fail visibly.
+- Every successful hotkey capture enters the visible queue before playback.
+  Automatic and click-to-play modes persist across launches.
+- Failures classified by the platform adapter as permission or protected
+  content never trigger automatic Copy fallback.
 - The repository documents build and usage instructions for macOS, Windows, and
   Linux, including the Wayland limitation.
 

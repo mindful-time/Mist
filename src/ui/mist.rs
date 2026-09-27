@@ -46,8 +46,14 @@ impl MistRenderer {
         let motion = motion_for(presentation.activity, reactivity, brightness);
         // Phase is deliberately independent of audio energy. Multiplying the
         // absolute clock by a changing frequency caused visible phase jumps.
-        let phase = time * 0.14 + voice_seed;
-        let breathing = 1.0 + (phase * 0.83).sin() * motion.breath;
+        let phase = time * 0.3 + voice_seed;
+        let breath_wave = (phase * 0.83).sin();
+        let breathing = 1.0 + breath_wave * motion.breath;
+        let idle_opacity_breath = if presentation.activity == MistActivity::Idle {
+            breath_wave.mul_add(0.5, 0.5) * 6.0
+        } else {
+            0.0
+        };
         let primary = palette_color(palette.primary);
         let secondary = palette_color(palette.secondary);
         let glow = palette_color(palette.glow);
@@ -81,7 +87,7 @@ impl MistRenderer {
                 * (0.045 + index as f32 * 0.009)
                 * if index % 2 == 0 { 1.0 } else { -1.0 }
                 + voice_wave * reactivity * (0.035 + index as f32 * 0.006);
-            let opacity = (f32::from(alpha) + reactivity * 100.0)
+            let opacity = (f32::from(alpha) + reactivity * 100.0 + idle_opacity_breath)
                 .round()
                 .clamp(0.0, 255.0) as u8;
             painter.add(textured_quad(
@@ -125,12 +131,12 @@ fn audio_reactivity(energy: u8) -> f32 {
 }
 
 fn motion_for(activity: MistActivity, reactivity: f32, brightness: f32) -> MistMotion {
-    let breath = 0.032 + reactivity * 0.11;
+    let breath = 0.052 + reactivity * 0.12;
     let color_flow = brightness * 0.12 + reactivity * 0.18;
     match activity {
         MistActivity::Idle => MistMotion {
             breath,
-            turbulence: 0.5 + color_flow,
+            turbulence: 0.62 + color_flow,
         },
         MistActivity::Busy => MistMotion {
             breath: breath + 0.012,
@@ -193,5 +199,12 @@ mod tests {
         assert!(idle < 0.1);
         assert!(speaking > 0.9);
         assert!(speaking > idle * 10.0);
+    }
+
+    #[test]
+    fn compact_idle_mist_keeps_a_visible_breath() {
+        let idle = motion_for(MistActivity::Idle, 0.0, 16.0 / 255.0);
+
+        assert!(idle.breath >= 0.05);
     }
 }

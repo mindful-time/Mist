@@ -1,22 +1,38 @@
+use std::{error::Error, fmt};
 use std::{ffi::c_void, ptr};
 
 use anyhow::{Context, bail};
 use core_foundation::{
-    base::{Boolean, CFType, CFTypeRef, TCFType},
+    array::CFArray,
+    base::{Boolean, CFRange, CFType, CFTypeRef, TCFType},
     boolean::CFBoolean,
     dictionary::{CFDictionary, CFDictionaryRef},
     string::{CFString, CFStringRef},
 };
+use objc2_app_kit::NSWorkspace;
 
-use crate::domain::SelectedText;
+use crate::domain::{SelectedText, SelectionCaptureError};
 
 type AXError = i32;
 type AXUIElementRef = *const c_void;
+type AXValueRef = *const c_void;
 
 const AX_ERROR_SUCCESS: AXError = 0;
 const AX_ERROR_API_DISABLED: AXError = -25_211;
 const AX_ERROR_ATTRIBUTE_UNSUPPORTED: AXError = -25_205;
 const AX_ERROR_NO_VALUE: AXError = -25_212;
+const AX_VALUE_CF_RANGE_TYPE: u32 = 4;
+
+#[derive(Debug)]
+struct AccessibilityAttributeError(AXError);
+
+impl fmt::Display for AccessibilityAttributeError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&accessibility_error(self.0))
+    }
+}
+
+impl Error for AccessibilityAttributeError {}
 
 #[link(name = "ApplicationServices", kind = "framework")]
 unsafe extern "C" {
@@ -25,11 +41,19 @@ unsafe extern "C" {
     fn AXIsProcessTrusted() -> Boolean;
     fn AXIsProcessTrustedWithOptions(options: CFDictionaryRef) -> Boolean;
     fn AXUIElementCreateSystemWide() -> AXUIElementRef;
+    fn AXUIElementCreateApplication(pid: i32) -> AXUIElementRef;
     fn AXUIElementCopyAttributeValue(
         element: AXUIElementRef,
         attribute: CFStringRef,
         value: *mut CFTypeRef,
     ) -> AXError;
+    fn AXUIElementSetAttributeValue(
+        element: AXUIElementRef,
+        attribute: CFStringRef,
+        value: CFTypeRef,
+    ) -> AXError;
+    fn AXValueGetType(value: AXValueRef) -> u32;
+    fn AXValueGetValue(value: AXValueRef, value_type: u32, value_ptr: *mut c_void) -> Boolean;
 }
 
 /// Requests the one permission needed to inspect selection in applications
@@ -53,21 +77,235 @@ pub fn is_accessibility_trusted() -> bool {
 /// element without touching the user's clipboard.
 pub fn capture_selected_text() -> anyhow::Result<SelectedText> {
     if !is_accessibility_trusted() {
-        bail!("Allow Mist in System Settings → Privacy & Security → Accessibility, then try again");
+        return Err(SelectionCaptureError::PermissionRequired.into());
     }
 
     // SAFETY: The create function returns an owned Core Foundation object.
     let system_wide =
         unsafe { CFType::wrap_under_create_rule(AXUIElementCreateSystemWide().cast::<c_void>()) };
-    let focused = copy_attribute(&system_wide, "AXFocusedUIElement")
-        .context("could not inspect the focused application")?;
-    let selected = copy_attribute(&focused, "AXSelectedText")
-        .context("the focused control does not expose selected text")?;
-    let selected = selected
-        .downcast_into::<CFString>()
-        .context("the selected accessibility value is not text")?;
+    if let Some(focused) = optional_focused_element(&system_wide)? {
+        ensure_not_protected(&focused)?;
+        if let Some(selection) = selected_text_from_focus_chain(&focused)? {
+            return Ok(selection);
+        }
+    }
+    let application =
+        frontmost_application_element().context("could not inspect the focused application")?;
+    if let Some(selection) = selected_text_from_application(&application)? {
+        return Ok(selection);
+    }
+    if enable_manual_accessibility(&application) {
+        std::thread::sleep(std::time::Duration::from_millis(80));
+        if let Some(selection) = selected_text_from_application(&application)? {
+            return Ok(selection);
+        }
+    }
+    Err(SelectionCaptureError::NoSelection.into())
+}
 
-    SelectedText::new(selected.to_string()).map_err(Into::into)
+fn frontmost_application_element() -> anyhow::Result<CFType> {
+    let application = NSWorkspace::sharedWorkspace()
+        .frontmostApplication()
+        .context("macOS did not report a frontmost application")?;
+    let pid = application.processIdentifier();
+    Ok(application_element(pid))
+}
+
+fn application_element(pid: i32) -> CFType {
+    // SAFETY: The running application supplies a valid process identifier and
+    // the create function returns an owned accessibility element.
+    unsafe { CFType::wrap_under_create_rule(AXUIElementCreateApplication(pid).cast::<c_void>()) }
+}
+
+fn enable_manual_accessibility(application: &CFType) -> bool {
+    let attribute = CFString::new("AXManualAccessibility");
+    let enabled = CFBoolean::true_value();
+    // SAFETY: All Core Foundation objects remain alive for the call. Unsupported
+    // applications return an AX error and continue through the normal path.
+    unsafe {
+        AXUIElementSetAttributeValue(
+            application.as_CFTypeRef().cast::<c_void>(),
+            attribute.as_concrete_TypeRef(),
+            enabled.as_CFTypeRef(),
+        ) == AX_ERROR_SUCCESS
+    }
+}
+
+fn selected_text_from_application(application: &CFType) -> anyhow::Result<Option<SelectedText>> {
+    let focused = focused_element(application)?;
+    ensure_not_protected(&focused)?;
+    if let Some(selection) = selected_text_from_focus_chain(&focused)? {
+        return Ok(Some(selection));
+    }
+    if let Ok(window) = copy_attribute(application, "AXFocusedWindow")
+        && let Some(selection) = selected_text_from_tree(&window)?
+    {
+        return Ok(Some(selection));
+    }
+    Ok(None)
+}
+
+fn selected_text(element: &CFType) -> anyhow::Result<Option<SelectedText>> {
+    if let Ok(selected) = copy_attribute(element, "AXSelectedText")
+        && let Some(selected) = selected.downcast_into::<CFString>()
+    {
+        let value = selected.to_string();
+        if !value.trim().is_empty() {
+            return SelectedText::new(value).map(Some).map_err(Into::into);
+        }
+    }
+    selected_text_from_range(element)
+}
+
+fn selected_text_from_range(element: &CFType) -> anyhow::Result<Option<SelectedText>> {
+    let Ok(value) = copy_attribute(element, "AXValue") else {
+        return Ok(None);
+    };
+    let Some(value) = value.downcast_into::<CFString>() else {
+        return Ok(None);
+    };
+    let Ok(range_value) = copy_attribute(element, "AXSelectedTextRange") else {
+        return Ok(None);
+    };
+    // SAFETY: AXSelectedTextRange values are AXValue objects. The type check
+    // precedes copying the embedded Core Foundation range into valid storage.
+    let range = unsafe {
+        if AXValueGetType(range_value.as_CFTypeRef().cast::<c_void>()) != AX_VALUE_CF_RANGE_TYPE {
+            return Ok(None);
+        }
+        let mut range = CFRange {
+            location: 0,
+            length: 0,
+        };
+        if AXValueGetValue(
+            range_value.as_CFTypeRef().cast::<c_void>(),
+            AX_VALUE_CF_RANGE_TYPE,
+            (&raw mut range).cast::<c_void>(),
+        ) == 0
+        {
+            return Ok(None);
+        }
+        range
+    };
+    let Some(selection) = utf16_range(&value.to_string(), range) else {
+        return Ok(None);
+    };
+    if selection.trim().is_empty() {
+        return Ok(None);
+    }
+    SelectedText::new(selection).map(Some).map_err(Into::into)
+}
+
+fn utf16_range(value: &str, range: CFRange) -> Option<String> {
+    let start = usize::try_from(range.location).ok()?;
+    let length = usize::try_from(range.length).ok()?;
+    let end = start.checked_add(length)?;
+    let utf16: Vec<u16> = value.encode_utf16().collect();
+    String::from_utf16(utf16.get(start..end)?).ok()
+}
+
+fn selected_text_from_tree(root: &CFType) -> anyhow::Result<Option<SelectedText>> {
+    ensure_not_protected(root)?;
+    if let Some(selection) = selected_text(root)? {
+        return Ok(Some(selection));
+    }
+    selected_text_in_descendants(root)
+}
+
+fn selected_text_from_focus_chain(root: &CFType) -> anyhow::Result<Option<SelectedText>> {
+    const MAX_ANCESTORS: usize = 24;
+    let mut current = root.clone();
+    for _ in 0..MAX_ANCESTORS {
+        ensure_not_protected(&current)?;
+        if let Some(selection) = selected_text(&current)? {
+            return Ok(Some(selection));
+        }
+        let Ok(parent) = copy_attribute(&current, "AXParent") else {
+            break;
+        };
+        current = parent;
+    }
+    Ok(None)
+}
+
+fn focused_element(element: &CFType) -> anyhow::Result<CFType> {
+    optional_focused_element(element)?
+        .ok_or_else(|| anyhow::Error::from(SelectionCaptureError::ProtectionUnknown))
+}
+
+fn optional_focused_element(element: &CFType) -> anyhow::Result<Option<CFType>> {
+    match copy_attribute(element, "AXFocusedUIElement") {
+        Ok(focused) => Ok(Some(focused)),
+        Err(error) if attribute_unavailable(&error) => Ok(None),
+        Err(error) if attribute_error_code(&error) == Some(AX_ERROR_API_DISABLED) => {
+            Err(SelectionCaptureError::PermissionRequired.into())
+        }
+        Err(_) => Err(SelectionCaptureError::ProtectionUnknown.into()),
+    }
+}
+
+fn ensure_not_protected(element: &CFType) -> anyhow::Result<()> {
+    match copy_attribute(element, "AXSubrole") {
+        Ok(value) => {
+            let Some(subrole) = value.downcast_into::<CFString>() else {
+                return Err(SelectionCaptureError::ProtectionUnknown.into());
+            };
+            if subrole == "AXSecureTextField" {
+                return Err(SelectionCaptureError::ProtectedContent.into());
+            }
+            Ok(())
+        }
+        Err(error) if attribute_unavailable(&error) => {
+            let role = copy_attribute(element, "AXRole")
+                .map_err(|_| SelectionCaptureError::ProtectionUnknown)?;
+            let Some(role) = role.downcast_into::<CFString>() else {
+                return Err(SelectionCaptureError::ProtectionUnknown.into());
+            };
+            if role == "AXTextField" {
+                return Err(SelectionCaptureError::ProtectionUnknown.into());
+            }
+            Ok(())
+        }
+        Err(_) => Err(SelectionCaptureError::ProtectionUnknown.into()),
+    }
+}
+
+fn selected_text_in_descendants(root: &CFType) -> anyhow::Result<Option<SelectedText>> {
+    const MAX_NODES: usize = 512;
+    const MAX_DEPTH: usize = 16;
+
+    let mut pending = std::collections::VecDeque::from([(root.clone(), 0)]);
+    let mut visited = 0;
+    while let Some((element, depth)) = pending.pop_front() {
+        if visited >= MAX_NODES {
+            break;
+        }
+        visited += 1;
+
+        ensure_not_protected(&element)?;
+
+        if depth > 0
+            && let Some(selection) = selected_text(&element)?
+        {
+            return Ok(Some(selection));
+        }
+
+        if depth >= MAX_DEPTH {
+            continue;
+        }
+        let Some(children) = copy_attribute(&element, "AXChildren")
+            .ok()
+            .and_then(|value| value.downcast_into::<CFArray>())
+        else {
+            continue;
+        };
+        for child in children.get_all_values() {
+            // SAFETY: AXChildren contains borrowed accessibility elements. The
+            // get rule retains each child for the queued CFType wrapper.
+            pending.push_back((unsafe { CFType::wrap_under_get_rule(child) }, depth + 1));
+        }
+    }
+    Ok(None)
 }
 
 fn copy_attribute(element: &CFType, attribute: &str) -> anyhow::Result<CFType> {
@@ -83,7 +321,7 @@ fn copy_attribute(element: &CFType, attribute: &str) -> anyhow::Result<CFType> {
         )
     };
     if error != AX_ERROR_SUCCESS {
-        bail!(accessibility_error(error));
+        return Err(AccessibilityAttributeError(error).into());
     }
     if value.is_null() {
         bail!("macOS returned an empty accessibility value");
@@ -91,6 +329,19 @@ fn copy_attribute(element: &CFType, attribute: &str) -> anyhow::Result<CFType> {
 
     // SAFETY: A successful Copy call returned a non-null owned CFTypeRef.
     Ok(unsafe { CFType::wrap_under_create_rule(value) })
+}
+
+fn attribute_error_code(error: &anyhow::Error) -> Option<AXError> {
+    error
+        .downcast_ref::<AccessibilityAttributeError>()
+        .map(|error| error.0)
+}
+
+fn attribute_unavailable(error: &anyhow::Error) -> bool {
+    matches!(
+        attribute_error_code(error),
+        Some(AX_ERROR_ATTRIBUTE_UNSUPPORTED | AX_ERROR_NO_VALUE)
+    )
 }
 
 fn accessibility_error(error: AXError) -> String {
@@ -113,5 +364,18 @@ mod tests {
     fn accessibility_errors_are_actionable() {
         assert!(accessibility_error(AX_ERROR_API_DISABLED).contains("permission"));
         assert!(accessibility_error(AX_ERROR_NO_VALUE).contains("does not expose"));
+    }
+
+    #[test]
+    fn accessibility_ranges_use_utf16_offsets() {
+        let selection = utf16_range(
+            "A mist 🌫 speaks",
+            CFRange {
+                location: 7,
+                length: 2,
+            },
+        );
+
+        assert_eq!(selection.as_deref(), Some("🌫"));
     }
 }

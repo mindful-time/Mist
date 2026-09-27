@@ -57,7 +57,7 @@ async fn run(sender: Sender<WaylandShortcutMessage>) -> anyhow::Result<()> {
         .context("could not create a global-shortcut session")?;
     let requested = [
         NewShortcut::new(SHORTCUT_ID, "Speak selected text with Kokoro")
-            .preferred_trigger("CTRL+ALT+s"),
+            .preferred_trigger("CTRL+space"),
     ];
     let bound = shortcuts
         .bind_shortcuts(&session, &requested, None, BindShortcutsOptions::default())
@@ -69,7 +69,7 @@ async fn run(sender: Sender<WaylandShortcutMessage>) -> anyhow::Result<()> {
         .find(|shortcut| shortcut.id() == SHORTCUT_ID)
         .context("the desktop did not grant the Speak Selection shortcut")?;
     let trigger = match granted.trigger_description().trim() {
-        "" => "Ctrl+Alt+S".to_owned(),
+        "" => "Ctrl+Space".to_owned(),
         description => description.to_owned(),
     };
 

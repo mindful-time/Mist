@@ -57,22 +57,3 @@ fn capture_x11_selection() -> anyhow::Result<SelectedText> {
     };
     SelectedText::new(text.trim_matches('\0')).map_err(Into::into)
 }
-
-pub fn capture_clipboard_text() -> anyhow::Result<SelectedText> {
-    let text = clipboard_text_from(
-        &mut arboard::Clipboard::new().context("could not open the clipboard")?,
-    )?;
-    SelectedText::new(text).map_err(Into::into)
-}
-
-fn clipboard_text_from(clipboard: &mut arboard::Clipboard) -> anyhow::Result<String> {
-    use anyhow::bail;
-
-    let text = clipboard
-        .get_text()
-        .context("the clipboard does not contain text")?;
-    if text.trim().is_empty() {
-        bail!("the clipboard does not contain text");
-    }
-    Ok(text)
-}

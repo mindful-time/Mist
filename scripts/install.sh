@@ -25,4 +25,4 @@ if [[ -d "$legacy_app" ]]; then
 fi
 
 echo "Installed Mist in $install_directory"
-echo "Open it once, allow Accessibility access, then select text and press Ctrl+Alt+S."
+echo "Open it once, allow Accessibility access, then select text and press Ctrl+Space."

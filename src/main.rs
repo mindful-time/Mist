@@ -11,8 +11,8 @@ fn main() -> eframe::Result {
     use mist::{
         SelectedText, SpeakSelection,
         adapters::{
-            kokoro::KokoroSynthesizer, system_audio::SystemAudioPlayer,
-            voice_preferences::VoicePreferencesStore,
+            kokoro::KokoroSynthesizer, playback_preferences::PlaybackPreferencesStore,
+            system_audio::SystemAudioPlayer, voice_preferences::VoicePreferencesStore,
         },
         model_store::ModelStore,
         worker,
@@ -43,6 +43,8 @@ fn main() -> eframe::Result {
         return Ok(());
     }
 
+    let playback_preferences_store = PlaybackPreferencesStore::at(store.root());
+    let playback_preferences = playback_preferences_store.load();
     let worker::WorkerHandle {
         commands,
         statuses,
@@ -71,6 +73,8 @@ fn main() -> eframe::Result {
                 commands,
                 statuses,
                 selected_voice,
+                playback_preferences,
+                playback_preferences_store,
             )))
         }),
     )

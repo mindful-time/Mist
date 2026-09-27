@@ -49,10 +49,164 @@ pub enum SelectionError {
     TooLong { actual: usize, maximum: usize },
 }
 
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
+pub enum SelectionCaptureError {
+    #[error("Accessibility permission is required to read selected text")]
+    PermissionRequired,
+    #[error("Mist will not read or copy text from a protected field")]
+    ProtectedContent,
+    #[error("Mist could not verify that the focused content is safe to copy")]
+    ProtectionUnknown,
+    #[error("Select some text first")]
+    NoSelection,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct QueueItemId(u64);
+
+impl QueueItemId {
+    pub const fn get(self) -> u64 {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum QueueItemState {
+    Waiting,
+    Preparing,
+    Playing,
+    Failed,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct QueuedSpeech {
+    pub id: QueueItemId,
+    pub text: SelectedText,
+    pub state: QueueItemState,
+}
+
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
+pub enum QueueError {
+    #[error("The speech queue is full")]
+    Full,
+}
+
+/// Ordered speech requested by the user. The queue owns text lifecycle while
+/// OS adapters separately own any temporary clipboard lease.
+#[derive(Debug, Default)]
+pub struct SpeechQueue {
+    items: Vec<QueuedSpeech>,
+    next_id: u64,
+}
+
+impl SpeechQueue {
+    pub const MAX_ITEMS: usize = 8;
+
+    pub fn push(&mut self, text: SelectedText) -> Result<QueueItemId, QueueError> {
+        if self.items.len() >= Self::MAX_ITEMS {
+            return Err(QueueError::Full);
+        }
+        self.next_id = self.next_id.wrapping_add(1);
+        let id = QueueItemId(self.next_id);
+        self.items.push(QueuedSpeech {
+            id,
+            text,
+            state: QueueItemState::Waiting,
+        });
+        Ok(id)
+    }
+
+    pub fn items(&self) -> &[QueuedSpeech] {
+        &self.items
+    }
+
+    pub fn active_id(&self) -> Option<QueueItemId> {
+        self.items
+            .iter()
+            .find(|item| {
+                matches!(
+                    item.state,
+                    QueueItemState::Preparing | QueueItemState::Playing
+                )
+            })
+            .map(|item| item.id)
+    }
+
+    pub fn start_next(&mut self) -> Option<QueuedSpeech> {
+        let id = self
+            .items
+            .iter()
+            .find(|item| item.state == QueueItemState::Waiting)
+            .map(|item| item.id)?;
+        self.start(id)
+    }
+
+    pub fn start(&mut self, id: QueueItemId) -> Option<QueuedSpeech> {
+        if self.active_id().is_some() {
+            return None;
+        }
+        let item = self.items.iter_mut().find(|item| item.id == id)?;
+        item.state = QueueItemState::Preparing;
+        Some(item.clone())
+    }
+
+    pub fn mark_playing(&mut self, id: QueueItemId) -> bool {
+        let Some(item) = self
+            .items
+            .iter_mut()
+            .find(|item| item.id == id && item.state == QueueItemState::Preparing)
+        else {
+            return false;
+        };
+        item.state = QueueItemState::Playing;
+        true
+    }
+
+    pub fn complete(&mut self, id: QueueItemId) -> Option<QueuedSpeech> {
+        let position = self.items.iter().position(|item| {
+            item.id == id
+                && matches!(
+                    item.state,
+                    QueueItemState::Preparing | QueueItemState::Playing
+                )
+        })?;
+        Some(self.items.remove(position))
+    }
+
+    pub fn fail(&mut self, id: QueueItemId) -> bool {
+        let Some(item) = self.items.iter_mut().find(|item| {
+            item.id == id
+                && matches!(
+                    item.state,
+                    QueueItemState::Preparing | QueueItemState::Playing
+                )
+        }) else {
+            return false;
+        };
+        item.state = QueueItemState::Failed;
+        true
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct VoiceSettings {
     pub voice_id: VoiceId,
     pub speed: f32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PlaybackPreferences {
+    pub auto_play_queue: bool,
+    pub automatic_clipboard_fallback: bool,
+}
+
+impl Default for PlaybackPreferences {
+    fn default() -> Self {
+        Self {
+            auto_play_queue: true,
+            automatic_clipboard_fallback: true,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -273,6 +427,46 @@ fn features(samples: &[f32]) -> AudioFeatures {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn speech_queue_plays_in_order_and_removes_only_completed_items() {
+        let mut queue = SpeechQueue::default();
+        let first = queue
+            .push(SelectedText::new("First selection").unwrap())
+            .unwrap();
+        let second = queue
+            .push(SelectedText::new("Second selection").unwrap())
+            .unwrap();
+
+        assert_eq!(queue.start_next().map(|item| item.id), Some(first));
+        assert_eq!(
+            queue.complete(first).unwrap().text.as_str(),
+            "First selection"
+        );
+        assert_eq!(queue.items().len(), 1);
+        assert_eq!(queue.items()[0].id, second);
+        assert_eq!(queue.items()[0].state, QueueItemState::Waiting);
+    }
+
+    #[test]
+    fn speech_queue_can_play_an_exact_item_and_keeps_failed_items_for_retry() {
+        let mut queue = SpeechQueue::default();
+        let first = queue
+            .push(SelectedText::new("First selection").unwrap())
+            .unwrap();
+        let second = queue
+            .push(SelectedText::new("Play this one").unwrap())
+            .unwrap();
+
+        let started = queue.start(second).unwrap();
+        assert_eq!(started.id, second);
+        assert_eq!(started.state, QueueItemState::Preparing);
+        assert!(queue.start(first).is_none());
+        assert!(queue.mark_playing(second));
+        assert!(queue.fail(second));
+        assert_eq!(queue.items()[1].state, QueueItemState::Failed);
+        assert_eq!(queue.start(second).map(|item| item.id), Some(second));
+    }
 
     #[test]
     fn selection_trims_outer_whitespace() {

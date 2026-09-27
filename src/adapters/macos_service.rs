@@ -1,14 +1,14 @@
-use std::sync::mpsc::{SyncSender, TrySendError};
+use std::sync::mpsc::Sender;
 
 use objc2::{DefinedClass, MainThreadOnly, define_class, msg_send, rc::Retained};
 use objc2_app_kit::{NSApplication, NSPasteboard, NSPasteboardTypeString};
 use objc2_foundation::{MainThreadMarker, NSObject, NSObjectProtocol, NSString};
 
-use crate::{domain::SelectedText, worker::WorkerCommand};
+use crate::domain::SelectedText;
 
 #[derive(Debug)]
 pub struct ServiceProviderIvars {
-    commands: SyncSender<WorkerCommand>,
+    selections: Sender<SelectedText>,
 }
 
 define_class!(
@@ -43,12 +43,8 @@ define_class!(
                     return;
                 }
             };
-            if let Err(queue_error) = self.ivars().commands.try_send(WorkerCommand::Speak(text)) {
-                let message = match queue_error {
-                    TrySendError::Full(_) => "Mist is busy; try again in a moment",
-                    TrySendError::Disconnected(_) => "The speech worker is not running",
-                };
-                set_service_error(error, message);
+            if self.ivars().selections.send(text).is_err() {
+                set_service_error(error, "Mist is not accepting selections");
             }
         }
     }
@@ -66,17 +62,17 @@ fn set_service_error(error: *mut *mut NSString, message: &str) {
 }
 
 impl ServiceProvider {
-    fn new(mtm: MainThreadMarker, commands: SyncSender<WorkerCommand>) -> Retained<Self> {
-        let this = Self::alloc(mtm).set_ivars(ServiceProviderIvars { commands });
+    fn new(mtm: MainThreadMarker, selections: Sender<SelectedText>) -> Retained<Self> {
+        let this = Self::alloc(mtm).set_ivars(ServiceProviderIvars { selections });
         // SAFETY: NSObject's `init` signature is correct for this subclass.
         unsafe { msg_send![super(this), init] }
     }
 }
 
 /// Registers the object AppKit calls when the user chooses the text Service.
-pub fn register(commands: SyncSender<WorkerCommand>) -> Retained<ServiceProvider> {
+pub fn register(selections: Sender<SelectedText>) -> Retained<ServiceProvider> {
     let mtm = MainThreadMarker::new().expect("the pet UI must run on the macOS main thread");
-    let provider = ServiceProvider::new(mtm, commands);
+    let provider = ServiceProvider::new(mtm, selections);
     let application = NSApplication::sharedApplication(mtm);
     // SAFETY: ServiceProvider implements the selector advertised in this app's Info.plist.
     unsafe { application.setServicesProvider(Some(&provider)) };

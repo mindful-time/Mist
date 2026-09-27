@@ -210,7 +210,7 @@ pub(super) fn copy_for_status(
                 StatusCopy {
                     eyebrow: "READY",
                     title: "Your mist is listening",
-                    detail: "Select text anywhere and press Ctrl+Alt+S. Use the menu-bar or tray mist to change voices.".to_owned(),
+                    detail: "Select text anywhere and press Ctrl+Space. Use the menu-bar or tray mist to change voices.".to_owned(),
                     action: PrimaryAction::None,
                 }
             }

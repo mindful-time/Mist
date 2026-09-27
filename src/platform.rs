@@ -1,21 +1,77 @@
-use std::sync::mpsc::SyncSender;
-
 #[cfg(target_os = "macos")]
 use crate::adapters::macos_selection::capture_selected_text;
+#[cfg(target_os = "macos")]
+use crate::adapters::macos_shortcut::{self, MacShortcutMessage};
 #[cfg(target_os = "windows")]
-use crate::adapters::windows_selection::{capture_clipboard_text, capture_selected_text};
+use crate::adapters::windows_selection::capture_selected_text;
 #[cfg(target_os = "linux")]
 use crate::adapters::{
-    linux_selection::{capture_clipboard_text, capture_selected_text, is_wayland_session},
+    linux_selection::{capture_selected_text, is_wayland_session},
     wayland_shortcut::{self, WaylandShortcutMessage},
 };
-use crate::{domain::SelectedText, worker::WorkerCommand};
+use crate::{
+    adapters::clipboard_fallback::{
+        ClipboardLease, clear_if_owned, copy_selected_text, read_current_text,
+    },
+    domain::{SelectedText, SelectionCaptureError},
+};
+use std::sync::{
+    Arc,
+    atomic::{AtomicU8, Ordering},
+};
 
-const SHORTCUT_HINT: &str = "Select text anywhere, then press Ctrl+Alt+S";
-type CaptureMessage = (u64, Result<SelectedText, String>);
+const SHORTCUT_HINT: &str = "Select text, then press Ctrl+Space";
+const NATIVE_CAPTURE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+const FALLBACK_CAPTURE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(4);
+type CaptureMessage = (u64, Result<CapturedSelection, String>);
+
+const CAPTURE_NATIVE: u8 = 0;
+const CAPTURE_FALLBACK: u8 = 1;
+const CAPTURE_CANCELLED: u8 = 2;
+
+#[derive(Clone, Debug)]
+struct CaptureControl(Arc<AtomicU8>);
+
+impl CaptureControl {
+    fn new() -> Self {
+        Self(Arc::new(AtomicU8::new(CAPTURE_NATIVE)))
+    }
+
+    fn begin_fallback(&self) -> bool {
+        self.0
+            .compare_exchange(
+                CAPTURE_NATIVE,
+                CAPTURE_FALLBACK,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            )
+            .is_ok()
+    }
+
+    fn cancel_native(&self) -> bool {
+        self.0
+            .compare_exchange(
+                CAPTURE_NATIVE,
+                CAPTURE_CANCELLED,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            )
+            .is_ok()
+    }
+
+    fn fallback_started(&self) -> bool {
+        self.0.load(Ordering::Acquire) == CAPTURE_FALLBACK
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct CapturedSelection {
+    pub text: SelectedText,
+    pub clipboard_lease: Option<ClipboardLease>,
+}
 
 pub enum PlatformEvent {
-    Speak(SelectedText),
+    Captured(CapturedSelection),
     AccessibilityPermissionRequired,
     Error(String),
 }
@@ -23,6 +79,10 @@ pub enum PlatformEvent {
 pub struct PlatformBridge {
     #[cfg(target_os = "macos")]
     _service_provider: objc2::rc::Retained<crate::adapters::macos_service::ServiceProvider>,
+    #[cfg(target_os = "macos")]
+    service_receiver: std::sync::mpsc::Receiver<SelectedText>,
+    #[cfg(target_os = "macos")]
+    macos_shortcuts: Option<std::sync::mpsc::Receiver<MacShortcutMessage>>,
     manager: Option<global_hotkey::GlobalHotKeyManager>,
     hotkey: global_hotkey::hotkey::HotKey,
     shortcut_label: String,
@@ -35,22 +95,37 @@ pub struct PlatformBridge {
     capture_sender: std::sync::mpsc::Sender<CaptureMessage>,
     capture_receiver: std::sync::mpsc::Receiver<CaptureMessage>,
     capture_generation: u64,
-    capture_in_flight: Option<(u64, std::time::Instant)>,
+    capture_in_flight: Option<(u64, std::time::Instant, CaptureControl)>,
+    deferred_clipboard_cleanup: Vec<ClipboardLease>,
+    automatic_clipboard_fallback: bool,
     #[cfg(target_os = "linux")]
     wayland_shortcuts: Option<std::sync::mpsc::Receiver<WaylandShortcutMessage>>,
 }
 
+impl Default for PlatformBridge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PlatformBridge {
-    pub fn new(commands: SyncSender<WorkerCommand>) -> Self {
+    pub fn new() -> Self {
         use global_hotkey::hotkey::{Code, HotKey, Modifiers};
 
-        let hotkey = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyS);
+        let hotkey = HotKey::new(Some(Modifiers::CONTROL), Code::Space);
+        #[cfg(target_os = "macos")]
+        let (manager, registration_error) = (None, None);
+        #[cfg(not(target_os = "macos"))]
         let (manager, registration_error) = if is_wayland() {
             (None, None)
         } else {
             register_hotkey(hotkey)
         };
         let (capture_sender, capture_receiver) = std::sync::mpsc::channel();
+        #[cfg(target_os = "macos")]
+        let (service_sender, service_receiver) = std::sync::mpsc::channel();
+        #[cfg(target_os = "macos")]
+        let macos_shortcuts = manager.is_none().then(macos_shortcut::spawn);
 
         #[cfg(target_os = "macos")]
         let shortcut_error = registration_error.clone();
@@ -58,26 +133,19 @@ impl PlatformBridge {
         let accessibility_pending =
             !crate::adapters::macos_selection::request_accessibility_permission();
         #[cfg(target_os = "macos")]
-        let registration_error = if accessibility_pending {
-            let permission_error =
-                "Allow Accessibility access to read selections outside native Services";
-            Some(match registration_error {
-                Some(shortcut_error) => format!("{shortcut_error}; {permission_error}"),
-                None => permission_error.to_owned(),
-            })
-        } else {
-            registration_error
-        };
-
-        #[cfg(not(target_os = "macos"))]
-        let _ = commands;
+        let registration_error =
+            macos_registration_error(registration_error.as_deref(), accessibility_pending);
 
         Self {
             #[cfg(target_os = "macos")]
-            _service_provider: crate::adapters::macos_service::register(commands),
+            _service_provider: crate::adapters::macos_service::register(service_sender),
+            #[cfg(target_os = "macos")]
+            service_receiver,
+            #[cfg(target_os = "macos")]
+            macos_shortcuts,
             manager,
             hotkey,
-            shortcut_label: "Ctrl+Alt+S".to_owned(),
+            shortcut_label: "Ctrl+Space".to_owned(),
             usage_hint: SHORTCUT_HINT.to_owned(),
             registration_error,
             #[cfg(target_os = "macos")]
@@ -88,6 +156,8 @@ impl PlatformBridge {
             capture_receiver,
             capture_generation: 0,
             capture_in_flight: None,
+            deferred_clipboard_cleanup: Vec::new(),
+            automatic_clipboard_fallback: true,
             #[cfg(target_os = "linux")]
             wayland_shortcuts: is_wayland_session().then(wayland_shortcut::spawn),
         }
@@ -101,7 +171,43 @@ impl PlatformBridge {
             && crate::adapters::macos_selection::is_accessibility_trusted()
         {
             self.accessibility_pending = false;
-            self.registration_error.clone_from(&self.shortcut_error);
+            self.registration_error =
+                macos_registration_error(self.shortcut_error.as_deref(), false);
+        }
+
+        #[cfg(target_os = "macos")]
+        if let Some(message) = self
+            .macos_shortcuts
+            .as_ref()
+            .and_then(|messages| messages.try_recv().ok())
+        {
+            match message {
+                MacShortcutMessage::Registered => {
+                    self.shortcut_error = None;
+                    self.accessibility_pending = false;
+                    self.registration_error = None;
+                }
+                MacShortcutMessage::Activated => {
+                    if let Err(error) = self.start_selection_capture() {
+                        return Some(PlatformEvent::Error(error));
+                    }
+                }
+                MacShortcutMessage::Error(error) => {
+                    self.shortcut_error = Some(error);
+                    self.registration_error = macos_registration_error(
+                        self.shortcut_error.as_deref(),
+                        self.accessibility_pending,
+                    );
+                }
+            }
+        }
+
+        #[cfg(target_os = "macos")]
+        if let Ok(text) = self.service_receiver.try_recv() {
+            return Some(PlatformEvent::Captured(CapturedSelection {
+                text,
+                clipboard_lease: None,
+            }));
         }
 
         #[cfg(target_os = "linux")]
@@ -112,12 +218,12 @@ impl PlatformBridge {
         {
             match message {
                 WaylandShortcutMessage::Registered(trigger) => {
-                    self.usage_hint = format!("Select text anywhere, then press {trigger}");
+                    self.usage_hint = format!("Select text, then press {trigger}");
                     self.shortcut_label = trigger;
                     self.registration_error = None;
                 }
                 WaylandShortcutMessage::Activated => {
-                    if let Err(error) = self.start_capture(capture_selected_text) {
+                    if let Err(error) = self.start_selection_capture() {
                         return Some(PlatformEvent::Error(error));
                     }
                 }
@@ -131,24 +237,35 @@ impl PlatformBridge {
         while let Ok((generation, message)) = self.capture_receiver.try_recv() {
             if self
                 .capture_in_flight
-                .is_some_and(|(active, _)| active == generation)
+                .as_ref()
+                .is_some_and(|(active, _, _)| *active == generation)
             {
                 self.capture_in_flight = None;
                 return Some(match message {
-                    Ok(text) => PlatformEvent::Speak(text),
+                    Ok(selection) => PlatformEvent::Captured(selection),
                     Err(error) => self.capture_error(error),
                 });
             }
+            if let Ok(selection) = message
+                && let Some(lease) = selection.clipboard_lease
+                && clear_if_owned(&lease).is_err()
+            {
+                self.deferred_clipboard_cleanup.push(lease);
+            }
         }
 
-        if self
-            .capture_in_flight
-            .is_some_and(|(_, started)| started.elapsed() > std::time::Duration::from_secs(3))
-        {
-            self.capture_in_flight = None;
-            return Some(PlatformEvent::Error(
-                "Selection capture timed out; try again".to_owned(),
-            ));
+        if let Some((_, started, control)) = &self.capture_in_flight {
+            let timed_out = if control.fallback_started() {
+                started.elapsed() > FALLBACK_CAPTURE_TIMEOUT
+            } else {
+                started.elapsed() > NATIVE_CAPTURE_TIMEOUT && control.cancel_native()
+            };
+            if timed_out {
+                self.capture_in_flight = None;
+                return Some(PlatformEvent::Error(
+                    "Selection capture timed out; try again".to_owned(),
+                ));
+            }
         }
 
         if self.manager.is_none() || self.capture_in_flight.is_some() {
@@ -157,7 +274,7 @@ impl PlatformBridge {
 
         while let Ok(event) = GlobalHotKeyEvent::receiver().try_recv() {
             if event.id == self.hotkey.id() && event.state == HotKeyState::Released {
-                if let Err(error) = self.start_capture(capture_selected_text) {
+                if let Err(error) = self.start_selection_capture() {
                     return Some(PlatformEvent::Error(error));
                 }
                 break;
@@ -188,27 +305,39 @@ impl PlatformBridge {
         self.registration_error.as_deref()
     }
 
-    #[cfg(any(target_os = "windows", target_os = "linux"))]
-    pub fn request_clipboard_text(&mut self) -> Result<(), String> {
-        self.start_capture(capture_clipboard_text)
+    pub fn set_automatic_clipboard_fallback(&mut self, enabled: bool) {
+        self.automatic_clipboard_fallback = enabled;
     }
 
-    fn start_capture(
-        &mut self,
-        capture: fn() -> anyhow::Result<SelectedText>,
-    ) -> Result<(), String> {
+    pub fn request_clipboard_text(&mut self) -> Result<(), String> {
+        self.start_capture(CaptureRequest::ExistingClipboard)
+    }
+
+    pub fn clear_temporary_clipboard(&self, lease: &ClipboardLease) -> Result<bool, String> {
+        clear_if_owned(lease).map_err(|error| format!("{error:#}"))
+    }
+
+    fn start_selection_capture(&mut self) -> Result<(), String> {
+        self.start_capture(CaptureRequest::Selection {
+            clipboard_fallback: self.automatic_clipboard_fallback,
+        })
+    }
+
+    fn start_capture(&mut self, request: CaptureRequest) -> Result<(), String> {
+        self.retry_deferred_clipboard_cleanup();
         if self.capture_in_flight.is_some() {
             return Err("Selection capture is already in progress".to_owned());
         }
 
         self.capture_generation = self.capture_generation.wrapping_add(1);
         let generation = self.capture_generation;
-        self.capture_in_flight = Some((generation, std::time::Instant::now()));
+        let control = CaptureControl::new();
+        self.capture_in_flight = Some((generation, std::time::Instant::now(), control.clone()));
         let sender = self.capture_sender.clone();
         std::thread::Builder::new()
             .name("selected-text-capture".to_owned())
             .spawn(move || {
-                let message = capture().map_err(|error| format!("{error:#}"));
+                let message = capture(request, &control).map_err(|error| format!("{error:#}"));
                 let _ = sender.send((generation, message));
             })
             .map_err(|error| {
@@ -216,6 +345,11 @@ impl PlatformBridge {
                 format!("Could not start selection capture: {error}")
             })?;
         Ok(())
+    }
+
+    fn retry_deferred_clipboard_cleanup(&mut self) {
+        self.deferred_clipboard_cleanup
+            .retain(|lease| clear_if_owned(lease).is_err());
     }
 
     #[cfg(target_os = "macos")]
@@ -234,6 +368,63 @@ impl PlatformBridge {
     }
 }
 
+impl Drop for PlatformBridge {
+    fn drop(&mut self) {
+        for lease in self.deferred_clipboard_cleanup.drain(..) {
+            let _ = clear_if_owned(&lease);
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum CaptureRequest {
+    Selection { clipboard_fallback: bool },
+    ExistingClipboard,
+}
+
+fn capture(request: CaptureRequest, control: &CaptureControl) -> anyhow::Result<CapturedSelection> {
+    match request {
+        CaptureRequest::Selection { clipboard_fallback } => match capture_selected_text() {
+            Ok(text) => Ok(CapturedSelection {
+                text,
+                clipboard_lease: None,
+            }),
+            Err(selection_error)
+                if clipboard_fallback
+                    && allows_clipboard_fallback(&selection_error)
+                    && control.begin_fallback() =>
+            {
+                let capture = copy_selected_text().map_err(|clipboard_error| {
+                    anyhow::anyhow!(
+                        "Selection access failed: {selection_error:#}. Clipboard fallback failed: {clipboard_error:#}"
+                    )
+                })?;
+                Ok(CapturedSelection {
+                    text: capture.text,
+                    clipboard_lease: Some(capture.lease),
+                })
+            }
+            Err(error) => Err(error),
+        },
+        CaptureRequest::ExistingClipboard => Ok(CapturedSelection {
+            text: read_current_text()?,
+            clipboard_lease: None,
+        }),
+    }
+}
+
+fn allows_clipboard_fallback(error: &anyhow::Error) -> bool {
+    !matches!(
+        error.downcast_ref::<SelectionCaptureError>(),
+        Some(
+            SelectionCaptureError::PermissionRequired
+                | SelectionCaptureError::ProtectedContent
+                | SelectionCaptureError::ProtectionUnknown
+        )
+    )
+}
+
+#[cfg(not(target_os = "macos"))]
 fn register_hotkey(
     hotkey: global_hotkey::hotkey::HotKey,
 ) -> (Option<global_hotkey::GlobalHotKeyManager>, Option<String>) {
@@ -242,14 +433,14 @@ fn register_hotkey(
             Ok(()) => (Some(manager), None),
             Err(error) => (
                 None,
-                Some(format!("Could not register Ctrl+Alt+S: {error}")),
+                Some(format!("Could not register Ctrl+Space: {error}")),
             ),
         },
         Err(error) => (None, Some(format!("Global shortcut unavailable: {error}"))),
     }
 }
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(target_os = "windows")]
 fn is_wayland() -> bool {
     false
 }
@@ -259,13 +450,51 @@ fn is_wayland() -> bool {
     is_wayland_session()
 }
 
+#[cfg(target_os = "macos")]
+fn macos_registration_error(
+    shortcut_error: Option<&str>,
+    accessibility_pending: bool,
+) -> Option<String> {
+    let permission_error = accessibility_pending
+        .then_some("Allow Accessibility access to read selections and enable Control-Space");
+    match (shortcut_error, permission_error) {
+        (Some(shortcut), Some(permission)) => Some(format!("{shortcut}; {permission}")),
+        (Some(shortcut), None) => Some(shortcut.to_owned()),
+        (None, Some(permission)) => Some(permission.to_owned()),
+        (None, None) => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::domain::SelectionCaptureError;
+
     #[test]
     fn shortcut_hint_explains_the_system_wide_activation() {
-        assert_eq!(
-            super::SHORTCUT_HINT,
-            "Select text anywhere, then press Ctrl+Alt+S"
-        );
+        assert_eq!(super::SHORTCUT_HINT, "Select text, then press Ctrl+Space");
+    }
+
+    #[test]
+    fn clipboard_fallback_never_bypasses_permission_or_protected_content() {
+        assert!(!super::allows_clipboard_fallback(
+            &SelectionCaptureError::PermissionRequired.into()
+        ));
+        assert!(!super::allows_clipboard_fallback(
+            &SelectionCaptureError::ProtectedContent.into()
+        ));
+        assert!(!super::allows_clipboard_fallback(
+            &SelectionCaptureError::ProtectionUnknown.into()
+        ));
+        assert!(super::allows_clipboard_fallback(
+            &SelectionCaptureError::NoSelection.into()
+        ));
+    }
+
+    #[test]
+    fn timed_out_native_capture_cannot_start_a_late_copy() {
+        let control = super::CaptureControl::new();
+
+        assert!(control.cancel_native());
+        assert!(!control.begin_fallback());
     }
 }
