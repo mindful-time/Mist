@@ -1,5 +1,5 @@
 #[cfg(target_os = "macos")]
-use crate::adapters::macos_selection::capture_selected_text;
+use crate::adapters::macos_selection::{capture_selected_text, frontmost_application_pid};
 #[cfg(target_os = "macos")]
 use crate::adapters::macos_shortcut::{self, MacShortcutMessage};
 #[cfg(target_os = "windows")]
@@ -24,6 +24,11 @@ const SHORTCUT_HINT: &str = "Select text, then press Ctrl+Space";
 const NATIVE_CAPTURE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
 const FALLBACK_CAPTURE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(4);
 type CaptureMessage = (u64, Result<CapturedSelection, String>);
+
+#[cfg(target_os = "macos")]
+type SelectionTarget = i32;
+#[cfg(not(target_os = "macos"))]
+type SelectionTarget = ();
 
 const CAPTURE_NATIVE: u8 = 0;
 const CAPTURE_FALLBACK: u8 = 1;
@@ -318,8 +323,10 @@ impl PlatformBridge {
     }
 
     fn start_selection_capture(&mut self) -> Result<(), String> {
+        let target = current_selection_target()?;
         self.start_capture(CaptureRequest::Selection {
             clipboard_fallback: self.automatic_clipboard_fallback,
+            target,
         })
     }
 
@@ -378,13 +385,19 @@ impl Drop for PlatformBridge {
 
 #[derive(Clone, Copy)]
 enum CaptureRequest {
-    Selection { clipboard_fallback: bool },
+    Selection {
+        clipboard_fallback: bool,
+        target: SelectionTarget,
+    },
     ExistingClipboard,
 }
 
 fn capture(request: CaptureRequest, control: &CaptureControl) -> anyhow::Result<CapturedSelection> {
     match request {
-        CaptureRequest::Selection { clipboard_fallback } => match capture_selected_text() {
+        CaptureRequest::Selection {
+            clipboard_fallback,
+            target,
+        } => match capture_native_selected_text(target) {
             Ok(text) => Ok(CapturedSelection {
                 text,
                 clipboard_lease: None,
@@ -411,6 +424,27 @@ fn capture(request: CaptureRequest, control: &CaptureControl) -> anyhow::Result<
             clipboard_lease: None,
         }),
     }
+}
+
+#[cfg(target_os = "macos")]
+fn current_selection_target() -> Result<SelectionTarget, String> {
+    frontmost_application_pid()
+        .map_err(|error| format!("Could not identify the selected app: {error:#}"))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn current_selection_target() -> Result<SelectionTarget, String> {
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn capture_native_selected_text(target: SelectionTarget) -> anyhow::Result<SelectedText> {
+    capture_selected_text(target)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn capture_native_selected_text(_target: SelectionTarget) -> anyhow::Result<SelectedText> {
+    capture_selected_text()
 }
 
 fn allows_clipboard_fallback(error: &anyhow::Error) -> bool {

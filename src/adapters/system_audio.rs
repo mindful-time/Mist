@@ -2,7 +2,6 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::{Child, Command, ExitStatus},
-    thread,
     time::{Duration, Instant},
 };
 
@@ -128,7 +127,8 @@ impl SystemAudioPlayer {
             let now = Instant::now();
             let tick = now.saturating_duration_since(last_tick);
             last_tick = now;
-            match self.playback.phase() {
+            let phase = self.playback.phase();
+            match phase {
                 PlaybackPhase::Cancelled => {
                     mci_command(&format!("stop {ALIAS}"))?;
                     return Err(PlaybackStopped.into());
@@ -154,7 +154,7 @@ impl SystemAudioPlayer {
             if mci_command(&format!("status {ALIAS} mode"))? == "stopped" {
                 return Ok(());
             }
-            thread::sleep(SAMPLE_INTERVAL);
+            self.playback.wait_for_phase_change(phase, SAMPLE_INTERVAL);
         }
     }
 }
@@ -208,7 +208,8 @@ fn monitor_playback(
         let now = Instant::now();
         let tick = now.saturating_duration_since(last_tick);
         last_tick = now;
-        match playback.phase() {
+        let phase = playback.phase();
+        match phase {
             PlaybackPhase::Cancelled => {
                 stop_child(child);
                 return Err(PlaybackStopped.into());
@@ -236,7 +237,7 @@ fn monitor_playback(
             }
             PlaybackPhase::Idle | PlaybackPhase::Preparing => {}
         }
-        thread::sleep(SAMPLE_INTERVAL);
+        playback.wait_for_phase_change(phase, SAMPLE_INTERVAL);
     }
 }
 
@@ -260,7 +261,10 @@ fn set_process_paused(child: &Child, paused: bool) -> Result<()> {
 
 #[cfg(all(test, any(target_os = "macos", target_os = "linux")))]
 mod tests {
-    use std::sync::{Arc, Mutex};
+    use std::{
+        sync::{Arc, Mutex, mpsc},
+        thread,
+    };
 
     use super::*;
 
@@ -306,6 +310,69 @@ mod tests {
         assert!(playback_error_was_stopped(&error));
         assert_eq!(&*transitions.lock().unwrap(), &[true, true, true]);
         assert!(samples > 0);
+    }
+
+    #[test]
+    fn pause_reaches_the_system_player_without_waiting_for_the_visual_sample_tick() {
+        let control = PlaybackController::default();
+        let mut queue = crate::domain::SpeechQueue::default();
+        let id = queue
+            .push(crate::domain::SelectedText::new("Immediate pause test").unwrap())
+            .unwrap();
+        let token = crate::playback::PlaybackToken::queue_item(id);
+        assert!(control.register(token));
+        control.begin_session(token).unwrap();
+
+        let mut child = Command::new("/bin/sleep").arg("5").spawn().unwrap();
+        let process_id = child.id() as libc::pid_t;
+        let (sample_sender, sample_receiver) = mpsc::sync_channel(1);
+        let controller = control.clone();
+        let control_thread = thread::spawn(move || {
+            sample_receiver.recv().unwrap();
+            let started = Instant::now();
+            assert!(controller.pause(token));
+
+            let latency = loop {
+                let mut status = 0;
+                // SAFETY: `process_id` belongs to the child created for this
+                // test and `status` is a valid writable wait-status pointer.
+                let result = unsafe {
+                    libc::waitpid(process_id, &mut status, libc::WNOHANG | libc::WUNTRACED)
+                };
+                if result == process_id && libc::WIFSTOPPED(status) {
+                    break started.elapsed();
+                }
+                if started.elapsed() >= Duration::from_millis(250) {
+                    break started.elapsed();
+                }
+                thread::sleep(Duration::from_millis(1));
+            };
+            assert!(controller.cancel(token));
+            latency
+        });
+
+        let audio = Audio::kokoro(vec![0.1; 24_000]);
+        let mut sent_sample = false;
+        let error = monitor_playback(
+            &mut child,
+            &audio,
+            &mut |_| {
+                if !sent_sample {
+                    sample_sender.send(()).unwrap();
+                    sent_sample = true;
+                }
+            },
+            &control,
+        )
+        .unwrap_err();
+        let pause_latency = control_thread.join().unwrap();
+        control.finish_session(token);
+
+        assert!(playback_error_was_stopped(&error));
+        assert!(
+            pause_latency < Duration::from_millis(20),
+            "pause reached the system player after {pause_latency:?}"
+        );
     }
 
     fn playback_error_was_stopped(error: &anyhow::Error) -> bool {

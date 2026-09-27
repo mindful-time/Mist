@@ -146,9 +146,11 @@ impl SpeechQueue {
         if self.active_id().is_some() {
             return None;
         }
-        let item = self.items.iter_mut().find(|item| item.id == id)?;
+        let position = self.items.iter().position(|item| item.id == id)?;
+        let mut item = self.items.remove(position);
         item.state = QueueItemState::Preparing;
-        Some(item.clone())
+        self.items.insert(0, item.clone());
+        Some(item)
     }
 
     pub fn mark_playing(&mut self, id: QueueItemId) -> bool {
@@ -494,8 +496,38 @@ mod tests {
         assert!(queue.start(first).is_none());
         assert!(queue.mark_playing(second));
         assert!(queue.fail(second));
-        assert_eq!(queue.items()[1].state, QueueItemState::Failed);
+        assert_eq!(
+            queue
+                .items()
+                .iter()
+                .find(|item| item.id == second)
+                .unwrap()
+                .state,
+            QueueItemState::Failed
+        );
         assert_eq!(queue.start(second).map(|item| item.id), Some(second));
+    }
+
+    #[test]
+    fn choosing_a_queued_item_moves_it_to_the_top_for_playback() {
+        let mut queue = SpeechQueue::default();
+        let first = queue
+            .push(SelectedText::new("First selection").unwrap())
+            .unwrap();
+        let second = queue
+            .push(SelectedText::new("Second selection").unwrap())
+            .unwrap();
+        let third = queue
+            .push(SelectedText::new("Play this one now").unwrap())
+            .unwrap();
+
+        assert_eq!(queue.start(third).map(|item| item.id), Some(third));
+
+        assert_eq!(
+            queue.items().iter().map(|item| item.id).collect::<Vec<_>>(),
+            vec![third, first, second]
+        );
+        assert_eq!(queue.items()[0].state, QueueItemState::Preparing);
     }
 
     #[test]

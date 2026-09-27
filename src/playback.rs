@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Condvar, Mutex},
+    time::Duration,
+};
 
 use thiserror::Error;
 
@@ -34,6 +37,12 @@ struct PlaybackControlState {
     phase: PlaybackPhase,
 }
 
+#[derive(Debug, Default)]
+struct PlaybackControl {
+    state: Mutex<PlaybackControlState>,
+    changed: Condvar,
+}
+
 impl Default for PlaybackControlState {
     fn default() -> Self {
         Self {
@@ -51,22 +60,31 @@ impl Default for PlaybackControlState {
 /// the platform adapter.
 #[derive(Clone, Debug, Default)]
 pub struct PlaybackController {
-    state: Arc<Mutex<PlaybackControlState>>,
+    control: Arc<PlaybackControl>,
 }
 
 impl PlaybackController {
     pub fn register(&self, token: PlaybackToken) -> bool {
-        let mut state = self.state.lock().expect("playback control was poisoned");
+        let mut state = self
+            .control
+            .state
+            .lock()
+            .expect("playback control was poisoned");
         if state.token.is_some() {
             return false;
         }
         state.token = Some(token);
         state.phase = PlaybackPhase::Idle;
+        self.control.changed.notify_all();
         true
     }
 
     pub fn begin_session(&self, token: PlaybackToken) -> Result<(), PlaybackStopped> {
-        let mut state = self.state.lock().expect("playback control was poisoned");
+        let mut state = self
+            .control
+            .state
+            .lock()
+            .expect("playback control was poisoned");
         if state.token.is_none() {
             state.token = Some(token);
         }
@@ -74,16 +92,22 @@ impl PlaybackController {
             return Err(PlaybackStopped);
         }
         state.phase = PlaybackPhase::Preparing;
+        self.control.changed.notify_all();
         Ok(())
     }
 
     pub fn begin_playback(&self) -> Result<(), PlaybackStopped> {
-        let mut state = self.state.lock().expect("playback control was poisoned");
+        let mut state = self
+            .control
+            .state
+            .lock()
+            .expect("playback control was poisoned");
         if state.phase == PlaybackPhase::Cancelled {
             return Err(PlaybackStopped);
         }
         if state.phase != PlaybackPhase::Paused {
             state.phase = PlaybackPhase::Playing;
+            self.control.changed.notify_all();
         }
         Ok(())
     }
@@ -97,34 +121,74 @@ impl PlaybackController {
     }
 
     pub fn cancel(&self, token: PlaybackToken) -> bool {
-        let mut state = self.state.lock().expect("playback control was poisoned");
+        let mut state = self
+            .control
+            .state
+            .lock()
+            .expect("playback control was poisoned");
         if state.token != Some(token) || state.phase == PlaybackPhase::Cancelled {
             return false;
         }
         state.phase = PlaybackPhase::Cancelled;
+        self.control.changed.notify_all();
         true
     }
 
     pub fn finish_session(&self, token: PlaybackToken) {
-        let mut state = self.state.lock().expect("playback control was poisoned");
+        let mut state = self
+            .control
+            .state
+            .lock()
+            .expect("playback control was poisoned");
         if state.token == Some(token) {
             *state = PlaybackControlState::default();
+            self.control.changed.notify_all();
         }
     }
 
     pub fn phase(&self) -> PlaybackPhase {
-        self.state
+        self.control
+            .state
             .lock()
             .expect("playback control was poisoned")
             .phase
     }
 
+    /// Waits until playback control changes, or until the visual sampling
+    /// interval expires. Audio adapters use this instead of sleeping so pause,
+    /// resume, and cancellation reach the system player without polling lag.
+    pub fn wait_for_phase_change(
+        &self,
+        observed: PlaybackPhase,
+        timeout: Duration,
+    ) -> PlaybackPhase {
+        let state = self
+            .control
+            .state
+            .lock()
+            .expect("playback control was poisoned");
+        if state.phase != observed {
+            return state.phase;
+        }
+        let (state, _) = self
+            .control
+            .changed
+            .wait_timeout_while(state, timeout, |state| state.phase == observed)
+            .expect("playback control was poisoned while waiting");
+        state.phase
+    }
+
     fn transition(&self, token: PlaybackToken, from: PlaybackPhase, to: PlaybackPhase) -> bool {
-        let mut state = self.state.lock().expect("playback control was poisoned");
+        let mut state = self
+            .control
+            .state
+            .lock()
+            .expect("playback control was poisoned");
         if state.token != Some(token) || state.phase != from {
             return false;
         }
         state.phase = to;
+        self.control.changed.notify_all();
         true
     }
 }

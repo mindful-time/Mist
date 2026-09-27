@@ -49,7 +49,6 @@ const PANEL_WINDOW: Vec2 = Vec2::new(600.0, 680.0);
 enum ViewportMode {
     Mist,
     Speaking,
-    Queue { speaking: bool, rows: u8 },
     ContextMenu,
     Panel,
 }
@@ -59,34 +58,13 @@ impl ViewportMode {
         match self {
             Self::Mist => MIST_WINDOW,
             Self::Speaking => SPEAKING_MIST_WINDOW,
-            Self::Queue { speaking, rows } => {
-                let mist_height = if speaking {
-                    SPEAKING_MIST_WINDOW.y
-                } else {
-                    MIST_WINDOW.y
-                };
-                Vec2::new(
-                    QUEUE_WINDOW_WIDTH,
-                    mist_height + queue_tray::height(usize::from(rows)),
-                )
-            }
             Self::ContextMenu => CONTEXT_MENU_WINDOW,
             Self::Panel => PANEL_WINDOW,
         }
     }
 
     fn mist_center(self) -> Vec2 {
-        match self {
-            Self::Queue { speaking, .. } => Vec2::new(
-                QUEUE_WINDOW_WIDTH * 0.5,
-                if speaking {
-                    SPEAKING_MIST_WINDOW.y * 0.5
-                } else {
-                    MIST_WINDOW.y * 0.5
-                },
-            ),
-            _ => self.size() * 0.5,
-        }
+        self.size() * 0.5
     }
 }
 
@@ -107,6 +85,7 @@ pub struct PetApp {
     panel_open: bool,
     viewport_mode: ViewportMode,
     mist_screen_center: Option<Pos2>,
+    queue_screen_position: Option<Pos2>,
     speech_queue: SpeechQueue,
     clipboard_leases: HashMap<QueueItemId, ClipboardLease>,
     deferred_clipboard_cleanup: Vec<ClipboardLease>,
@@ -156,6 +135,7 @@ impl PetApp {
             panel_open,
             viewport_mode: ViewportMode::Mist,
             mist_screen_center: None,
+            queue_screen_position: None,
             speech_queue: SpeechQueue::default(),
             clipboard_leases: HashMap::new(),
             deferred_clipboard_cleanup: Vec::new(),
@@ -547,7 +527,7 @@ impl PetApp {
         ui: &mut egui::Ui,
         time: f32,
         presentation: presentation::MistPresentation,
-    ) -> (bool, QueueTrayResponse) {
+    ) -> bool {
         let context = ui.ctx().clone();
         let mist_size = if presentation.activity == presentation::MistActivity::Speaking {
             SPEAKING_MIST_WINDOW
@@ -562,23 +542,67 @@ impl PetApp {
         self.mist
             .paint(ui, rect, time, presentation, profile.palette, seed);
 
-        let queue_response = if self.speech_queue.items().is_empty() {
-            QueueTrayResponse::default()
-        } else {
-            queue_tray::show(
-                ui,
-                self.speech_queue.items(),
-                rect.bottom() + queue_tray::TOP_GAP,
-                profile.palette,
-                self.playback_preferences.auto_play_queue,
-            )
-        };
-
-        if response.drag_started() || queue_response.drag_started {
+        if response.drag_started() {
             context.send_viewport_cmd(egui::ViewportCommand::StartDrag);
         }
         response.context_menu(|ui| self.context_menu(ui, &context));
-        (response.context_menu_opened(), queue_response)
+        response.context_menu_opened()
+    }
+
+    fn paint_queue_window(&mut self, context: &egui::Context) -> QueueTrayResponse {
+        if self.speech_queue.items().is_empty() {
+            return QueueTrayResponse::default();
+        }
+
+        let viewport_id = queue_viewport_id();
+        if let Some(position) = context.input(|input| {
+            input
+                .raw
+                .viewports
+                .get(&viewport_id)
+                .and_then(|viewport| viewport.outer_rect)
+                .map(|rect| rect.min)
+        }) {
+            self.queue_screen_position = Some(position);
+        }
+
+        let size = queue_window_size(self.speech_queue.items().len());
+        let position = self.queue_screen_position.or_else(|| {
+            context.input(|input| {
+                input
+                    .viewport()
+                    .outer_rect
+                    .map(|root| queue_position_below(root, size))
+            })
+        });
+        self.queue_screen_position = position;
+
+        let mut builder = egui::ViewportBuilder::default()
+            .with_title("Mist queue")
+            .with_inner_size(size)
+            .with_min_inner_size(size)
+            .with_max_inner_size(size)
+            .with_resizable(false)
+            .with_decorations(false)
+            .with_transparent(true)
+            .with_has_shadow(false)
+            .with_taskbar(false)
+            .with_always_on_top();
+        if let Some(position) = position {
+            builder = builder.with_position(position);
+        }
+
+        let items = self.speech_queue.items().to_vec();
+        let selected = self.selected_voice.voice_id.as_str();
+        let palette = voice_profile(selected).unwrap_or(&VOICE_CATALOG[0]).palette;
+        let auto_play = self.playback_preferences.auto_play_queue;
+        context.show_viewport_immediate(viewport_id, builder, move |ui, _class| {
+            let response = queue_tray::show(ui, &items, queue_tray::TOP_GAP, palette, auto_play);
+            if response.drag_started {
+                ui.ctx().send_viewport_cmd(egui::ViewportCommand::StartDrag);
+            }
+            response
+        })
     }
 
     fn paint_panel(
@@ -896,12 +920,13 @@ impl eframe::App for PetApp {
             );
         let time = context.input(|input| input.time as f32);
         let presentation = self.mist_smoother.update(presentation, time);
-        let (context_menu_visible, queue_response) = if panel_visible {
+        let context_menu_visible = if panel_visible {
             self.paint_panel(ui, time, presentation);
-            (false, QueueTrayResponse::default())
+            false
         } else {
             self.paint_mist_only(ui, time, presentation)
         };
+        let queue_response = self.paint_queue_window(&context);
         if let Some(action) = queue_response.action {
             self.handle_queue_action(action);
         }
@@ -909,7 +934,6 @@ impl eframe::App for PetApp {
             panel_visible,
             context_menu_visible,
             presentation.activity == presentation::MistActivity::Speaking,
-            self.speech_queue.items().len(),
         );
         self.sync_window_size(&context, mode);
     }
@@ -937,26 +961,31 @@ fn selected_voice_index(selected: &str) -> usize {
         .unwrap_or(0)
 }
 
-fn viewport_mode(
-    panel_visible: bool,
-    context_menu_visible: bool,
-    speaking: bool,
-    queued_items: usize,
-) -> ViewportMode {
+fn viewport_mode(panel_visible: bool, context_menu_visible: bool, speaking: bool) -> ViewportMode {
     if panel_visible {
         ViewportMode::Panel
     } else if context_menu_visible {
         ViewportMode::ContextMenu
-    } else if queued_items > 0 {
-        ViewportMode::Queue {
-            speaking,
-            rows: u8::try_from(queue_tray::visible_rows(queued_items)).unwrap_or(u8::MAX),
-        }
     } else if speaking {
         ViewportMode::Speaking
     } else {
         ViewportMode::Mist
     }
+}
+
+fn queue_viewport_id() -> egui::ViewportId {
+    egui::ViewportId::from_hash_of("mist-queue")
+}
+
+fn queue_window_size(item_count: usize) -> Vec2 {
+    Vec2::new(QUEUE_WINDOW_WIDTH, queue_tray::height(item_count))
+}
+
+fn queue_position_below(root: Rect, queue_size: Vec2) -> Pos2 {
+    Pos2::new(
+        root.center().x - queue_size.x * 0.5,
+        root.bottom() + queue_tray::TOP_GAP,
+    )
 }
 
 fn required_panel_visible(requires_panel: bool, voices_ready: bool, queued_items: usize) -> bool {
@@ -1171,33 +1200,26 @@ mod tests {
 
     #[test]
     fn settings_panel_wins_over_context_menu_viewport_size() {
-        assert_eq!(viewport_mode(true, true, true, 2), ViewportMode::Panel);
-        assert_eq!(
-            viewport_mode(false, true, true, 2),
-            ViewportMode::ContextMenu
-        );
-        assert_eq!(viewport_mode(false, false, false, 0), ViewportMode::Mist);
+        assert_eq!(viewport_mode(true, true, true), ViewportMode::Panel);
+        assert_eq!(viewport_mode(false, true, true), ViewportMode::ContextMenu);
+        assert_eq!(viewport_mode(false, false, false), ViewportMode::Mist);
     }
 
     #[test]
     fn speaking_grows_then_returns_to_compact_mist() {
-        assert_eq!(viewport_mode(false, false, true, 0), ViewportMode::Speaking);
-        assert_eq!(viewport_mode(false, false, false, 0), ViewportMode::Mist);
+        assert_eq!(viewport_mode(false, false, true), ViewportMode::Speaking);
+        assert_eq!(viewport_mode(false, false, false), ViewportMode::Mist);
         assert!(ViewportMode::Speaking.size().x > ViewportMode::Mist.size().x);
     }
 
     #[test]
-    fn queued_items_expand_only_below_the_mist() {
-        let mode = viewport_mode(false, false, false, 2);
-        assert_eq!(
-            mode,
-            ViewportMode::Queue {
-                speaking: false,
-                rows: 2
-            }
-        );
-        assert_eq!(mode.mist_center().y, MIST_WINDOW.y * 0.5);
-        assert!(mode.size().y > MIST_WINDOW.y);
+    fn queue_does_not_expand_or_drag_the_mist_surface() {
+        let mode = viewport_mode(false, false, false);
+        let queue = queue_window_size(1);
+        assert_eq!(mode, ViewportMode::Mist);
+        assert_eq!(mode.size(), MIST_WINDOW);
+        assert_eq!(queue.x, QUEUE_WINDOW_WIDTH);
+        assert_eq!(queue.y, queue_tray::height(1));
     }
 
     #[test]

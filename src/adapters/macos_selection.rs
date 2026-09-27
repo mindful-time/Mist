@@ -75,7 +75,7 @@ pub fn is_accessibility_trusted() -> bool {
 
 /// Reads the selected text from the currently focused macOS accessibility
 /// element without touching the user's clipboard.
-pub fn capture_selected_text() -> anyhow::Result<SelectedText> {
+pub fn capture_selected_text(frontmost_pid: i32) -> anyhow::Result<SelectedText> {
     if !is_accessibility_trusted() {
         return Err(SelectionCaptureError::PermissionRequired.into());
     }
@@ -83,16 +83,26 @@ pub fn capture_selected_text() -> anyhow::Result<SelectedText> {
     // SAFETY: The create function returns an owned Core Foundation object.
     let system_wide =
         unsafe { CFType::wrap_under_create_rule(AXUIElementCreateSystemWide().cast::<c_void>()) };
-    if let Some(focused) = optional_focused_element(&system_wide)? {
-        ensure_not_protected(&focused)?;
-        if let Some(selection) = selected_text_from_focus_chain(&focused)? {
-            return Ok(selection);
+    match optional_focused_element(&system_wide) {
+        Ok(Some(focused)) => {
+            ensure_not_protected(&focused)?;
+            if let Some(selection) = selected_text_from_focus_chain(&focused)? {
+                return Ok(selection);
+            }
         }
+        Ok(None) => {}
+        // Electron apps can omit the system-wide focused element until their
+        // app-specific accessibility tree is activated. Retry through that
+        // stronger native handle before considering clipboard fallback.
+        Err(error) if should_retry_accessibility_route(&error) => {}
+        Err(error) => return Err(error),
     }
-    let application =
-        frontmost_application_element().context("could not inspect the focused application")?;
-    if let Some(selection) = selected_text_from_application(&application)? {
-        return Ok(selection);
+    let application = application_element(frontmost_pid);
+    match selected_text_from_application(&application) {
+        Ok(Some(selection)) => return Ok(selection),
+        Ok(None) => {}
+        Err(error) if should_retry_accessibility_route(&error) => {}
+        Err(error) => return Err(error),
     }
     if enable_manual_accessibility(&application) {
         std::thread::sleep(std::time::Duration::from_millis(80));
@@ -103,12 +113,14 @@ pub fn capture_selected_text() -> anyhow::Result<SelectedText> {
     Err(SelectionCaptureError::NoSelection.into())
 }
 
-fn frontmost_application_element() -> anyhow::Result<CFType> {
+/// Captures the frontmost process identity before selection work moves to its
+/// background thread. `NSWorkspace` reaches AppKit/HIToolbox state that macOS
+/// requires callers to access from the main UI thread.
+pub fn frontmost_application_pid() -> anyhow::Result<i32> {
     let application = NSWorkspace::sharedWorkspace()
         .frontmostApplication()
         .context("macOS did not report a frontmost application")?;
-    let pid = application.processIdentifier();
-    Ok(application_element(pid))
+    Ok(application.processIdentifier())
 }
 
 fn application_element(pid: i32) -> CFType {
@@ -344,6 +356,13 @@ fn attribute_unavailable(error: &anyhow::Error) -> bool {
     )
 }
 
+fn should_retry_accessibility_route(error: &anyhow::Error) -> bool {
+    matches!(
+        error.downcast_ref::<SelectionCaptureError>(),
+        Some(SelectionCaptureError::ProtectionUnknown)
+    )
+}
+
 fn accessibility_error(error: AXError) -> String {
     match error {
         AX_ERROR_API_DISABLED => {
@@ -377,5 +396,18 @@ mod tests {
         );
 
         assert_eq!(selection.as_deref(), Some("🌫"));
+    }
+
+    #[test]
+    fn uncertain_system_focus_retries_through_the_frontmost_application() {
+        assert!(should_retry_accessibility_route(
+            &SelectionCaptureError::ProtectionUnknown.into()
+        ));
+        assert!(!should_retry_accessibility_route(
+            &SelectionCaptureError::PermissionRequired.into()
+        ));
+        assert!(!should_retry_accessibility_route(
+            &SelectionCaptureError::ProtectedContent.into()
+        ));
     }
 }

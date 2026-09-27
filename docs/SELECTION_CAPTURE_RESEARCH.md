@@ -123,6 +123,12 @@ state
 The installed, signed bundle identity and path need to remain stable so the TCC
 grant remains understandable to the user.
 
+`NSWorkspace.frontmostApplication` must be resolved on the macOS UI thread
+before capture is dispatched. Calling it from Mist's background selection
+worker reaches HIToolbox input-source state and macOS terminates the process
+with a dispatch-queue assertion. The worker receives only the captured PID and
+uses `AXUIElementCreateApplication(pid)` from there.
+
 ### Chromium, Electron, and helper processes
 
 Chromium's renderer processes send accessibility data to the browser process,
@@ -138,7 +144,8 @@ Therefore:
   navigations, and are not the native accessibility root Chromium promises.
 - If an Electron target has no web accessibility tree, set
   `AXManualAccessibility=true` on the **Electron application** AX element, then
-  retry after the tree has had time to appear. Electron documents this exact
+  retry even when the first focused-element lookup was inconclusive, after the
+  tree has had time to appear. Electron documents this exact
   third-party activation mechanism
   ([Electron accessibility guide](https://www.electronjs.org/docs/latest/tutorial/accessibility)).
 - Treat failure to set that attribute as “unsupported by this target/version,”
@@ -400,6 +407,12 @@ interfaces they define
 
 At every rank, stop and report protected content rather than proceeding to a
 weaker mechanism.
+
+Mist's optional automatic macOS Copy fallback posts the fixed physical
+Command-C chord with CoreGraphics. It deliberately does not use a keyboard
+layout helper from the background capture worker: those helpers can enter
+main-thread-only HIToolbox state. Clipboard change-token and fingerprint checks
+still guard cleanup as described below.
 
 ### Why “save clipboard, press Copy, restore clipboard” is not acceptable
 

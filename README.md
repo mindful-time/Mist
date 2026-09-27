@@ -19,13 +19,16 @@ Windows/Linux system tray; setup and recoverable errors open a focused panel
 only when needed.
 
 Every captured selection appears in a compact Spotlight-style pill beneath the
-mist. Drag the pill to move the whole floating surface; its separate round
+mist in its own transparent always-on-top queue window. Drag the pill to move
+the queue independently while the mist remains in place; its separate round
 control pauses or resumes active speech and plays waiting items, while the ×
 control deletes that exact item. Deleting active speech stops its platform
-audio session before the next item starts. New items play automatically by
-default; turn off **Play new queue items automatically** to start each item
-yourself. Completed items disappear. When Mist used automatic Copy, it clears
-that temporary clipboard value after
+audio session before the next item starts. Choosing any waiting item moves it
+to the top before playback. Pause, resume, and delete wake the platform audio
+adapter immediately instead of waiting for the visual sampling interval. New
+items play automatically by default; turn off **Play new queue items
+automatically** to start each item yourself. Completed items disappear. When
+Mist used automatic Copy, it clears that temporary clipboard value after
 playback only if it still matches. macOS and Windows also require the clipboard
 change token to match; Linux uses a content fingerprint. Operating systems do
 not provide Mist with one portable atomic compare-and-clear operation, so this
@@ -90,6 +93,10 @@ Accessibility**, select text in a supported application, and press
 **Ctrl+Space**. Mist uses that permission for a narrow keyboard event tap that
 recognizes and consumes only Control-Space; this works even when macOS reserves
 the same chord for input-source switching, and it does not inspect typed text.
+Electron/Chromium applications such as Codex receive a second native capture
+attempt after Mist activates their accessibility tree. If a verified,
+non-protected target still does not expose selected text, the default-on
+Command-C fallback feeds the selection into the same visible queue.
 
 The native Service remains available for applications that support it. If it is
 hidden, enable it in **System Settings → Keyboard → Keyboard Shortcuts →

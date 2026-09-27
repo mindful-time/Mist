@@ -1,6 +1,7 @@
 use std::{thread, time::Duration};
 
 use anyhow::{Context, bail};
+#[cfg(not(target_os = "macos"))]
 use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 use sha2::{Digest, Sha256};
 
@@ -108,12 +109,39 @@ fn read_clipboard_text() -> anyhow::Result<String> {
         .context("the clipboard does not contain text")
 }
 
+#[cfg(target_os = "macos")]
+fn send_copy_shortcut() -> anyhow::Result<()> {
+    use core_graphics::{
+        event::{CGEvent, CGEventFlags, CGEventTapLocation, KeyCode},
+        event_source::{CGEventSource, CGEventSourceStateID},
+    };
+
+    let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState)
+        .map_err(|()| anyhow::anyhow!("could not create the macOS Copy event source"))?;
+    let command_down = CGEvent::new_keyboard_event(source.clone(), KeyCode::COMMAND, true)
+        .map_err(|()| anyhow::anyhow!("could not create Command-down"))?;
+    let copy_down = CGEvent::new_keyboard_event(source.clone(), KeyCode::ANSI_C, true)
+        .map_err(|()| anyhow::anyhow!("could not create C-down"))?;
+    let copy_up = CGEvent::new_keyboard_event(source.clone(), KeyCode::ANSI_C, false)
+        .map_err(|()| anyhow::anyhow!("could not create C-up"))?;
+    let command_up = CGEvent::new_keyboard_event(source, KeyCode::COMMAND, false)
+        .map_err(|()| anyhow::anyhow!("could not create Command-up"))?;
+
+    command_down.set_flags(CGEventFlags::CGEventFlagCommand);
+    copy_down.set_flags(CGEventFlags::CGEventFlagCommand);
+    copy_up.set_flags(CGEventFlags::CGEventFlagCommand);
+    command_up.set_flags(CGEventFlags::empty());
+    command_down.post(CGEventTapLocation::HID);
+    copy_down.post(CGEventTapLocation::HID);
+    copy_up.post(CGEventTapLocation::HID);
+    command_up.post(CGEventTapLocation::HID);
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
 fn send_copy_shortcut() -> anyhow::Result<()> {
     let mut enigo = Enigo::new(&Settings::default())
         .context("could not connect to the system input service")?;
-    #[cfg(target_os = "macos")]
-    let modifier = Key::Meta;
-    #[cfg(not(target_os = "macos"))]
     let modifier = Key::Control;
 
     enigo

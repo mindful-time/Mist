@@ -12,7 +12,10 @@ text-to-speech model.
   supported app, then press Ctrl+Space**.
 - macOS reads the focused accessibility element. The user is prompted once for
   Accessibility permission. The native AppKit Service remains available as an
-  additional action in applications that expose macOS Services.
+  additional action in applications that expose macOS Services. When an
+  Electron/Chromium app does not initially expose its focused element, Mist
+  activates that app's accessibility tree and retries before classifying the
+  result for automatic Copy fallback.
 - Windows reads the focused control through Microsoft UI Automation.
 - Linux X11 reads PRIMARY selection and registers the shortcut through X11.
 - Linux Wayland asks the compositor for a shortcut through the XDG
@@ -43,17 +46,21 @@ text-to-speech model.
   floating desktop surface. Voice choices behave as one exclusive group, so
   selecting one voice can never leave a second voice marked as selected.
 - Captured text appears in a compact floating bubble queue directly beneath the
-  mist. The queue is bounded, shows only short previews, and expands downward
-  so the mist keeps its desktop position. Each row is a small frosted pill with
-  separate circular playback and delete controls. Dragging the pill moves the
-  whole floating surface without stealing control clicks.
+  mist in a separate transparent, always-on-top viewport. The queue is bounded,
+  shows only short previews, and expands downward without resizing or moving
+  the mist viewport. Each row is a small frosted pill with separate circular
+  playback and delete controls. Dragging the pill moves only the queue window
+  without stealing control clicks.
 - Queue playback is automatic by default. A persisted setting switches to
-  click-to-play without changing queue order. Successful playback removes the
-  item; failed items remain available for an explicit retry. Active playback
-  can be paused and resumed. Deleting a waiting item removes only that item;
-  deleting the active item stops its system player, releases any temporary
-  clipboard lease, and waits for the worker cancellation acknowledgement
-  before starting the next item.
+  click-to-play. Choosing any waiting or failed item moves it to the top before
+  playback while preserving the relative order of the remaining items.
+  Successful playback removes the item; failed items remain available for an
+  explicit retry. Active playback can be paused and resumed; pause, resume, and
+  cancellation wake the system-player adapter immediately rather than waiting
+  for the visual sampling interval. Deleting a waiting item removes only that
+  item; deleting the active item stops its system player, releases any
+  temporary clipboard lease, and waits for the worker cancellation
+  acknowledgement before starting the next item.
 - Direct OS selection capture runs first. A persisted, default-on setting may
   send the platform Copy shortcut only when direct capture fails. Mist clears
   that temporary clipboard value after playback only when both its content and
@@ -103,6 +110,9 @@ text-to-speech model.
   preservation guarantees the OS does not provide.
 - Slow model loading, synthesis, download, and playback must not block the pet's
   UI event loop.
+- On macOS the frontmost application PID is captured on the UI thread before
+  selection work moves to its worker. The worker must not call AppKit or
+  HIToolbox; automatic Command-C uses CoreGraphics events directly.
 - Playback control uses an out-of-band, token-scoped application handle because
   synchronous platform playback blocks the speech worker. OS process pause and
   termination remain inside the audio adapter.
