@@ -50,6 +50,7 @@ tray-icon = { version = "0.25.1", default-features = false, features = ["ksni"] 
 kokoro-micro = { version = "=1.3.0", default-features = false, features = ["cuda"] }
 
 [dev-dependencies]
+skrifa = "0.44.0"
 tempfile = "3.23"
 
 [profile.release]

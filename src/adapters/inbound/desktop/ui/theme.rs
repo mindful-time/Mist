@@ -36,6 +36,26 @@ pub(super) fn configure_interface(context: &egui::Context) {
 }
 
 fn install_system_font(context: &egui::Context) {
+    let loaded = load_system_fonts();
+    if loaded.is_empty() {
+        return;
+    }
+
+    let mut fonts = FontDefinitions::default();
+    let mut names = Vec::with_capacity(loaded.len());
+    for (name, data) in loaded {
+        fonts.font_data.insert(name.clone(), Arc::new(data));
+        names.push(name);
+    }
+    fonts
+        .families
+        .entry(FontFamily::Proportional)
+        .or_default()
+        .splice(0..0, names);
+    context.set_fonts(fonts);
+}
+
+fn load_system_fonts() -> Vec<(String, FontData)> {
     #[cfg(target_os = "macos")]
     let candidates = [
         ("system-ui", "/System/Library/Fonts/SFNS.ttf"),
@@ -74,31 +94,20 @@ fn install_system_font(context: &egui::Context) {
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     let candidates: [(&str, &str); 0] = [];
 
-    let mut fonts = FontDefinitions::default();
-    let mut loaded = Vec::new();
-    for (name, path) in candidates {
-        let Ok(bytes) = fs::read(path) else {
-            continue;
-        };
-        let name = name.to_owned();
-        fonts
-            .font_data
-            .insert(name.clone(), Arc::new(FontData::from_owned(bytes)));
-        loaded.push(name);
-    }
-    if !loaded.is_empty() {
-        fonts
-            .families
-            .entry(FontFamily::Proportional)
-            .or_default()
-            .splice(0..0, loaded);
-        context.set_fonts(fonts);
-    }
+    candidates
+        .into_iter()
+        .filter_map(|(name, path)| {
+            fs::read(path)
+                .ok()
+                .map(|bytes| (name.to_owned(), FontData::from_owned(bytes)))
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use eframe::egui::{FontFamily, FontId, RawInput};
+    use eframe::egui::RawInput;
+    use skrifa::{FontRef, MetadataProvider};
 
     use super::*;
 
@@ -108,17 +117,25 @@ mod tests {
         configure_interface(&context);
         context.begin_pass(RawInput::default());
 
-        let font = FontId::new(16.0, FontFamily::Proportional);
+        let system_fonts = load_system_fonts();
+        assert!(!system_fonts.is_empty(), "no supported system fonts found");
         for sample in [
             "Mist speaks clearly",
             "ミストが話します",
             "薄雾会说话",
             "मिस्ट बोलता है",
         ] {
-            assert!(
-                context.fonts_mut(|fonts| fonts.has_glyphs(&font, sample)),
-                "configured UI fonts do not cover {sample:?}"
-            );
+            for character in sample
+                .chars()
+                .filter(|character| !character.is_whitespace())
+            {
+                let covered = system_fonts.iter().any(|(_, data)| {
+                    FontRef::from_index(data.font.as_ref(), data.index)
+                        .ok()
+                        .is_some_and(|font| font.charmap().map(character).is_some())
+                });
+                assert!(covered, "configured UI fonts do not cover {character:?}");
+            }
         }
 
         let mut output = context.end_pass();
