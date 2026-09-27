@@ -11,6 +11,7 @@ use crate::{
         kokoro::KokoroSynthesizer, system_audio::SystemAudioPlayer,
         voice_preferences::VoicePreferencesStore,
     },
+    application::VOICE_PREVIEW_TEXT,
     domain::{AudioFeatures, SelectedText},
     model_store::ModelStore,
 };
@@ -20,6 +21,7 @@ pub enum WorkerCommand {
     Speak(SelectedText),
     InstallModel,
     SelectVoice(VoiceSettings),
+    PreviewVoice(VoiceSettings),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -99,14 +101,20 @@ fn run(
                 result
             }
             WorkerCommand::SelectVoice(voice) => {
-                let result = preferences.save(&voice);
-                if result.is_ok() {
-                    selected_voice = voice;
-                    if let Some(session) = session.as_mut() {
-                        session.speaker.set_voice(selected_voice.clone());
-                    }
+                select_voice(voice, &preferences, &mut selected_voice, &mut session)
+            }
+            WorkerCommand::PreviewVoice(voice) => {
+                let result = select_voice(
+                    voice.clone(),
+                    &preferences,
+                    &mut selected_voice,
+                    &mut session,
+                );
+                if result.is_err() || !model_ready {
+                    result
+                } else {
+                    preview_voice(voice, &store, &statuses, &mut session)
                 }
-                result
             }
             WorkerCommand::Speak(text) => {
                 if !model_ready {
@@ -131,6 +139,20 @@ fn run(
     }
 }
 
+fn select_voice(
+    voice: VoiceSettings,
+    preferences: &VoicePreferencesStore,
+    selected_voice: &mut VoiceSettings,
+    session: &mut Option<SpeechSession>,
+) -> Result<()> {
+    preferences.save(&voice)?;
+    *selected_voice = voice;
+    if let Some(session) = session.as_mut() {
+        session.speaker.set_voice(selected_voice.clone());
+    }
+    Ok(())
+}
+
 fn install_model(store: &ModelStore, statuses: &Sender<AppStatus>) -> Result<()> {
     send_status(statuses, AppStatus::Downloading);
     InstallModel::new(store.clone())
@@ -145,22 +167,49 @@ fn speak(
     statuses: &Sender<AppStatus>,
     session: &mut Option<SpeechSession>,
 ) -> Result<()> {
-    if session.is_none() {
-        send_status(statuses, AppStatus::Loading);
-        let synthesizer = KokoroSynthesizer::load(&store.model_path(), &store.voices_path())?;
-        let inference_policy = synthesizer.inference_policy_label().to_owned();
-        let audio_cache = store.root().join("audio-cache");
-        let player = SystemAudioPlayer::new(&audio_cache)?;
-        *session = Some(SpeechSession {
-            speaker: SpeakSelection::new(synthesizer, player, selected_voice.clone()),
-            inference_policy,
-        });
-    }
-
-    let session = session
-        .as_mut()
-        .context("speech engine was not initialized")?;
     let preview = text.preview(32);
+    run_speech(
+        preview,
+        selected_voice,
+        store,
+        statuses,
+        session,
+        move |speaker, on_playback| speaker.execute_with_playback_cues(text, on_playback),
+    )
+}
+
+fn preview_voice(
+    voice: VoiceSettings,
+    store: &ModelStore,
+    statuses: &Sender<AppStatus>,
+    session: &mut Option<SpeechSession>,
+) -> Result<()> {
+    let preview = SelectedText::new(VOICE_PREVIEW_TEXT)
+        .expect("the built-in voice preview copy must remain valid")
+        .preview(32);
+    let session_voice = voice.clone();
+    run_speech(
+        preview,
+        &session_voice,
+        store,
+        statuses,
+        session,
+        move |speaker, on_playback| speaker.preview_voice_with_playback_cues(voice, on_playback),
+    )
+}
+
+fn run_speech(
+    preview: String,
+    voice: &VoiceSettings,
+    store: &ModelStore,
+    statuses: &Sender<AppStatus>,
+    session: &mut Option<SpeechSession>,
+    execute: impl FnOnce(
+        &mut SpeakSelection<KokoroSynthesizer, SystemAudioPlayer>,
+        &mut dyn FnMut(AudioFeatures),
+    ) -> Result<()>,
+) -> Result<()> {
+    let session = ensure_session(voice, store, statuses, session)?;
     let inference_policy = session.inference_policy.clone();
     send_status(
         statuses,
@@ -169,18 +218,39 @@ fn speak(
             inference_policy: inference_policy.clone(),
         },
     );
+    execute(&mut session.speaker, &mut |features| {
+        send_status(
+            statuses,
+            AppStatus::Speaking {
+                text: preview.clone(),
+                inference_policy: inference_policy.clone(),
+                features,
+            },
+        );
+    })
+}
+
+fn ensure_session<'a>(
+    voice: &VoiceSettings,
+    store: &ModelStore,
+    statuses: &Sender<AppStatus>,
+    session: &'a mut Option<SpeechSession>,
+) -> Result<&'a mut SpeechSession> {
+    if session.is_none() {
+        send_status(statuses, AppStatus::Loading);
+        let synthesizer = KokoroSynthesizer::load(&store.model_path(), &store.voices_path())?;
+        let inference_policy = synthesizer.inference_policy_label().to_owned();
+        let audio_cache = store.root().join("audio-cache");
+        let player = SystemAudioPlayer::new(&audio_cache)?;
+        *session = Some(SpeechSession {
+            speaker: SpeakSelection::new(synthesizer, player, voice.clone()),
+            inference_policy,
+        });
+    }
+
     session
-        .speaker
-        .execute_with_playback_cues(text, |features| {
-            send_status(
-                statuses,
-                AppStatus::Speaking {
-                    text: preview.clone(),
-                    inference_policy: inference_policy.clone(),
-                    features,
-                },
-            );
-        })
+        .as_mut()
+        .context("speech engine was not initialized")
 }
 
 fn send_status(statuses: &Sender<AppStatus>, status: AppStatus) {
@@ -222,5 +292,22 @@ mod tests {
             .unwrap();
 
         assert_eq!(handle.statuses.recv().unwrap(), AppStatus::MissingModel);
+    }
+
+    #[test]
+    fn previewing_before_setup_selects_the_clicked_voice() {
+        let temporary = tempfile::tempdir().unwrap();
+        let store = ModelStore::at(temporary.path());
+        let handle = spawn(store.clone());
+        assert_eq!(handle.statuses.recv().unwrap(), AppStatus::MissingModel);
+
+        let voice = VoiceSettings::from_voice_id("bm_daniel").unwrap();
+        handle
+            .commands
+            .send(WorkerCommand::PreviewVoice(voice.clone()))
+            .unwrap();
+
+        assert_eq!(handle.statuses.recv().unwrap(), AppStatus::MissingModel);
+        assert_eq!(VoicePreferencesStore::at(store.root()).load(), voice);
     }
 }

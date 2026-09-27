@@ -3,6 +3,8 @@ use crate::{
     ports::{AudioPlayer, ModelProvisioner, SpeechSynthesizer},
 };
 
+pub const VOICE_PREVIEW_TEXT: &str = "Hello. This is how I'll bring your selected words to life.";
+
 /// Application use-case. It knows nothing about AppKit, Kokoro, or system audio.
 pub struct SpeakSelection<S, P> {
     synthesizer: S,
@@ -50,6 +52,19 @@ where
 
     pub fn set_voice(&mut self, voice: VoiceSettings) {
         self.voice = voice;
+    }
+
+    /// Plays the short catalog sample with the voice the user just activated.
+    /// This is a separate application action from speaking an OS text selection.
+    pub fn preview_voice_with_playback_cues(
+        &mut self,
+        voice: VoiceSettings,
+        on_playback: impl FnMut(AudioFeatures),
+    ) -> anyhow::Result<()> {
+        self.set_voice(voice);
+        let sample = SelectedText::new(VOICE_PREVIEW_TEXT)
+            .expect("the built-in voice preview copy must remain valid");
+        self.execute_with_playback_cues(sample, on_playback)
     }
 
     pub fn execute_with_playback_started(
@@ -302,6 +317,46 @@ mod tests {
             .unwrap();
 
         assert_eq!(&*voices.lock().unwrap(), &["bf_emma"]);
+    }
+
+    #[test]
+    fn voice_preview_uses_the_clicked_voice_and_preview_copy() {
+        struct PreviewRecorder(Arc<Mutex<Vec<(String, String)>>>);
+
+        impl SpeechSynthesizer for PreviewRecorder {
+            fn synthesize(
+                &mut self,
+                text: &SelectedText,
+                voice: &VoiceSettings,
+            ) -> anyhow::Result<Audio> {
+                self.0
+                    .lock()
+                    .unwrap()
+                    .push((text.as_str().to_owned(), voice.voice_id.as_str().to_owned()));
+                Ok(Audio::kokoro(vec![0.2]))
+            }
+        }
+
+        let previews = Arc::new(Mutex::new(Vec::new()));
+        let mut use_case = SpeakSelection::new(
+            PreviewRecorder(previews.clone()),
+            FakePlayer {
+                sample_counts: Arc::new(Mutex::new(Vec::new())),
+            },
+            VoiceSettings::default(),
+        );
+
+        use_case
+            .preview_voice_with_playback_cues(
+                VoiceSettings::from_voice_id("bm_daniel").unwrap(),
+                |_| {},
+            )
+            .unwrap();
+
+        assert_eq!(
+            &*previews.lock().unwrap(),
+            &[(VOICE_PREVIEW_TEXT.to_owned(), "bm_daniel".to_owned())]
+        );
     }
 
     #[test]

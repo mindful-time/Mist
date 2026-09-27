@@ -41,6 +41,10 @@ text-to-speech model.
 - The default voice is `af_heart` at normal speed. Onboarding presents the
   supported voice catalog as visual mist choices, and the selected voice is
   persisted in the platform application-data directory.
+- Activating a voice card selects that voice and immediately streams a short
+  local preview through the same Kokoro and system-audio path used for selected
+  text. While a preview or selection is speaking, additional card activations
+  are disabled so stale previews do not queue behind it.
 - Changing voice affects subsequent speech without restarting the app.
 - Long selections are synthesized and played as ordered sentence chunks. The
   UI distinguishes generation of the first chunk from audible playback.
@@ -75,6 +79,8 @@ text-to-speech model.
 - After onboarding, the floating surface renders only mist. The tray/menu-bar
   menu can reopen voice settings, and setup or error panels remain keyboard and
   screen-reader legible.
+- Every voice card exposes a keyboard-focusable “Preview and select” action,
+  includes a visible play cue, and routes the exact card voice to Kokoro.
 - Playback-synchronised, time-windowed loudness and brightness reach
   presentation state only after the platform audio player has actually
   started.

@@ -45,6 +45,8 @@ pub struct PetApp {
     tray_error: Option<String>,
     last_platform_error: Option<String>,
     selected_voice: VoiceSettings,
+    voices_ready: bool,
+    voice_preview: VoicePreviewActivity,
     panel_open: bool,
     panel_visible_last_frame: bool,
     #[cfg(any(target_os = "windows", target_os = "linux"))]
@@ -78,6 +80,8 @@ impl PetApp {
             tray_error,
             last_platform_error,
             selected_voice,
+            voices_ready: false,
+            voice_preview: VoicePreviewActivity::Idle,
             panel_open,
             panel_visible_last_frame: false,
             #[cfg(any(target_os = "windows", target_os = "linux"))]
@@ -96,6 +100,12 @@ impl PetApp {
     }
 
     fn set_status(&mut self, status: AppStatus) {
+        match status {
+            AppStatus::Ready => self.voices_ready = true,
+            AppStatus::MissingModel | AppStatus::Downloading => self.voices_ready = false,
+            _ => {}
+        }
+        self.voice_preview = self.voice_preview.after_status(&status);
         let lifecycle_changed =
             std::mem::discriminant(&self.status) != std::mem::discriminant(&status);
         if matches!(status, AppStatus::MissingModel | AppStatus::Error(_)) {
@@ -149,12 +159,34 @@ impl PetApp {
             self.set_error(format!("Unknown Kokoro voice: {voice_id}"));
             return;
         };
-        if self.enqueue(WorkerCommand::SelectVoice(settings.clone())) {
-            self.selected_voice = settings;
-            if let Some(tray) = &self.tray {
-                tray.select_voice(voice_id);
-            }
+        self.enqueue_voice_command(settings.clone(), WorkerCommand::SelectVoice(settings));
+    }
+
+    fn preview_voice(&mut self, voice_id: &str) {
+        if self.voice_preview != VoicePreviewActivity::Idle || !self.voices_ready {
+            return;
         }
+        let (settings, command) = match voice_preview_command(voice_id) {
+            Ok(command) => command,
+            Err(error) => {
+                self.set_error(error);
+                return;
+            }
+        };
+        if self.enqueue_voice_command(settings, command) {
+            self.voice_preview = VoicePreviewActivity::Pending;
+        }
+    }
+
+    fn enqueue_voice_command(&mut self, settings: VoiceSettings, command: WorkerCommand) -> bool {
+        if !self.enqueue(command) {
+            return false;
+        }
+        if let Some(tray) = &self.tray {
+            tray.select_voice(settings.voice_id.as_str());
+        }
+        self.selected_voice = settings;
+        true
     }
 
     fn perform_action(&mut self, action: PrimaryAction) {
@@ -330,15 +362,17 @@ impl PetApp {
             context.send_viewport_cmd(egui::ViewportCommand::StartDrag);
         }
 
+        let gallery_mode = gallery_mode(&self.status, self.voices_ready, self.voice_preview);
         let gallery = voice_gallery::show(
             ui,
             &self.mist,
             outer,
             time,
             self.selected_voice.voice_id.as_str(),
+            gallery_mode,
         );
-        if let Some(voice) = gallery.selected_voice {
-            self.select_voice(voice);
+        if let Some(voice) = gallery.preview_voice {
+            self.preview_voice(voice);
         }
 
         let footer_top = gallery.bottom;
@@ -513,4 +547,98 @@ fn selected_voice_index(selected: &str) -> usize {
         .iter()
         .position(|voice| voice.id == selected)
         .unwrap_or(0)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum VoicePreviewActivity {
+    Idle,
+    Pending,
+    Active,
+}
+
+impl VoicePreviewActivity {
+    fn after_status(self, status: &AppStatus) -> Self {
+        match (self, status) {
+            (
+                Self::Pending,
+                AppStatus::Loading | AppStatus::Synthesizing { .. } | AppStatus::Speaking { .. },
+            ) => Self::Active,
+            (Self::Active, AppStatus::Ready | AppStatus::MissingModel | AppStatus::Error(_))
+            | (Self::Pending, AppStatus::MissingModel | AppStatus::Error(_)) => Self::Idle,
+            (activity, _) => activity,
+        }
+    }
+}
+
+fn gallery_mode(
+    status: &AppStatus,
+    voices_ready: bool,
+    preview: VoicePreviewActivity,
+) -> voice_gallery::GalleryMode {
+    if preview != VoicePreviewActivity::Idle {
+        return voice_gallery::GalleryMode::Busy;
+    }
+    match status {
+        AppStatus::CheckingModel => voice_gallery::GalleryMode::Checking,
+        AppStatus::MissingModel | AppStatus::Downloading => {
+            voice_gallery::GalleryMode::DownloadRequired
+        }
+        AppStatus::Loading | AppStatus::Synthesizing { .. } | AppStatus::Speaking { .. } => {
+            voice_gallery::GalleryMode::Busy
+        }
+        AppStatus::Ready | AppStatus::Error(_) if voices_ready => {
+            voice_gallery::GalleryMode::Available
+        }
+        AppStatus::Ready | AppStatus::Error(_) => voice_gallery::GalleryMode::DownloadRequired,
+    }
+}
+
+fn voice_preview_command(voice_id: &str) -> Result<(VoiceSettings, WorkerCommand), String> {
+    let settings = VoiceSettings::from_voice_id(voice_id)
+        .ok_or_else(|| format!("Unknown Kokoro voice: {voice_id}"))?;
+    Ok((settings.clone(), WorkerCommand::PreviewVoice(settings)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn voice_card_action_dispatches_preview_for_the_exact_voice() {
+        let (settings, command) = voice_preview_command("bf_emma").unwrap();
+
+        assert_eq!(settings.voice_id.as_str(), "bf_emma");
+        let WorkerCommand::PreviewVoice(preview) = command else {
+            panic!("voice cards must dispatch the preview path");
+        };
+        assert_eq!(preview.voice_id.as_str(), "bf_emma");
+    }
+
+    #[test]
+    fn pending_preview_disables_cards_until_its_terminal_status() {
+        let pending = VoicePreviewActivity::Pending;
+
+        assert_eq!(
+            gallery_mode(&AppStatus::Ready, true, pending),
+            voice_gallery::GalleryMode::Busy
+        );
+        assert_eq!(pending.after_status(&AppStatus::Ready), pending);
+        let active = pending.after_status(&AppStatus::Synthesizing {
+            text: "preview".to_owned(),
+            inference_policy: "CPU".to_owned(),
+        });
+        assert_eq!(active, VoicePreviewActivity::Active);
+        assert_eq!(
+            active.after_status(&AppStatus::Ready),
+            VoicePreviewActivity::Idle
+        );
+    }
+
+    #[test]
+    fn voice_cards_require_downloaded_model_artifacts() {
+        assert_eq!(
+            gallery_mode(&AppStatus::MissingModel, false, VoicePreviewActivity::Idle,),
+            voice_gallery::GalleryMode::DownloadRequired
+        );
+    }
 }

@@ -3,7 +3,7 @@ use std::{fs, sync::Arc};
 use eframe::egui::{self, Color32, FontData, FontDefinitions, FontFamily, Vec2};
 
 pub(super) const PANEL_BACKGROUND: Color32 = Color32::from_rgba_premultiplied(14, 16, 23, 248);
-pub(super) const PANEL_SURFACE: Color32 = Color32::from_rgba_premultiplied(255, 255, 255, 7);
+pub(super) const PANEL_SURFACE: Color32 = Color32::from_rgba_premultiplied(7, 7, 7, 7);
 pub(super) const TEXT_PRIMARY: Color32 = Color32::from_rgb(245, 246, 250);
 pub(super) const TEXT_SECONDARY: Color32 = Color32::from_rgb(169, 175, 193);
 pub(super) const TEXT_MUTED: Color32 = Color32::from_rgb(119, 126, 146);

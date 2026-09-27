@@ -1,5 +1,6 @@
 use eframe::egui::{
-    Align2, Button, Color32, FontId, Pos2, Rect, RichText, Stroke, StrokeKind, Vec2,
+    Align2, Button, Color32, Direction, FontId, Layout, Pos2, Rect, RichText, Stroke, StrokeKind,
+    UiBuilder, Vec2,
 };
 use select_to_speak::VOICE_CATALOG;
 
@@ -9,8 +10,31 @@ use super::{
 };
 
 pub(super) struct GalleryResponse {
-    pub(super) selected_voice: Option<&'static str>,
+    pub(super) preview_voice: Option<&'static str>,
     pub(super) bottom: f32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum GalleryMode {
+    Checking,
+    DownloadRequired,
+    Available,
+    Busy,
+}
+
+impl GalleryMode {
+    fn interaction_enabled(self) -> bool {
+        self == Self::Available
+    }
+
+    fn hint(self) -> &'static str {
+        match self {
+            Self::Checking => "Checking voices…",
+            Self::DownloadRequired => "Download to preview",
+            Self::Available => "Click to preview · on-device",
+            Self::Busy => "Preview playing…",
+        }
+    }
 }
 
 pub(super) fn show(
@@ -19,7 +43,9 @@ pub(super) fn show(
     outer: Rect,
     time: f32,
     selected_voice: &str,
+    mode: GalleryMode,
 ) -> GalleryResponse {
+    let interaction_enabled = mode.interaction_enabled();
     let painter = ui.painter().clone();
     let section_y = outer.top() + 171.0;
     painter.text(
@@ -32,7 +58,7 @@ pub(super) fn show(
     painter.text(
         Pos2::new(outer.right() - 27.0, section_y),
         Align2::RIGHT_TOP,
-        "Kokoro · on-device",
+        mode.hint(),
         FontId::proportional(10.5),
         TEXT_MUTED,
     );
@@ -42,7 +68,7 @@ pub(super) fn show(
     let gap = 10.0;
     let card_width = (outer.width() - 48.0 - gap) * 0.5;
     let card_height = 78.0;
-    let mut selected_voice_event = None;
+    let mut preview_voice_event = None;
     for (index, voice) in VOICE_CATALOG.iter().enumerate() {
         let column = index % 2;
         let row = index / 2;
@@ -54,20 +80,29 @@ pub(super) fn show(
             Vec2::new(card_width, card_height),
         );
         let selected = selected_voice == voice.id;
-        let response = ui.put(
-            card,
-            Button::new(
-                RichText::new(format!(
-                    "Select {} voice, {}",
-                    voice.display_name, voice.character
-                ))
-                .color(Color32::TRANSPARENT),
+        let response = ui
+            .scope_builder(
+                UiBuilder::new()
+                    .max_rect(card)
+                    .layout(Layout::centered_and_justified(Direction::TopDown)),
+                |ui| {
+                    ui.add_enabled(
+                        interaction_enabled,
+                        Button::new(
+                            RichText::new(format!(
+                                "Preview and select {} voice, {}",
+                                voice.display_name, voice.character
+                            ))
+                            .color(Color32::TRANSPARENT),
+                        )
+                        .fill(Color32::TRANSPARENT)
+                        .stroke(Stroke::NONE)
+                        .corner_radius(17.0),
+                    )
+                },
             )
-            .fill(Color32::TRANSPARENT)
-            .stroke(Stroke::NONE)
-            .corner_radius(17.0),
-        );
-        let hovered = response.hovered();
+            .inner;
+        let hovered = interaction_enabled && response.hovered();
         let focused = response.has_focus();
         painter.rect_filled(
             card,
@@ -114,20 +149,36 @@ pub(super) fn show(
             FontId::proportional(11.0),
             TEXT_SECONDARY,
         );
-        if selected {
-            painter.circle_filled(
-                Pos2::new(card.right() - 18.0, card.top() + 18.0),
-                3.5,
-                palette_color(voice.palette.primary),
-            );
-        }
-        if response.clicked() {
-            selected_voice_event = Some(voice.id);
+        let play_center = Pos2::new(card.right() - 20.0, card.center().y);
+        painter.circle_filled(
+            play_center,
+            10.0,
+            if selected {
+                with_alpha(palette_color(voice.palette.primary), 185)
+            } else {
+                Color32::from_white_alpha(if hovered { 28 } else { 14 })
+            },
+        );
+        painter.add(eframe::egui::Shape::convex_polygon(
+            vec![
+                play_center + Vec2::new(-2.0, -4.0),
+                play_center + Vec2::new(4.0, 0.0),
+                play_center + Vec2::new(-2.0, 4.0),
+            ],
+            if interaction_enabled {
+                TEXT_PRIMARY
+            } else {
+                TEXT_MUTED
+            },
+            Stroke::NONE,
+        ));
+        if interaction_enabled && response.clicked() {
+            preview_voice_event = Some(voice.id);
         }
     }
 
     GalleryResponse {
-        selected_voice: selected_voice_event,
+        preview_voice: preview_voice_event,
         bottom: grid_top + 4.0 * (card_height + gap) + 2.0,
     }
 }
