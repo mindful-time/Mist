@@ -10,6 +10,7 @@ pub struct SpeakSelection<S, P> {
     synthesizer: S,
     player: P,
     voice: VoiceSettings,
+    streaming_playback: bool,
 }
 
 /// Application use-case for the explicit first-run model installation.
@@ -43,6 +44,7 @@ where
             synthesizer,
             player,
             voice,
+            streaming_playback: true,
         }
     }
 
@@ -52,6 +54,10 @@ where
 
     pub fn set_voice(&mut self, voice: VoiceSettings) {
         self.voice = voice;
+    }
+
+    pub fn set_streaming_playback(&mut self, enabled: bool) {
+        self.streaming_playback = enabled;
     }
 
     /// Plays the short catalog sample with the voice the user just activated.
@@ -88,14 +94,22 @@ where
         let player = &mut self.player;
         let mut emitted_audio = false;
 
-        self.synthesizer
-            .synthesize_streaming(&text, &self.voice, &mut |audio| {
-                if audio.samples.is_empty() {
-                    return Ok(());
-                }
+        if self.streaming_playback {
+            self.synthesizer
+                .synthesize_streaming(&text, &self.voice, &mut |audio| {
+                    if audio.samples.is_empty() {
+                        return Ok(());
+                    }
+                    emitted_audio = true;
+                    player.play(&audio, &mut on_playback)
+                })?;
+        } else {
+            let audio = self.synthesizer.synthesize(&text, &self.voice)?;
+            if !audio.samples.is_empty() {
                 emitted_audio = true;
-                player.play(&audio, &mut on_playback)
-            })?;
+                player.play(&audio, &mut on_playback)?;
+            }
+        }
 
         if !emitted_audio {
             anyhow::bail!("Kokoro produced no audio");
@@ -216,6 +230,27 @@ mod tests {
         assert_eq!(&*seen.lock().unwrap(), &["Read this"]);
         assert_eq!(&*sample_counts.lock().unwrap(), &[2, 1]);
         assert_eq!(playback_starts.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn complete_mode_plays_one_buffer_after_synthesis() {
+        let sample_counts = Arc::new(Mutex::new(Vec::new()));
+        let mut use_case = SpeakSelection::new(
+            FakeSynthesizer {
+                seen: Arc::new(Mutex::new(Vec::new())),
+            },
+            FakePlayer {
+                sample_counts: sample_counts.clone(),
+            },
+            VoiceSettings::default(),
+        );
+        use_case.set_streaming_playback(false);
+
+        use_case
+            .execute(SelectedText::new("Read after synthesis").unwrap())
+            .unwrap();
+
+        assert_eq!(&*sample_counts.lock().unwrap(), &[3]);
     }
 
     #[test]

@@ -19,15 +19,23 @@ impl PlaybackPreferencesStore {
             return PlaybackPreferences::default();
         };
         let mut lines = contents.lines();
-        match (
-            lines.next().and_then(parse_bool),
-            lines.next().and_then(parse_bool),
-        ) {
-            (Some(auto_play_queue), Some(automatic_clipboard_fallback)) => PlaybackPreferences {
-                auto_play_queue,
-                automatic_clipboard_fallback,
+        let Some(auto_play_queue) = lines.next().and_then(parse_bool) else {
+            return PlaybackPreferences::default();
+        };
+        let Some(automatic_clipboard_fallback) = lines.next().and_then(parse_bool) else {
+            return PlaybackPreferences::default();
+        };
+        let streaming_playback = match lines.next() {
+            Some(value) => match parse_bool(value) {
+                Some(value) => value,
+                None => return PlaybackPreferences::default(),
             },
-            _ => PlaybackPreferences::default(),
+            None => true,
+        };
+        PlaybackPreferences {
+            auto_play_queue,
+            automatic_clipboard_fallback,
+            streaming_playback,
         }
     }
 
@@ -39,8 +47,10 @@ impl PlaybackPreferencesStore {
         fs::write(
             &temporary,
             format!(
-                "{}\n{}\n",
-                preferences.auto_play_queue, preferences.automatic_clipboard_fallback
+                "{}\n{}\n{}\n",
+                preferences.auto_play_queue,
+                preferences.automatic_clipboard_fallback,
+                preferences.streaming_playback
             ),
         )
         .with_context(|| format!("could not write {}", temporary.display()))?;
@@ -79,6 +89,7 @@ mod tests {
         let preferences = PlaybackPreferences {
             auto_play_queue: false,
             automatic_clipboard_fallback: false,
+            streaming_playback: false,
         };
         store.save(preferences).unwrap();
 
@@ -86,5 +97,22 @@ mod tests {
 
         fs::write(store.path(), "maybe\nfalse\n").unwrap();
         assert_eq!(store.load(), PlaybackPreferences::default());
+    }
+
+    #[test]
+    fn legacy_preferences_gain_streaming_as_the_default() {
+        let temporary = tempfile::tempdir().unwrap();
+        let store = PlaybackPreferencesStore::at(temporary.path());
+
+        fs::write(store.path(), "false\nfalse\n").unwrap();
+
+        assert_eq!(
+            store.load(),
+            PlaybackPreferences {
+                auto_play_queue: false,
+                automatic_clipboard_fallback: false,
+                streaming_playback: true,
+            }
+        );
     }
 }

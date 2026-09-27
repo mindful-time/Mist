@@ -766,8 +766,28 @@ impl PetApp {
         .on_hover_text(
             "After speaking, Mist clears the copied value only if its fingerprint and available platform change token still match. This is best effort; disable it for clipboard-sensitive workflows.",
         );
+        ui.put(
+            Rect::from_min_size(
+                Pos2::new(outer.left() + 24.0, footer_top + 64.0),
+                Vec2::new(320.0, 24.0),
+            ),
+            egui::Checkbox::new(
+                &mut self.playback_preferences.streaming_playback,
+                "Stream speech as it is generated",
+            ),
+        )
+        .on_hover_text(
+            "Enabled by default so long selections begin speaking after the first Kokoro chunk is ready.",
+        );
         if self.playback_preferences != preferences_before {
+            let streaming_changed = self.playback_preferences.streaming_playback
+                != preferences_before.streaming_playback;
             self.persist_playback_preferences();
+            if streaming_changed {
+                self.enqueue(WorkerCommand::SetStreaming(
+                    self.playback_preferences.streaming_playback,
+                ));
+            }
         }
 
         let button = Rect::from_min_size(

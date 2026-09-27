@@ -88,6 +88,8 @@ text-to-speech model.
   settings.
 - Long selections are synthesized and played as ordered sentence chunks. The
   UI distinguishes generation of the first chunk from audible playback.
+  Streaming is enabled by default and exposed as a persisted playback setting;
+  disabling it buffers the full generated selection before audio starts.
 - Hardware selection is automatic through ONNX Runtime provider probing:
   CoreML then CPU on macOS; CUDA then DirectML then CPU on Windows; CUDA then
   CPU on Linux. The UI displays that fallback order without claiming that a
@@ -122,6 +124,9 @@ text-to-speech model.
 - Domain and application use-cases have unit tests with in-memory adapters.
 - The native target passes `cargo check`, `cargo test`, and clippy with warnings
   denied.
+- Repository hooks run formatting, check, strict Clippy, tests, OSV dependency
+  scanning, and staged-secret scanning before commits. The pre-push release
+  hook keeps the package and native bundle SemVer metadata synchronized.
 - A macOS `.app` bundle advertises the text Service through `Info.plist`.
 - The bundled mist texture is embedded in the executable so packaged builds
   cannot silently omit it.

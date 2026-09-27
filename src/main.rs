@@ -40,9 +40,13 @@ fn main() -> eframe::Result {
             PlaybackController::default(),
         )
         .expect("could not create the audio cache");
-        SpeakSelection::new(synthesizer, player, voice)
-            .execute(text)
-            .expect("could not speak the text");
+        let mut speaker = SpeakSelection::new(synthesizer, player, voice);
+        speaker.set_streaming_playback(
+            PlaybackPreferencesStore::at(store.root())
+                .load()
+                .streaming_playback,
+        );
+        speaker.execute(text).expect("could not speak the text");
         return Ok(());
     }
 

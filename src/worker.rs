@@ -9,8 +9,8 @@ use crate::{
     InstallModel, PlaybackController, PlaybackStopped, PlaybackToken, SpeakSelection,
     VoiceSettings,
     adapters::{
-        kokoro::KokoroSynthesizer, system_audio::SystemAudioPlayer,
-        voice_preferences::VoicePreferencesStore,
+        kokoro::KokoroSynthesizer, playback_preferences::PlaybackPreferencesStore,
+        system_audio::SystemAudioPlayer, voice_preferences::VoicePreferencesStore,
     },
     application::VOICE_PREVIEW_TEXT,
     domain::{AudioFeatures, SelectedText},
@@ -26,6 +26,7 @@ pub enum WorkerCommand {
     InstallModel,
     SelectVoice(VoiceSettings),
     PreviewVoice(VoiceSettings),
+    SetStreaming(bool),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -56,6 +57,7 @@ struct SpeechEnvironment<'a> {
     store: &'a ModelStore,
     statuses: &'a Sender<AppStatus>,
     playback: &'a PlaybackController,
+    streaming_playback: bool,
 }
 
 pub struct WorkerHandle {
@@ -70,6 +72,9 @@ pub fn spawn(store: ModelStore) -> WorkerHandle {
     let (status_tx, status_rx) = mpsc::channel();
 
     let preferences = VoicePreferencesStore::at(store.root());
+    let streaming_playback = PlaybackPreferencesStore::at(store.root())
+        .load()
+        .streaming_playback;
     let selected_voice = preferences.load();
     let worker_voice = selected_voice.clone();
     let playback = PlaybackController::default();
@@ -83,6 +88,7 @@ pub fn spawn(store: ModelStore) -> WorkerHandle {
                 store,
                 preferences,
                 worker_voice,
+                streaming_playback,
                 worker_playback,
             )
         })
@@ -102,6 +108,7 @@ fn run(
     store: ModelStore,
     preferences: VoicePreferencesStore,
     mut selected_voice: VoiceSettings,
+    mut streaming_playback: bool,
     playback: PlaybackController,
 ) {
     let mut session: Option<SpeechSession> = None;
@@ -137,8 +144,24 @@ fn run(
                 if result.is_err() || !model_ready {
                     result
                 } else {
-                    preview_voice(voice, &store, &statuses, &playback, &mut session)
+                    preview_voice(
+                        voice,
+                        SpeechEnvironment {
+                            store: &store,
+                            statuses: &statuses,
+                            playback: &playback,
+                            streaming_playback,
+                        },
+                        &mut session,
+                    )
                 }
+            }
+            WorkerCommand::SetStreaming(enabled) => {
+                streaming_playback = enabled;
+                if let Some(session) = session.as_mut() {
+                    session.speaker.set_streaming_playback(enabled);
+                }
+                Ok(())
             }
             WorkerCommand::Speak { token, text } => {
                 if !model_ready {
@@ -149,9 +172,12 @@ fn run(
                     token,
                     text,
                     &selected_voice,
-                    &store,
-                    &statuses,
-                    &playback,
+                    SpeechEnvironment {
+                        store: &store,
+                        statuses: &statuses,
+                        playback: &playback,
+                        streaming_playback,
+                    },
                     &mut session,
                 )
             }
@@ -196,17 +222,10 @@ fn speak(
     token: PlaybackToken,
     text: SelectedText,
     selected_voice: &VoiceSettings,
-    store: &ModelStore,
-    statuses: &Sender<AppStatus>,
-    playback: &PlaybackController,
+    environment: SpeechEnvironment<'_>,
     session: &mut Option<SpeechSession>,
 ) -> Result<()> {
     let preview = text.preview(32);
-    let environment = SpeechEnvironment {
-        store,
-        statuses,
-        playback,
-    };
     run_speech(
         preview,
         selected_voice,
@@ -219,20 +238,13 @@ fn speak(
 
 fn preview_voice(
     voice: VoiceSettings,
-    store: &ModelStore,
-    statuses: &Sender<AppStatus>,
-    playback: &PlaybackController,
+    environment: SpeechEnvironment<'_>,
     session: &mut Option<SpeechSession>,
 ) -> Result<()> {
     let preview = SelectedText::new(VOICE_PREVIEW_TEXT)
         .expect("the built-in voice preview copy must remain valid")
         .preview(32);
     let session_voice = voice.clone();
-    let environment = SpeechEnvironment {
-        store,
-        statuses,
-        playback,
-    };
     run_speech(
         preview,
         &session_voice,
@@ -265,6 +277,7 @@ fn run_speech(
             environment.store,
             environment.statuses,
             environment.playback,
+            environment.streaming_playback,
             session,
         )?;
         let inference_policy = session.inference_policy.clone();
@@ -298,6 +311,7 @@ fn ensure_session<'a>(
     store: &ModelStore,
     statuses: &Sender<AppStatus>,
     playback: &PlaybackController,
+    streaming_playback: bool,
     session: &'a mut Option<SpeechSession>,
 ) -> Result<&'a mut SpeechSession> {
     if session.is_none() {
@@ -306,8 +320,10 @@ fn ensure_session<'a>(
         let inference_policy = synthesizer.inference_policy_label().to_owned();
         let audio_cache = store.root().join("audio-cache");
         let player = SystemAudioPlayer::new(&audio_cache, playback.clone())?;
+        let mut speaker = SpeakSelection::new(synthesizer, player, voice.clone());
+        speaker.set_streaming_playback(streaming_playback);
         *session = Some(SpeechSession {
-            speaker: SpeakSelection::new(synthesizer, player, voice.clone()),
+            speaker,
             inference_policy,
         });
     }

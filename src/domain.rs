@@ -230,6 +230,7 @@ pub struct VoiceSettings {
 pub struct PlaybackPreferences {
     pub auto_play_queue: bool,
     pub automatic_clipboard_fallback: bool,
+    pub streaming_playback: bool,
 }
 
 impl Default for PlaybackPreferences {
@@ -237,6 +238,7 @@ impl Default for PlaybackPreferences {
         Self {
             auto_play_queue: true,
             automatic_clipboard_fallback: true,
+            streaming_playback: true,
         }
     }
 }

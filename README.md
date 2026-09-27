@@ -40,7 +40,9 @@ Speech is generated locally with
 [Kokoro-82M](https://huggingface.co/spaces/hexgrad/Kokoro-TTS); selected text is
 never sent to a server. Long selections are synthesized sentence by sentence,
 so playback starts after the first audio chunk instead of waiting for the whole
-selection.
+selection. Streaming is enabled by default and is persisted as a playback
+setting; disable **Stream speech as it is generated** only when whole-selection
+buffering is preferred.
 
 The first launch presents eight distinct voice mists and a **Download voices**
 action. That fetches the quantized Kokoro v1.0 ONNX model (~92 MB) plus the
@@ -59,6 +61,26 @@ make run
 ```
 
 Then choose a voice and click **Download voices** in onboarding.
+
+### Commit and release gates
+
+Install the repository-owned Git hooks once per clone:
+
+```sh
+make hooks
+```
+
+Every commit then runs Rust formatting, `cargo check`, strict Clippy, all tests,
+an OSV dependency scan, and a staged Gitleaks scan. Install
+[OSV-Scanner](https://google.github.io/osv-scanner/installation/) and
+[Gitleaks](https://github.com/gitleaks/gitleaks#installing) before committing.
+Run the same gate directly with `make quality`; run a full-history secret scan
+with `make security`.
+
+The pre-push release hook checks that `VERSION`, `Cargo.toml`, `Cargo.lock`, and
+the macOS bundle metadata resolve consistently. Mist is currently prepared as
+SemVer release `0.5.0`; future releases must bump the tracked version files
+together.
 
 ### macOS app bundle
 
@@ -201,7 +223,8 @@ macOS Accessibility + Service / Windows UIA / Linux selection
   adapter.
 - `adapters/clipboard_fallback.rs`: optional Copy fallback with fingerprint and
   platform-token-checked best-effort cleanup.
-- `adapters/playback_preferences.rs`: automatic-play and fallback settings.
+- `adapters/playback_preferences.rs`: automatic-play, clipboard fallback, and
+  streaming settings.
 - `ui/mist.rs`: the embedded, audio-reactive mist renderer.
 - `ui/tray.rs`: the cross-platform menu-bar/system-tray adapter.
 - `ui/voice_gallery.rs`: the accessible onboarding and settings voice gallery.
