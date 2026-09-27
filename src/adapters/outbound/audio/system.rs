@@ -3,12 +3,13 @@
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::{Child, Command, ExitStatus},
     time::{Duration, Instant},
 };
 
 #[cfg(target_os = "linux")]
 use std::io::ErrorKind;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+use std::process::{Child, Command, ExitStatus};
 
 use anyhow::{Context, Result, bail};
 
@@ -182,6 +183,7 @@ impl AudioPlayer for SystemAudioPlayer {
     }
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 fn monitor_playback(
     child: &mut Child,
     audio: &Audio,
@@ -243,6 +245,7 @@ fn monitor_playback(
     }
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 fn stop_child(child: &mut Child) {
     let _ = child.kill();
     let _ = child.wait();
