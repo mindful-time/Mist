@@ -48,7 +48,7 @@ pub(crate) const MIST_WINDOW: Vec2 = Vec2::new(164.0, 164.0);
 const SPEAKING_MIST_WINDOW: Vec2 = Vec2::new(232.0, 232.0);
 const QUEUE_WINDOW_WIDTH: f32 = 282.0;
 const CONTEXT_MENU_WINDOW: Vec2 = Vec2::new(280.0, 420.0);
-const PANEL_WINDOW: Vec2 = Vec2::new(720.0, 680.0);
+const PANEL_WINDOW: Vec2 = Vec2::new(860.0, 760.0);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ViewportMode {
@@ -826,15 +826,15 @@ impl PetApp {
             Pos2::new(outer.left() + 18.0, outer.top() + 178.0),
             Pos2::new(outer.right() - 18.0, outer.bottom() - 18.0),
         );
-        let sidebar = Rect::from_min_max(body.min, Pos2::new(body.left() + 148.0, body.bottom()));
+        let sidebar = Rect::from_min_max(body.min, Pos2::new(body.left() + 164.0, body.bottom()));
         let content = Rect::from_min_max(
-            Pos2::new(sidebar.right() + 26.0, body.top() + 4.0),
-            Pos2::new(body.right() - 6.0, body.bottom() - 4.0),
+            Pos2::new(sidebar.right() + 30.0, body.top() + 4.0),
+            Pos2::new(body.right() - 10.0, body.bottom() - 4.0),
         );
         painter.line_segment(
             [
-                Pos2::new(sidebar.right() + 12.0, body.top() + 4.0),
-                Pos2::new(sidebar.right() + 12.0, body.bottom() - 4.0),
+                Pos2::new(sidebar.right() + 14.0, body.top() + 4.0),
+                Pos2::new(sidebar.right() + 14.0, body.bottom() - 4.0),
             ],
             Stroke::new(1.0, Color32::from_white_alpha(15)),
         );
@@ -861,13 +861,21 @@ impl PetApp {
                             .expect("catalog is not empty")
                             .id
                     });
-                if let Some(language) = settings::voice_language(
+                let gallery = voice_gallery::show(
                     ui,
+                    &self.mist,
                     content,
-                    self.voice_catalog.as_ref(),
-                    language,
-                    accent,
-                ) {
+                    voice_gallery::GalleryContent {
+                        time,
+                        selected_voice: self.selected_voice.voice_id.as_str(),
+                        voices: self.voice_catalog.voices(),
+                        languages: self.voice_catalog.languages(),
+                        selected_language: language,
+                        mode: gallery_mode,
+                        accent,
+                    },
+                );
+                if let Some(language) = gallery.select_language {
                     match language_voice_id(self.voice_catalog.as_ref(), language) {
                         Ok(default_voice) => {
                             if should_preview_language(
@@ -882,33 +890,6 @@ impl PetApp {
                         Err(error) => self.set_error(error),
                     }
                 }
-                let language = self
-                    .voice_catalog
-                    .language_for(self.selected_voice.voice_id.as_str())
-                    .unwrap_or(language);
-                let language_name = self
-                    .voice_catalog
-                    .languages()
-                    .iter()
-                    .find(|profile| profile.id == language)
-                    .map(|profile| profile.display_name)
-                    .unwrap_or(language.as_str());
-                let gallery = voice_gallery::show(
-                    ui,
-                    &self.mist,
-                    Rect::from_min_max(
-                        Pos2::new(content.left(), content.top() + settings::VOICE_LIST_OFFSET),
-                        content.max,
-                    ),
-                    voice_gallery::GalleryContent {
-                        time,
-                        selected_voice: self.selected_voice.voice_id.as_str(),
-                        voices: self.voice_catalog.voices(),
-                        language,
-                        language_name,
-                        mode: gallery_mode,
-                    },
-                );
                 if let Some(voice) = gallery.select_voice {
                     self.preview_voice(&voice);
                 }

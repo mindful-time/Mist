@@ -90,7 +90,7 @@ fn main() -> eframe::Result {
             .with_title("Mist")
             .with_inner_size(ui::MIST_WINDOW)
             .with_min_inner_size(ui::MIST_WINDOW)
-            .with_max_inner_size([720.0, 680.0])
+            .with_max_inner_size([860.0, 760.0])
             .with_resizable(false)
             .with_decorations(false)
             .with_transparent(true)
