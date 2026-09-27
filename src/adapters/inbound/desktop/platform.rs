@@ -15,7 +15,6 @@ use crate::{
     },
     domain::{SelectedText, SelectionCaptureError},
 };
-use anyhow::Context;
 use std::sync::{
     Arc,
     atomic::{AtomicU8, Ordering},
@@ -27,7 +26,10 @@ const FALLBACK_CAPTURE_TIMEOUT: std::time::Duration = std::time::Duration::from_
 type CaptureMessage = (u64, Result<CapturedSelection, String>);
 
 #[derive(Clone, Copy, Debug)]
-struct SelectionTarget(Option<i32>);
+struct SelectionTarget {
+    #[cfg(target_os = "macos")]
+    pid: i32,
+}
 
 const CAPTURE_NATIVE: u8 = 0;
 const CAPTURE_FALLBACK: u8 = 1;
@@ -431,21 +433,18 @@ fn capture(request: CaptureRequest, control: &CaptureControl) -> anyhow::Result<
 #[cfg(target_os = "macos")]
 fn current_selection_target() -> Result<SelectionTarget, String> {
     frontmost_application_pid()
-        .map(|pid| SelectionTarget(Some(pid)))
+        .map(|pid| SelectionTarget { pid })
         .map_err(|error| format!("Could not identify the selected app: {error:#}"))
 }
 
 #[cfg(not(target_os = "macos"))]
 fn current_selection_target() -> Result<SelectionTarget, String> {
-    Ok(SelectionTarget(None))
+    Ok(SelectionTarget {})
 }
 
 #[cfg(target_os = "macos")]
 fn capture_native_selected_text(target: SelectionTarget) -> anyhow::Result<SelectedText> {
-    let pid = target
-        .0
-        .context("the macOS selection target has no process identifier")?;
-    crate::adapters::inbound::os::macos::selection::capture_selected_text(pid)
+    crate::adapters::inbound::os::macos::selection::capture_selected_text(target.pid)
 }
 
 #[cfg(target_os = "windows")]
@@ -465,6 +464,7 @@ fn allows_clipboard_fallback(error: &anyhow::Error) -> bool {
             SelectionCaptureError::PermissionRequired
                 | SelectionCaptureError::ProtectedContent
                 | SelectionCaptureError::ProtectionUnknown
+                | SelectionCaptureError::FocusChanged
                 | SelectionCaptureError::ShortcutConflict
                 | SelectionCaptureError::IntegrityBoundary
                 | SelectionCaptureError::PortalDenied
@@ -553,6 +553,9 @@ mod tests {
         ));
         assert!(!super::allows_clipboard_fallback(
             &SelectionCaptureError::PortalDenied.into()
+        ));
+        assert!(!super::allows_clipboard_fallback(
+            &SelectionCaptureError::FocusChanged.into()
         ));
     }
 

@@ -62,18 +62,14 @@ impl TrayAdapter {
             .context("could not complete the tray menu")?;
 
         let icon = mist_icon()?;
-        let mut builder = TrayIconBuilder::new()
+        let builder = TrayIconBuilder::new()
             .with_tooltip("Mist · local speech")
             .with_menu(Box::new(menu))
             .with_icon(icon);
         #[cfg(target_os = "macos")]
-        {
-            builder = builder.with_icon_as_template(true);
-        }
+        let builder = builder.with_icon_as_template(true);
         #[cfg(target_os = "windows")]
-        {
-            builder = builder.with_menu_on_left_click(false);
-        }
+        let builder = builder.with_menu_on_left_click(false);
         let icon = builder
             .build()
             .context("could not create the system tray icon")?;

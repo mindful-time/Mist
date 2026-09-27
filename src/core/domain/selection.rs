@@ -61,6 +61,8 @@ pub enum SelectionCaptureError {
     ProviderUnsupported,
     #[error("The focused application did not answer before the selection timeout")]
     ProviderTimeout,
+    #[error("Focus changed while Mist was reading the selection; try again")]
+    FocusChanged,
     #[error("The configured Speak shortcut is already in use")]
     ShortcutConflict,
     #[error("The focused application is outside Mist's accessibility integrity boundary")]

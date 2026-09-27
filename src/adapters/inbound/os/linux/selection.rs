@@ -67,9 +67,11 @@ fn capture_x11_selection() -> anyhow::Result<SelectedText> {
 }
 
 fn x11_selection_error(error: x11_clipboard::error::Error) -> anyhow::Error {
-    let capture_error = is_timeout(&error)
-        .then_some(SelectionCaptureError::ProviderTimeout)
-        .unwrap_or(SelectionCaptureError::ProviderUnsupported);
+    let capture_error = if is_timeout(&error) {
+        SelectionCaptureError::ProviderTimeout
+    } else {
+        SelectionCaptureError::ProviderUnsupported
+    };
     anyhow::Error::new(capture_error).context(format!(
         "the X11 primary selection does not contain supported text: {error}"
     ))
