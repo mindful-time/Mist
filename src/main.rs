@@ -3,25 +3,24 @@
     windows_subsystem = "windows"
 )]
 
-mod ui;
-
 fn main() -> eframe::Result {
     use std::{env, sync::Arc};
 
     use mist::{
         PlaybackController, SelectedText, SpeakSelection,
-        adapters::{
-            kokoro::{
-                KokoroEngineFactory, KokoroSynthesizer, configure_inference_provider,
-                provider_capabilities,
+        adapters::inbound::desktop::ui,
+        adapters::outbound::{
+            audio::system::SystemAudioPlayer,
+            persistence::{
+                inference::ModelPreferencesStore, playback::PlaybackPreferencesStore,
+                voice::VoicePreferencesStore,
             },
-            kokoro_catalog::KokoroVoiceCatalog,
-            model_preferences::ModelPreferencesStore,
-            playback_preferences::PlaybackPreferencesStore,
-            system_audio::SystemAudioPlayer,
-            voice_preferences::VoicePreferencesStore,
+            provisioning::kokoro::ModelStore,
+            speech::kokoro::{
+                KokoroEngineFactory, KokoroSynthesizer, catalog::KokoroVoiceCatalog,
+                configure_inference_provider, provider_capabilities,
+            },
         },
-        model_store::ModelStore,
         ports::VoiceCatalog,
         worker,
     };

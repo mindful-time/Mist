@@ -1,20 +1,19 @@
-pub mod clipboard_fallback;
-pub mod kokoro;
-pub mod kokoro_catalog;
-pub mod playback_preferences;
-pub mod system_audio;
-pub mod voice_preferences;
+//! Hexagonal adapters grouped by the direction in which they cross the core boundary.
 
-#[cfg(target_os = "linux")]
-pub mod linux_selection;
-#[cfg(target_os = "macos")]
-pub mod macos_selection;
-#[cfg(target_os = "macos")]
-pub mod macos_service;
-#[cfg(target_os = "macos")]
-pub mod macos_shortcut;
-pub mod model_preferences;
-#[cfg(target_os = "linux")]
-pub mod wayland_shortcut;
+pub mod inbound;
+pub mod outbound;
+
+// Stable compatibility paths for existing callers. New composition code should
+// prefer `adapters::inbound::*` and `adapters::outbound::*`.
 #[cfg(target_os = "windows")]
-pub mod windows_selection;
+pub use inbound::windows_selection;
+pub use inbound::{clipboard_fallback, platform};
+#[cfg(target_os = "linux")]
+pub use inbound::{linux_selection, wayland_shortcut};
+#[cfg(target_os = "macos")]
+pub use inbound::{macos_selection, macos_service, macos_shortcut};
+
+pub use outbound::{
+    kokoro, kokoro_catalog, model_preferences, model_store, playback_preferences, system_audio,
+    voice_preferences,
+};

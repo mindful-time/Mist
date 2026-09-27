@@ -1,11 +1,13 @@
 pub mod adapters;
-pub mod application;
-pub mod domain;
-pub mod model_store;
-pub mod platform;
-pub mod playback;
-pub mod ports;
-pub mod worker;
+pub mod core;
+pub mod runtime;
+
+// Stable compatibility paths for callers while the canonical ownership lives
+// under `core`.
+pub use adapters::model_store;
+pub use adapters::platform;
+pub use core::{application, domain, playback, ports};
+pub use runtime::worker;
 
 pub use application::{InstallModel, SpeakSelection};
 pub use domain::{

@@ -3,7 +3,7 @@
   "version": "0.5.0",
   "entries": [
     {
-      "file": "./src/adapters/clipboard_fallback.rs",
+      "file": "./src/adapters/inbound/selection/clipboard.rs",
       "function": "ClipboardLease::new",
       "line": 20,
       "cyclomatic": 1.0,
@@ -11,7 +11,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/clipboard_fallback.rs",
+      "file": "./src/adapters/inbound/selection/clipboard.rs",
       "function": "ClipboardLease::still_owns",
       "line": 27,
       "cyclomatic": 2.0,
@@ -19,7 +19,7 @@
       "crap": 2.0
     },
     {
-      "file": "./src/adapters/clipboard_fallback.rs",
+      "file": "./src/adapters/inbound/selection/clipboard.rs",
       "function": "ClipboardLease::version_matches",
       "line": 31,
       "cyclomatic": 1.0,
@@ -27,7 +27,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/clipboard_fallback.rs",
+      "file": "./src/adapters/inbound/selection/clipboard.rs",
       "function": "clear_if_owned",
       "line": 84,
       "cyclomatic": 7.0,
@@ -41,7 +41,7 @@
       ]
     },
     {
-      "file": "./src/adapters/clipboard_fallback.rs",
+      "file": "./src/adapters/inbound/selection/clipboard.rs",
       "function": "clipboard_version",
       "line": 162,
       "cyclomatic": 1.0,
@@ -55,7 +55,7 @@
       ]
     },
     {
-      "file": "./src/adapters/clipboard_fallback.rs",
+      "file": "./src/adapters/inbound/selection/clipboard.rs",
       "function": "clipboard_version",
       "line": 169,
       "cyclomatic": 1.0,
@@ -63,7 +63,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/clipboard_fallback.rs",
+      "file": "./src/adapters/inbound/selection/clipboard.rs",
       "function": "clipboard_version",
       "line": 181,
       "cyclomatic": 1.0,
@@ -71,7 +71,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/clipboard_fallback.rs",
+      "file": "./src/adapters/inbound/selection/clipboard.rs",
       "function": "copy_selected_text",
       "line": 46,
       "cyclomatic": 10.0,
@@ -85,7 +85,7 @@
       ]
     },
     {
-      "file": "./src/adapters/clipboard_fallback.rs",
+      "file": "./src/adapters/inbound/selection/clipboard.rs",
       "function": "fingerprint",
       "line": 157,
       "cyclomatic": 1.0,
@@ -93,7 +93,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/clipboard_fallback.rs",
+      "file": "./src/adapters/inbound/selection/clipboard.rs",
       "function": "read_clipboard_text",
       "line": 105,
       "cyclomatic": 2.0,
@@ -107,7 +107,7 @@
       ]
     },
     {
-      "file": "./src/adapters/clipboard_fallback.rs",
+      "file": "./src/adapters/inbound/selection/clipboard.rs",
       "function": "read_current_text",
       "line": 78,
       "cyclomatic": 2.0,
@@ -121,29 +121,29 @@
       ]
     },
     {
-      "file": "./src/adapters/clipboard_fallback.rs",
+      "file": "./src/adapters/inbound/selection/clipboard.rs",
       "function": "send_copy_shortcut",
-      "line": 113,
+      "line": 115,
       "cyclomatic": 6.0,
       "coverage": 0.0,
       "crap": 42.0,
       "uncovered": [
         {
-          "start": 113,
-          "end": 139
+          "start": 115,
+          "end": 141
         }
       ]
     },
     {
-      "file": "./src/adapters/clipboard_fallback.rs",
+      "file": "./src/adapters/inbound/selection/clipboard.rs",
       "function": "send_copy_shortcut",
-      "line": 142,
+      "line": 144,
       "cyclomatic": 5.0,
       "coverage": 100.0,
       "crap": 5.0
     },
     {
-      "file": "./src/adapters/kokoro.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/mod.rs",
       "function": "InferencePolicy::label",
       "line": 179,
       "cyclomatic": 5.0,
@@ -157,7 +157,7 @@
       ]
     },
     {
-      "file": "./src/adapters/kokoro.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/mod.rs",
       "function": "KokoroEngineFactory::load",
       "line": 46,
       "cyclomatic": 2.0,
@@ -171,7 +171,7 @@
       ]
     },
     {
-      "file": "./src/adapters/kokoro.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/mod.rs",
       "function": "KokoroEngineFactory::new",
       "line": 37,
       "cyclomatic": 1.0,
@@ -179,7 +179,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/kokoro.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/mod.rs",
       "function": "KokoroSynthesizer::inference_policy_label",
       "line": 213,
       "cyclomatic": 1.0,
@@ -193,7 +193,7 @@
       ]
     },
     {
-      "file": "./src/adapters/kokoro.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/mod.rs",
       "function": "KokoroSynthesizer::load",
       "line": 190,
       "cyclomatic": 3.0,
@@ -207,7 +207,7 @@
       ]
     },
     {
-      "file": "./src/adapters/kokoro.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/mod.rs",
       "function": "KokoroSynthesizer::synthesize",
       "line": 219,
       "cyclomatic": 2.0,
@@ -221,7 +221,7 @@
       ]
     },
     {
-      "file": "./src/adapters/kokoro.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/mod.rs",
       "function": "KokoroSynthesizer::synthesize_streaming",
       "line": 234,
       "cyclomatic": 2.0,
@@ -235,7 +235,7 @@
       ]
     },
     {
-      "file": "./src/adapters/kokoro.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/mod.rs",
       "function": "capabilities_for",
       "line": 87,
       "cyclomatic": 7.0,
@@ -253,7 +253,7 @@
       ]
     },
     {
-      "file": "./src/adapters/kokoro.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/mod.rs",
       "function": "configure_inference_provider",
       "line": 60,
       "cyclomatic": 5.0,
@@ -267,7 +267,7 @@
       ]
     },
     {
-      "file": "./src/adapters/kokoro.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/mod.rs",
       "function": "cuda_device_present",
       "line": 77,
       "cyclomatic": 2.0,
@@ -281,7 +281,7 @@
       ]
     },
     {
-      "file": "./src/adapters/kokoro.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/mod.rs",
       "function": "detect_inference_policy",
       "line": 323,
       "cyclomatic": 1.0,
@@ -295,7 +295,7 @@
       ]
     },
     {
-      "file": "./src/adapters/kokoro.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/mod.rs",
       "function": "policy_for",
       "line": 331,
       "cyclomatic": 6.0,
@@ -303,7 +303,7 @@
       "crap": 6.0
     },
     {
-      "file": "./src/adapters/kokoro.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/mod.rs",
       "function": "provider",
       "line": 154,
       "cyclomatic": 1.0,
@@ -311,7 +311,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/kokoro.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/mod.rs",
       "function": "provider_capabilities",
       "line": 56,
       "cyclomatic": 1.0,
@@ -325,7 +325,7 @@
       ]
     },
     {
-      "file": "./src/adapters/kokoro.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/mod.rs",
       "function": "requested_device",
       "line": 285,
       "cyclomatic": 5.0,
@@ -339,7 +339,7 @@
       ]
     },
     {
-      "file": "./src/adapters/kokoro.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/mod.rs",
       "function": "speech_chunks",
       "line": 298,
       "cyclomatic": 6.0,
@@ -353,7 +353,7 @@
       ]
     },
     {
-      "file": "./src/adapters/kokoro_catalog.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/catalog.rs",
       "function": "KokoroVoiceCatalog::default_voice_for",
       "line": 358,
       "cyclomatic": 11.0,
@@ -367,7 +367,7 @@
       ]
     },
     {
-      "file": "./src/adapters/kokoro_catalog.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/catalog.rs",
       "function": "KokoroVoiceCatalog::default_voice_id",
       "line": 354,
       "cyclomatic": 1.0,
@@ -375,7 +375,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/kokoro_catalog.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/catalog.rs",
       "function": "KokoroVoiceCatalog::languages",
       "line": 346,
       "cyclomatic": 1.0,
@@ -383,7 +383,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/kokoro_catalog.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/catalog.rs",
       "function": "KokoroVoiceCatalog::preview_text",
       "line": 373,
       "cyclomatic": 10.0,
@@ -397,7 +397,7 @@
       ]
     },
     {
-      "file": "./src/adapters/kokoro_catalog.rs",
+      "file": "./src/adapters/outbound/speech/kokoro/catalog.rs",
       "function": "KokoroVoiceCatalog::voices",
       "line": 350,
       "cyclomatic": 1.0,
@@ -405,7 +405,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/linux_selection.rs",
+      "file": "./src/adapters/inbound/os/linux/selection.rs",
       "function": "capture_selected_text",
       "line": 13,
       "cyclomatic": 2.0,
@@ -413,7 +413,7 @@
       "crap": 6.0
     },
     {
-      "file": "./src/adapters/linux_selection.rs",
+      "file": "./src/adapters/inbound/os/linux/selection.rs",
       "function": "capture_wayland_selection",
       "line": 21,
       "cyclomatic": 4.0,
@@ -421,7 +421,7 @@
       "crap": 20.0
     },
     {
-      "file": "./src/adapters/linux_selection.rs",
+      "file": "./src/adapters/inbound/os/linux/selection.rs",
       "function": "capture_x11_selection",
       "line": 35,
       "cyclomatic": 6.0,
@@ -429,7 +429,7 @@
       "crap": 42.0
     },
     {
-      "file": "./src/adapters/linux_selection.rs",
+      "file": "./src/adapters/inbound/os/linux/selection.rs",
       "function": "is_wayland_session",
       "line": 7,
       "cyclomatic": 1.0,
@@ -437,7 +437,7 @@
       "crap": 2.0
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "AccessibilityAttributeError::fmt",
       "line": 30,
       "cyclomatic": 1.0,
@@ -451,7 +451,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "accessibility_error",
       "line": 366,
       "cyclomatic": 4.0,
@@ -465,7 +465,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "application_element",
       "line": 126,
       "cyclomatic": 1.0,
@@ -479,7 +479,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "attribute_error_code",
       "line": 346,
       "cyclomatic": 1.0,
@@ -493,7 +493,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "attribute_unavailable",
       "line": 352,
       "cyclomatic": 1.0,
@@ -507,7 +507,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "capture_selected_text",
       "line": 78,
       "cyclomatic": 16.0,
@@ -521,7 +521,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "copy_attribute",
       "line": 323,
       "cyclomatic": 3.0,
@@ -535,7 +535,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "enable_manual_accessibility",
       "line": 132,
       "cyclomatic": 1.0,
@@ -549,7 +549,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "ensure_not_protected",
       "line": 259,
       "cyclomatic": 7.0,
@@ -563,7 +563,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "focused_element",
       "line": 243,
       "cyclomatic": 2.0,
@@ -577,7 +577,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "frontmost_application_pid",
       "line": 119,
       "cyclomatic": 2.0,
@@ -591,7 +591,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "is_accessibility_trusted",
       "line": 71,
       "cyclomatic": 1.0,
@@ -605,7 +605,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "optional_focused_element",
       "line": 248,
       "cyclomatic": 5.0,
@@ -619,7 +619,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "request_accessibility_permission",
       "line": 61,
       "cyclomatic": 1.0,
@@ -633,7 +633,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "selected_text",
       "line": 160,
       "cyclomatic": 4.0,
@@ -647,7 +647,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "selected_text_from_application",
       "line": 146,
       "cyclomatic": 8.0,
@@ -661,7 +661,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "selected_text_from_focus_chain",
       "line": 227,
       "cyclomatic": 5.0,
@@ -675,7 +675,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "selected_text_from_range",
       "line": 172,
       "cyclomatic": 4.0,
@@ -689,7 +689,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "selected_text_from_tree",
       "line": 219,
       "cyclomatic": 4.0,
@@ -703,7 +703,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "selected_text_in_descendants",
       "line": 285,
       "cyclomatic": 9.0,
@@ -717,7 +717,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "should_retry_accessibility_route",
       "line": 359,
       "cyclomatic": 1.0,
@@ -725,7 +725,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/macos_selection.rs",
+      "file": "./src/adapters/inbound/os/macos/selection.rs",
       "function": "utf16_range",
       "line": 211,
       "cyclomatic": 5.0,
@@ -733,7 +733,7 @@
       "crap": 5.0
     },
     {
-      "file": "./src/adapters/macos_service.rs",
+      "file": "./src/adapters/inbound/os/macos/service.rs",
       "function": "ServiceProvider::new",
       "line": 70,
       "cyclomatic": 1.0,
@@ -747,7 +747,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_service.rs",
+      "file": "./src/adapters/inbound/os/macos/service.rs",
       "function": "register",
       "line": 78,
       "cyclomatic": 1.0,
@@ -761,7 +761,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_service.rs",
+      "file": "./src/adapters/inbound/os/macos/service.rs",
       "function": "set_service_error",
       "line": 58,
       "cyclomatic": 2.0,
@@ -775,7 +775,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_shortcut.rs",
+      "file": "./src/adapters/inbound/os/macos/shortcut.rs",
       "function": "ShortcutState::finish_if_released",
       "line": 52,
       "cyclomatic": 5.0,
@@ -783,7 +783,7 @@
       "crap": 5.0
     },
     {
-      "file": "./src/adapters/macos_shortcut.rs",
+      "file": "./src/adapters/inbound/os/macos/shortcut.rs",
       "function": "ShortcutState::new",
       "line": 43,
       "cyclomatic": 1.0,
@@ -791,7 +791,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/macos_shortcut.rs",
+      "file": "./src/adapters/inbound/os/macos/shortcut.rs",
       "function": "ShortcutState::reenable_tap",
       "line": 66,
       "cyclomatic": 2.0,
@@ -805,7 +805,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_shortcut.rs",
+      "file": "./src/adapters/inbound/os/macos/shortcut.rs",
       "function": "is_control_space",
       "line": 173,
       "cyclomatic": 3.0,
@@ -813,7 +813,7 @@
       "crap": 3.0
     },
     {
-      "file": "./src/adapters/macos_shortcut.rs",
+      "file": "./src/adapters/inbound/os/macos/shortcut.rs",
       "function": "run",
       "line": 94,
       "cyclomatic": 5.0,
@@ -827,7 +827,7 @@
       ]
     },
     {
-      "file": "./src/adapters/macos_shortcut.rs",
+      "file": "./src/adapters/inbound/os/macos/shortcut.rs",
       "function": "spawn",
       "line": 85,
       "cyclomatic": 1.0,
@@ -841,7 +841,7 @@
       ]
     },
     {
-      "file": "./src/adapters/model_preferences.rs",
+      "file": "./src/adapters/outbound/persistence/inference.rs",
       "function": "ModelPreferencesStore::at",
       "line": 13,
       "cyclomatic": 1.0,
@@ -849,7 +849,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/model_preferences.rs",
+      "file": "./src/adapters/outbound/persistence/inference.rs",
       "function": "ModelPreferencesStore::load",
       "line": 17,
       "cyclomatic": 1.0,
@@ -857,7 +857,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/model_preferences.rs",
+      "file": "./src/adapters/outbound/persistence/inference.rs",
       "function": "ModelPreferencesStore::path",
       "line": 48,
       "cyclomatic": 1.0,
@@ -865,7 +865,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/model_preferences.rs",
+      "file": "./src/adapters/outbound/persistence/inference.rs",
       "function": "ModelPreferencesStore::save",
       "line": 33,
       "cyclomatic": 5.0,
@@ -879,7 +879,7 @@
       ]
     },
     {
-      "file": "./src/adapters/playback_preferences.rs",
+      "file": "./src/adapters/outbound/persistence/playback.rs",
       "function": "PlaybackPreferencesStore::at",
       "line": 13,
       "cyclomatic": 1.0,
@@ -887,7 +887,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/playback_preferences.rs",
+      "file": "./src/adapters/outbound/persistence/playback.rs",
       "function": "PlaybackPreferencesStore::load",
       "line": 17,
       "cyclomatic": 6.0,
@@ -909,7 +909,7 @@
       ]
     },
     {
-      "file": "./src/adapters/playback_preferences.rs",
+      "file": "./src/adapters/outbound/persistence/playback.rs",
       "function": "PlaybackPreferencesStore::path",
       "line": 73,
       "cyclomatic": 1.0,
@@ -917,7 +917,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/playback_preferences.rs",
+      "file": "./src/adapters/outbound/persistence/playback.rs",
       "function": "PlaybackPreferencesStore::save",
       "line": 49,
       "cyclomatic": 5.0,
@@ -931,7 +931,7 @@
       ]
     },
     {
-      "file": "./src/adapters/playback_preferences.rs",
+      "file": "./src/adapters/outbound/persistence/playback.rs",
       "function": "parse_bool",
       "line": 78,
       "cyclomatic": 4.0,
@@ -939,7 +939,7 @@
       "crap": 4.0
     },
     {
-      "file": "./src/adapters/system_audio.rs",
+      "file": "./src/adapters/outbound/audio/system.rs",
       "function": "MciSession::drop",
       "line": 433,
       "cyclomatic": 1.0,
@@ -947,7 +947,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/system_audio.rs",
+      "file": "./src/adapters/outbound/audio/system.rs",
       "function": "SystemAudioPlayer::new",
       "line": 27,
       "cyclomatic": 2.0,
@@ -961,7 +961,7 @@
       ]
     },
     {
-      "file": "./src/adapters/system_audio.rs",
+      "file": "./src/adapters/outbound/audio/system.rs",
       "function": "SystemAudioPlayer::play",
       "line": 163,
       "cyclomatic": 7.0,
@@ -975,7 +975,7 @@
       ]
     },
     {
-      "file": "./src/adapters/system_audio.rs",
+      "file": "./src/adapters/outbound/audio/system.rs",
       "function": "SystemAudioPlayer::play_file",
       "line": 67,
       "cyclomatic": 8.0,
@@ -983,7 +983,7 @@
       "crap": 8.0
     },
     {
-      "file": "./src/adapters/system_audio.rs",
+      "file": "./src/adapters/outbound/audio/system.rs",
       "function": "SystemAudioPlayer::play_windows",
       "line": 109,
       "cyclomatic": 16.0,
@@ -991,7 +991,7 @@
       "crap": 16.0
     },
     {
-      "file": "./src/adapters/system_audio.rs",
+      "file": "./src/adapters/outbound/audio/system.rs",
       "function": "SystemAudioPlayer::start_player",
       "line": 59,
       "cyclomatic": 1.0,
@@ -1005,7 +1005,7 @@
       ]
     },
     {
-      "file": "./src/adapters/system_audio.rs",
+      "file": "./src/adapters/outbound/audio/system.rs",
       "function": "SystemAudioPlayer::write_wav",
       "line": 40,
       "cyclomatic": 4.0,
@@ -1019,7 +1019,7 @@
       ]
     },
     {
-      "file": "./src/adapters/system_audio.rs",
+      "file": "./src/adapters/outbound/audio/system.rs",
       "function": "mci_command",
       "line": 386,
       "cyclomatic": 3.0,
@@ -1027,7 +1027,7 @@
       "crap": 3.0
     },
     {
-      "file": "./src/adapters/system_audio.rs",
+      "file": "./src/adapters/outbound/audio/system.rs",
       "function": "monitor_playback",
       "line": 183,
       "cyclomatic": 13.0,
@@ -1057,7 +1057,7 @@
       ]
     },
     {
-      "file": "./src/adapters/system_audio.rs",
+      "file": "./src/adapters/outbound/audio/system.rs",
       "function": "nul_position",
       "line": 421,
       "cyclomatic": 1.0,
@@ -1065,7 +1065,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/system_audio.rs",
+      "file": "./src/adapters/outbound/audio/system.rs",
       "function": "playback_error_was_stopped",
       "line": 378,
       "cyclomatic": 1.0,
@@ -1073,7 +1073,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/system_audio.rs",
+      "file": "./src/adapters/outbound/audio/system.rs",
       "function": "set_process_paused",
       "line": 250,
       "cyclomatic": 3.0,
@@ -1087,7 +1087,7 @@
       ]
     },
     {
-      "file": "./src/adapters/system_audio.rs",
+      "file": "./src/adapters/outbound/audio/system.rs",
       "function": "stop_child",
       "line": 244,
       "cyclomatic": 1.0,
@@ -1095,7 +1095,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/voice_preferences.rs",
+      "file": "./src/adapters/outbound/persistence/voice.rs",
       "function": "VoicePreferencesStore::at",
       "line": 15,
       "cyclomatic": 1.0,
@@ -1103,7 +1103,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/voice_preferences.rs",
+      "file": "./src/adapters/outbound/persistence/voice.rs",
       "function": "VoicePreferencesStore::load",
       "line": 19,
       "cyclomatic": 2.0,
@@ -1121,7 +1121,7 @@
       ]
     },
     {
-      "file": "./src/adapters/voice_preferences.rs",
+      "file": "./src/adapters/outbound/persistence/voice.rs",
       "function": "VoicePreferencesStore::path",
       "line": 58,
       "cyclomatic": 1.0,
@@ -1129,7 +1129,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/adapters/voice_preferences.rs",
+      "file": "./src/adapters/outbound/persistence/voice.rs",
       "function": "VoicePreferencesStore::save",
       "line": 37,
       "cyclomatic": 6.0,
@@ -1147,7 +1147,7 @@
       ]
     },
     {
-      "file": "./src/adapters/wayland_shortcut.rs",
+      "file": "./src/adapters/inbound/os/linux/shortcut.rs",
       "function": "run",
       "line": 41,
       "cyclomatic": 16.0,
@@ -1155,7 +1155,7 @@
       "crap": 272.0
     },
     {
-      "file": "./src/adapters/wayland_shortcut.rs",
+      "file": "./src/adapters/inbound/os/linux/shortcut.rs",
       "function": "spawn",
       "line": 16,
       "cyclomatic": 2.0,
@@ -1163,7 +1163,7 @@
       "crap": 6.0
     },
     {
-      "file": "./src/adapters/windows_selection.rs",
+      "file": "./src/adapters/inbound/os/windows/selection.rs",
       "function": "capture_selected_text",
       "line": 8,
       "cyclomatic": 11.0,
@@ -1171,7 +1171,7 @@
       "crap": 132.0
     },
     {
-      "file": "./src/adapters/windows_selection.rs",
+      "file": "./src/adapters/inbound/os/windows/selection.rs",
       "function": "selected_text_from",
       "line": 41,
       "cyclomatic": 7.0,
@@ -1179,7 +1179,7 @@
       "crap": 56.0
     },
     {
-      "file": "./src/application.rs",
+      "file": "./src/core/application/models.rs",
       "function": "InstallModel::execute",
       "line": 27,
       "cyclomatic": 3.0,
@@ -1187,7 +1187,7 @@
       "crap": 3.0
     },
     {
-      "file": "./src/application.rs",
+      "file": "./src/core/application/models.rs",
       "function": "InstallModel::new",
       "line": 23,
       "cyclomatic": 1.0,
@@ -1195,7 +1195,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/application.rs",
+      "file": "./src/core/application/speech.rs",
       "function": "SpeakSelection::execute",
       "line": 49,
       "cyclomatic": 1.0,
@@ -1203,7 +1203,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/application.rs",
+      "file": "./src/core/application/speech.rs",
       "function": "SpeakSelection::execute_with_playback_cues",
       "line": 86,
       "cyclomatic": 7.0,
@@ -1225,7 +1225,7 @@
       ]
     },
     {
-      "file": "./src/application.rs",
+      "file": "./src/core/application/speech.rs",
       "function": "SpeakSelection::execute_with_playback_started",
       "line": 73,
       "cyclomatic": 1.0,
@@ -1233,7 +1233,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/application.rs",
+      "file": "./src/core/application/speech.rs",
       "function": "SpeakSelection::new",
       "line": 40,
       "cyclomatic": 1.0,
@@ -1241,7 +1241,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/application.rs",
+      "file": "./src/core/application/speech.rs",
       "function": "SpeakSelection::preview_voice_with_playback_cues",
       "line": 63,
       "cyclomatic": 1.0,
@@ -1249,7 +1249,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/application.rs",
+      "file": "./src/core/application/speech.rs",
       "function": "SpeakSelection::set_playback_mode",
       "line": 57,
       "cyclomatic": 1.0,
@@ -1257,7 +1257,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/application.rs",
+      "file": "./src/core/application/speech.rs",
       "function": "SpeakSelection::set_voice",
       "line": 53,
       "cyclomatic": 1.0,
@@ -1265,7 +1265,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/audio.rs",
       "function": "Audio::energy",
       "line": 400,
       "cyclomatic": 1.0,
@@ -1273,7 +1273,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/audio.rs",
       "function": "Audio::features_at",
       "line": 406,
       "cyclomatic": 3.0,
@@ -1287,7 +1287,7 @@
       ]
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/audio.rs",
       "function": "Audio::new",
       "line": 392,
       "cyclomatic": 1.0,
@@ -1295,7 +1295,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/inference.rs",
       "function": "InferenceProviderId::as_str",
       "line": 288,
       "cyclomatic": 1.0,
@@ -1303,7 +1303,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/inference.rs",
       "function": "InferenceProviderId::new",
       "line": 283,
       "cyclomatic": 1.0,
@@ -1311,7 +1311,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/voice.rs",
       "function": "LanguageId::as_str",
       "line": 359,
       "cyclomatic": 1.0,
@@ -1325,7 +1325,7 @@
       ]
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/voice.rs",
       "function": "LanguageId::new",
       "line": 355,
       "cyclomatic": 1.0,
@@ -1339,7 +1339,7 @@
       ]
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/playback.rs",
       "function": "PlaybackMode::streams_audio",
       "line": 236,
       "cyclomatic": 1.0,
@@ -1347,7 +1347,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/playback.rs",
       "function": "PlaybackPreferences::default",
       "line": 311,
       "cyclomatic": 1.0,
@@ -1355,7 +1355,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/playback.rs",
       "function": "PlaybackSpeed::default",
       "line": 266,
       "cyclomatic": 1.0,
@@ -1363,7 +1363,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/playback.rs",
       "function": "PlaybackSpeed::from_percent",
       "line": 248,
       "cyclomatic": 3.0,
@@ -1377,7 +1377,7 @@
       ]
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/playback.rs",
       "function": "PlaybackSpeed::multiplier",
       "line": 260,
       "cyclomatic": 1.0,
@@ -1385,7 +1385,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/playback.rs",
       "function": "PlaybackSpeed::percent",
       "line": 256,
       "cyclomatic": 1.0,
@@ -1393,7 +1393,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/queue.rs",
       "function": "QueueItemId::get",
       "line": 68,
       "cyclomatic": 1.0,
@@ -1401,7 +1401,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/selection.rs",
       "function": "SelectedText::as_str",
       "line": 31,
       "cyclomatic": 1.0,
@@ -1409,7 +1409,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/selection.rs",
       "function": "SelectedText::new",
       "line": 12,
       "cyclomatic": 3.0,
@@ -1423,7 +1423,7 @@
       ]
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/selection.rs",
       "function": "SelectedText::preview",
       "line": 35,
       "cyclomatic": 2.0,
@@ -1431,7 +1431,7 @@
       "crap": 2.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/queue.rs",
       "function": "SpeechQueue::active_id",
       "line": 124,
       "cyclomatic": 1.0,
@@ -1439,7 +1439,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/queue.rs",
       "function": "SpeechQueue::complete",
       "line": 197,
       "cyclomatic": 2.0,
@@ -1453,7 +1453,7 @@
       ]
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/queue.rs",
       "function": "SpeechQueue::fail",
       "line": 208,
       "cyclomatic": 1.0,
@@ -1471,7 +1471,7 @@
       ]
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/queue.rs",
       "function": "SpeechQueue::items",
       "line": 120,
       "cyclomatic": 1.0,
@@ -1479,7 +1479,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/queue.rs",
       "function": "SpeechQueue::mark_playing",
       "line": 156,
       "cyclomatic": 1.0,
@@ -1493,7 +1493,7 @@
       ]
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/queue.rs",
       "function": "SpeechQueue::pause",
       "line": 168,
       "cyclomatic": 1.0,
@@ -1501,7 +1501,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/queue.rs",
       "function": "SpeechQueue::push",
       "line": 106,
       "cyclomatic": 2.0,
@@ -1515,7 +1515,7 @@
       ]
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/queue.rs",
       "function": "SpeechQueue::remove",
       "line": 192,
       "cyclomatic": 2.0,
@@ -1523,7 +1523,7 @@
       "crap": 2.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/queue.rs",
       "function": "SpeechQueue::resume",
       "line": 180,
       "cyclomatic": 1.0,
@@ -1537,7 +1537,7 @@
       ]
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/queue.rs",
       "function": "SpeechQueue::start",
       "line": 145,
       "cyclomatic": 3.0,
@@ -1545,7 +1545,7 @@
       "crap": 3.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/queue.rs",
       "function": "SpeechQueue::start_next",
       "line": 136,
       "cyclomatic": 2.0,
@@ -1553,7 +1553,7 @@
       "crap": 2.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/voice.rs",
       "function": "VoiceId::as_str",
       "line": 330,
       "cyclomatic": 1.0,
@@ -1561,7 +1561,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/voice.rs",
       "function": "VoiceId::new",
       "line": 325,
       "cyclomatic": 1.0,
@@ -1569,7 +1569,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/voice.rs",
       "function": "VoiceSettings::new",
       "line": 371,
       "cyclomatic": 1.0,
@@ -1577,7 +1577,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/domain.rs",
+      "file": "./src/core/domain/audio.rs",
       "function": "features",
       "line": 422,
       "cyclomatic": 4.0,
@@ -1605,7 +1605,7 @@
       ]
     },
     {
-      "file": "./src/model_store.rs",
+      "file": "./src/adapters/outbound/provisioning/kokoro.rs",
       "function": "ModelStore::at",
       "line": 41,
       "cyclomatic": 1.0,
@@ -1613,7 +1613,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/model_store.rs",
+      "file": "./src/adapters/outbound/provisioning/kokoro.rs",
       "function": "ModelStore::discover",
       "line": 27,
       "cyclomatic": 3.0,
@@ -1627,35 +1627,35 @@
       ]
     },
     {
-      "file": "./src/model_store.rs",
+      "file": "./src/adapters/outbound/provisioning/kokoro.rs",
       "function": "ModelStore::install",
-      "line": 62,
+      "line": 64,
       "cyclomatic": 4.0,
       "coverage": 0.0,
       "crap": 20.0,
       "uncovered": [
         {
-          "start": 62,
-          "end": 73
+          "start": 64,
+          "end": 75
         }
       ]
     },
     {
-      "file": "./src/model_store.rs",
+      "file": "./src/adapters/outbound/provisioning/kokoro.rs",
       "function": "ModelStore::install",
-      "line": 81,
+      "line": 83,
       "cyclomatic": 1.0,
       "coverage": 0.0,
       "crap": 2.0,
       "uncovered": [
         {
-          "start": 81,
-          "end": 83
+          "start": 83,
+          "end": 85
         }
       ]
     },
     {
-      "file": "./src/model_store.rs",
+      "file": "./src/adapters/outbound/provisioning/kokoro.rs",
       "function": "ModelStore::is_ready",
       "line": 57,
       "cyclomatic": 2.0,
@@ -1669,7 +1669,7 @@
       ]
     },
     {
-      "file": "./src/model_store.rs",
+      "file": "./src/adapters/outbound/provisioning/kokoro.rs",
       "function": "ModelStore::is_ready",
       "line": 77,
       "cyclomatic": 1.0,
@@ -1677,7 +1677,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/model_store.rs",
+      "file": "./src/adapters/outbound/provisioning/kokoro.rs",
       "function": "ModelStore::model_path",
       "line": 49,
       "cyclomatic": 1.0,
@@ -1685,7 +1685,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/model_store.rs",
+      "file": "./src/adapters/outbound/provisioning/kokoro.rs",
       "function": "ModelStore::root",
       "line": 45,
       "cyclomatic": 1.0,
@@ -1693,7 +1693,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/model_store.rs",
+      "file": "./src/adapters/outbound/provisioning/kokoro.rs",
       "function": "ModelStore::voices_path",
       "line": 53,
       "cyclomatic": 1.0,
@@ -1701,7 +1701,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/model_store.rs",
+      "file": "./src/adapters/outbound/provisioning/kokoro.rs",
       "function": "artifact_is_valid",
       "line": 86,
       "cyclomatic": 2.0,
@@ -1709,7 +1709,7 @@
       "crap": 2.0
     },
     {
-      "file": "./src/model_store.rs",
+      "file": "./src/adapters/outbound/provisioning/kokoro.rs",
       "function": "download",
       "line": 115,
       "cyclomatic": 8.0,
@@ -1723,7 +1723,7 @@
       ]
     },
     {
-      "file": "./src/model_store.rs",
+      "file": "./src/adapters/outbound/provisioning/kokoro.rs",
       "function": "sha256",
       "line": 97,
       "cyclomatic": 5.0,
@@ -1731,7 +1731,7 @@
       "crap": 5.0
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "CaptureControl::begin_fallback",
       "line": 42,
       "cyclomatic": 1.0,
@@ -1739,7 +1739,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "CaptureControl::cancel_native",
       "line": 53,
       "cyclomatic": 1.0,
@@ -1747,7 +1747,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "CaptureControl::fallback_started",
       "line": 64,
       "cyclomatic": 1.0,
@@ -1761,7 +1761,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "CaptureControl::new",
       "line": 38,
       "cyclomatic": 1.0,
@@ -1769,7 +1769,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "PlatformBridge::accessibility_required",
       "line": 297,
       "cyclomatic": 1.0,
@@ -1783,7 +1783,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "PlatformBridge::accessibility_required",
       "line": 302,
       "cyclomatic": 1.0,
@@ -1791,7 +1791,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "PlatformBridge::capture_error",
       "line": 360,
       "cyclomatic": 2.0,
@@ -1805,7 +1805,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "PlatformBridge::capture_error",
       "line": 370,
       "cyclomatic": 1.0,
@@ -1813,7 +1813,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "PlatformBridge::clear_temporary_clipboard",
       "line": 318,
       "cyclomatic": 1.0,
@@ -1827,7 +1827,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "PlatformBridge::default",
       "line": 108,
       "cyclomatic": 1.0,
@@ -1841,7 +1841,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "PlatformBridge::drop",
       "line": 376,
       "cyclomatic": 2.0,
@@ -1855,7 +1855,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "PlatformBridge::new",
       "line": 114,
       "cyclomatic": 2.0,
@@ -1869,7 +1869,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "PlatformBridge::poll",
       "line": 168,
       "cyclomatic": 31.0,
@@ -1883,7 +1883,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "PlatformBridge::registration_error",
       "line": 306,
       "cyclomatic": 1.0,
@@ -1897,7 +1897,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "PlatformBridge::request_clipboard_text",
       "line": 314,
       "cyclomatic": 1.0,
@@ -1911,7 +1911,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "PlatformBridge::retry_deferred_clipboard_cleanup",
       "line": 354,
       "cyclomatic": 1.0,
@@ -1925,7 +1925,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "PlatformBridge::set_automatic_clipboard_fallback",
       "line": 310,
       "cyclomatic": 1.0,
@@ -1939,7 +1939,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "PlatformBridge::shortcut_label",
       "line": 292,
       "cyclomatic": 1.0,
@@ -1953,7 +1953,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "PlatformBridge::start_capture",
       "line": 330,
       "cyclomatic": 3.0,
@@ -1967,7 +1967,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "PlatformBridge::start_selection_capture",
       "line": 322,
       "cyclomatic": 2.0,
@@ -1981,7 +1981,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "PlatformBridge::usage_hint",
       "line": 288,
       "cyclomatic": 1.0,
@@ -1995,7 +1995,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "allows_clipboard_fallback",
       "line": 456,
       "cyclomatic": 1.0,
@@ -2003,7 +2003,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "capture",
       "line": 392,
       "cyclomatic": 10.0,
@@ -2017,7 +2017,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "capture_native_selected_text",
       "line": 439,
       "cyclomatic": 2.0,
@@ -2031,7 +2031,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "capture_native_selected_text",
       "line": 447,
       "cyclomatic": 1.0,
@@ -2039,7 +2039,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "capture_native_selected_text",
       "line": 452,
       "cyclomatic": 1.0,
@@ -2047,7 +2047,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "current_selection_target",
       "line": 427,
       "cyclomatic": 1.0,
@@ -2061,7 +2061,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "current_selection_target",
       "line": 434,
       "cyclomatic": 1.0,
@@ -2069,7 +2069,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "is_wayland",
       "line": 484,
       "cyclomatic": 1.0,
@@ -2077,7 +2077,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "is_wayland",
       "line": 489,
       "cyclomatic": 1.0,
@@ -2085,7 +2085,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "macos_registration_error",
       "line": 494,
       "cyclomatic": 5.0,
@@ -2099,7 +2099,7 @@
       ]
     },
     {
-      "file": "./src/platform.rs",
+      "file": "./src/adapters/inbound/desktop/platform.rs",
       "function": "register_hotkey",
       "line": 468,
       "cyclomatic": 5.0,
@@ -2107,7 +2107,7 @@
       "crap": 5.0
     },
     {
-      "file": "./src/playback.rs",
+      "file": "./src/core/application/playback.rs",
       "function": "PlaybackControlState::default",
       "line": 47,
       "cyclomatic": 1.0,
@@ -2115,7 +2115,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/playback.rs",
+      "file": "./src/core/application/playback.rs",
       "function": "PlaybackController::begin_playback",
       "line": 99,
       "cyclomatic": 3.0,
@@ -2129,7 +2129,7 @@
       ]
     },
     {
-      "file": "./src/playback.rs",
+      "file": "./src/core/application/playback.rs",
       "function": "PlaybackController::begin_session",
       "line": 82,
       "cyclomatic": 4.0,
@@ -2143,7 +2143,7 @@
       ]
     },
     {
-      "file": "./src/playback.rs",
+      "file": "./src/core/application/playback.rs",
       "function": "PlaybackController::cancel",
       "line": 123,
       "cyclomatic": 3.0,
@@ -2151,7 +2151,7 @@
       "crap": 3.0
     },
     {
-      "file": "./src/playback.rs",
+      "file": "./src/core/application/playback.rs",
       "function": "PlaybackController::finish_session",
       "line": 137,
       "cyclomatic": 2.0,
@@ -2159,7 +2159,7 @@
       "crap": 2.0
     },
     {
-      "file": "./src/playback.rs",
+      "file": "./src/core/application/playback.rs",
       "function": "PlaybackController::pause",
       "line": 115,
       "cyclomatic": 1.0,
@@ -2167,7 +2167,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/playback.rs",
+      "file": "./src/core/application/playback.rs",
       "function": "PlaybackController::phase",
       "line": 149,
       "cyclomatic": 1.0,
@@ -2175,7 +2175,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/playback.rs",
+      "file": "./src/core/application/playback.rs",
       "function": "PlaybackController::register",
       "line": 67,
       "cyclomatic": 2.0,
@@ -2189,7 +2189,7 @@
       ]
     },
     {
-      "file": "./src/playback.rs",
+      "file": "./src/core/application/playback.rs",
       "function": "PlaybackController::resume",
       "line": 119,
       "cyclomatic": 1.0,
@@ -2197,7 +2197,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/playback.rs",
+      "file": "./src/core/application/playback.rs",
       "function": "PlaybackController::transition",
       "line": 181,
       "cyclomatic": 3.0,
@@ -2205,7 +2205,7 @@
       "crap": 3.0
     },
     {
-      "file": "./src/playback.rs",
+      "file": "./src/core/application/playback.rs",
       "function": "PlaybackController::wait_for_phase_change",
       "line": 160,
       "cyclomatic": 2.0,
@@ -2219,7 +2219,7 @@
       ]
     },
     {
-      "file": "./src/playback.rs",
+      "file": "./src/core/application/playback.rs",
       "function": "PlaybackToken::queue_item",
       "line": 16,
       "cyclomatic": 1.0,
@@ -2227,7 +2227,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/ports.rs",
+      "file": "./src/core/ports/speech.rs",
       "function": "DynSpeechSynthesizer::new",
       "line": 22,
       "cyclomatic": 1.0,
@@ -2241,7 +2241,7 @@
       ]
     },
     {
-      "file": "./src/ports.rs",
+      "file": "./src/core/ports/speech.rs",
       "function": "DynSpeechSynthesizer::synthesize",
       "line": 28,
       "cyclomatic": 1.0,
@@ -2255,7 +2255,7 @@
       ]
     },
     {
-      "file": "./src/ports.rs",
+      "file": "./src/core/ports/speech.rs",
       "function": "DynSpeechSynthesizer::synthesize_streaming",
       "line": 32,
       "cyclomatic": 1.0,
@@ -2269,7 +2269,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::clear_clipboard_lease",
       "line": 413,
       "cyclomatic": 4.0,
@@ -2283,7 +2283,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::clear_color",
       "line": 1103,
       "cyclomatic": 1.0,
@@ -2297,7 +2297,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::complete_active_queue",
       "line": 406,
       "cyclomatic": 3.0,
@@ -2311,7 +2311,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::context_menu",
       "line": 964,
       "cyclomatic": 6.0,
@@ -2325,7 +2325,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::delete_queue_item",
       "line": 361,
       "cyclomatic": 4.0,
@@ -2339,7 +2339,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::dispatch_queue_item",
       "line": 385,
       "cyclomatic": 5.0,
@@ -2353,7 +2353,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::drain_statuses",
       "line": 194,
       "cyclomatic": 13.0,
@@ -2367,7 +2367,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::drop",
       "line": 1109,
       "cyclomatic": 3.0,
@@ -2381,7 +2381,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::enqueue",
       "line": 281,
       "cyclomatic": 4.0,
@@ -2395,7 +2395,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::enqueue_preview",
       "line": 495,
       "cyclomatic": 3.0,
@@ -2409,7 +2409,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::enqueue_voice_command",
       "line": 481,
       "cyclomatic": 3.0,
@@ -2423,7 +2423,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::handle_queue_action",
       "line": 376,
       "cyclomatic": 5.0,
@@ -2437,7 +2437,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::handle_tray",
       "line": 521,
       "cyclomatic": 7.0,
@@ -2451,7 +2451,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::logic",
       "line": 1030,
       "cyclomatic": 8.0,
@@ -2465,7 +2465,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::maybe_start_automatic_queue",
       "line": 328,
       "cyclomatic": 5.0,
@@ -2479,7 +2479,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::mist_rect",
       "line": 564,
       "cyclomatic": 6.0,
@@ -2493,7 +2493,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::new",
       "line": 121,
       "cyclomatic": 5.0,
@@ -2507,7 +2507,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::paint_mist_only",
       "line": 584,
       "cyclomatic": 3.0,
@@ -2521,7 +2521,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::paint_panel",
       "line": 681,
       "cyclomatic": 28.0,
@@ -2535,7 +2535,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::paint_queue_window",
       "line": 616,
       "cyclomatic": 4.0,
@@ -2549,7 +2549,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::pause_queue_item",
       "line": 349,
       "cyclomatic": 2.0,
@@ -2563,7 +2563,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::perform_action",
       "line": 507,
       "cyclomatic": 5.0,
@@ -2577,7 +2577,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::persist_playback_preferences",
       "line": 435,
       "cyclomatic": 2.0,
@@ -2591,7 +2591,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::play_queue_item",
       "line": 340,
       "cyclomatic": 3.0,
@@ -2605,7 +2605,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::preview_voice",
       "line": 456,
       "cyclomatic": 9.0,
@@ -2619,7 +2619,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::queue_capture",
       "line": 294,
       "cyclomatic": 6.0,
@@ -2633,7 +2633,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::resume_queue_item",
       "line": 355,
       "cyclomatic": 2.0,
@@ -2647,7 +2647,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::retry_deferred_clipboard_cleanup",
       "line": 430,
       "cyclomatic": 1.0,
@@ -2661,7 +2661,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::select_voice",
       "line": 447,
       "cyclomatic": 1.0,
@@ -2675,7 +2675,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::set_error",
       "line": 262,
       "cyclomatic": 1.0,
@@ -2689,7 +2689,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::set_status",
       "line": 239,
       "cyclomatic": 9.0,
@@ -2703,7 +2703,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::sync_platform_status",
       "line": 266,
       "cyclomatic": 4.0,
@@ -2717,7 +2717,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::sync_window_size",
       "line": 548,
       "cyclomatic": 4.0,
@@ -2731,7 +2731,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::ui",
       "line": 1054,
       "cyclomatic": 5.0,
@@ -2745,7 +2745,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "PetApp::worker_available_for_queue",
       "line": 319,
       "cyclomatic": 1.0,
@@ -2759,7 +2759,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "ViewportMode::mist_center",
       "line": 71,
       "cyclomatic": 1.0,
@@ -2767,7 +2767,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "ViewportMode::size",
       "line": 62,
       "cyclomatic": 5.0,
@@ -2781,7 +2781,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "VoicePreviewActivity::after_status",
       "line": 1182,
       "cyclomatic": 4.0,
@@ -2789,7 +2789,7 @@
       "crap": 4.0
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "authoritative_voice_after_enqueue",
       "line": 1166,
       "cyclomatic": 2.0,
@@ -2797,7 +2797,7 @@
       "crap": 2.0
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "gallery_mode",
       "line": 1195,
       "cyclomatic": 8.0,
@@ -2819,7 +2819,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "language_voice_id",
       "line": 1249,
       "cyclomatic": 1.0,
@@ -2833,7 +2833,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "queue_position_below",
       "line": 1147,
       "cyclomatic": 1.0,
@@ -2847,7 +2847,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "queue_viewport_id",
       "line": 1139,
       "cyclomatic": 1.0,
@@ -2861,7 +2861,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "queue_window_size",
       "line": 1143,
       "cyclomatic": 1.0,
@@ -2869,7 +2869,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "queue_worker_available",
       "line": 1259,
       "cyclomatic": 4.0,
@@ -2877,7 +2877,7 @@
       "crap": 4.0
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "required_panel_visible",
       "line": 1154,
       "cyclomatic": 3.0,
@@ -2885,7 +2885,7 @@
       "crap": 3.0
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "selected_voice_index",
       "line": 1119,
       "cyclomatic": 1.0,
@@ -2899,7 +2899,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "should_preview_language",
       "line": 1271,
       "cyclomatic": 2.0,
@@ -2907,7 +2907,7 @@
       "crap": 2.0
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "status_opens_panel",
       "line": 1158,
       "cyclomatic": 1.0,
@@ -2915,7 +2915,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "viewport_mode",
       "line": 1127,
       "cyclomatic": 4.0,
@@ -2923,7 +2923,7 @@
       "crap": 4.0
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "viewport_origin_for_mist_center",
       "line": 1162,
       "cyclomatic": 1.0,
@@ -2931,7 +2931,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "voice_preview_available",
       "line": 1220,
       "cyclomatic": 5.0,
@@ -2945,7 +2945,7 @@
       ]
     },
     {
-      "file": "./src/ui.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mod.rs",
       "function": "voice_preview_settings",
       "line": 1240,
       "cyclomatic": 1.0,
@@ -2953,7 +2953,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/ui/mist.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mist.rs",
       "function": "MistRenderer::new",
       "line": 23,
       "cyclomatic": 2.0,
@@ -2967,7 +2967,7 @@
       ]
     },
     {
-      "file": "./src/ui/mist.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mist.rs",
       "function": "MistRenderer::paint",
       "line": 33,
       "cyclomatic": 4.0,
@@ -2981,7 +2981,7 @@
       ]
     },
     {
-      "file": "./src/ui/mist.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mist.rs",
       "function": "MistRenderer::paint_swatch",
       "line": 103,
       "cyclomatic": 1.0,
@@ -2995,7 +2995,7 @@
       ]
     },
     {
-      "file": "./src/ui/mist.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mist.rs",
       "function": "audio_reactivity",
       "line": 129,
       "cyclomatic": 1.0,
@@ -3003,7 +3003,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/ui/mist.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mist.rs",
       "function": "motion_for",
       "line": 133,
       "cyclomatic": 5.0,
@@ -3017,7 +3017,7 @@
       ]
     },
     {
-      "file": "./src/ui/mist.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mist.rs",
       "function": "textured_quad",
       "line": 156,
       "cyclomatic": 2.0,
@@ -3031,7 +3031,7 @@
       ]
     },
     {
-      "file": "./src/ui/mist.rs",
+      "file": "./src/adapters/inbound/desktop/ui/mist.rs",
       "function": "with_alpha",
       "line": 186,
       "cyclomatic": 1.0,
@@ -3045,7 +3045,7 @@
       ]
     },
     {
-      "file": "./src/ui/presentation.rs",
+      "file": "./src/adapters/inbound/desktop/ui/presentation.rs",
       "function": "MistSmoother::update",
       "line": 26,
       "cyclomatic": 3.0,
@@ -3063,7 +3063,7 @@
       ]
     },
     {
-      "file": "./src/ui/presentation.rs",
+      "file": "./src/adapters/inbound/desktop/ui/presentation.rs",
       "function": "busy",
       "line": 124,
       "cyclomatic": 1.0,
@@ -3071,7 +3071,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/ui/presentation.rs",
+      "file": "./src/adapters/inbound/desktop/ui/presentation.rs",
       "function": "copy_for_status",
       "line": 136,
       "cyclomatic": 10.0,
@@ -3089,7 +3089,7 @@
       ]
     },
     {
-      "file": "./src/ui/presentation.rs",
+      "file": "./src/adapters/inbound/desktop/ui/presentation.rs",
       "function": "ease",
       "line": 63,
       "cyclomatic": 1.0,
@@ -3097,7 +3097,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/ui/presentation.rs",
+      "file": "./src/adapters/inbound/desktop/ui/presentation.rs",
       "function": "features",
       "line": 132,
       "cyclomatic": 1.0,
@@ -3105,7 +3105,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/ui/presentation.rs",
+      "file": "./src/adapters/inbound/desktop/ui/presentation.rs",
       "function": "mist_for_status",
       "line": 81,
       "cyclomatic": 9.0,
@@ -3127,7 +3127,7 @@
       ]
     },
     {
-      "file": "./src/ui/presentation.rs",
+      "file": "./src/adapters/inbound/desktop/ui/presentation.rs",
       "function": "shorten",
       "line": 213,
       "cyclomatic": 2.0,
@@ -3141,7 +3141,7 @@
       ]
     },
     {
-      "file": "./src/ui/queue_tray.rs",
+      "file": "./src/adapters/inbound/desktop/ui/queue_tray.rs",
       "function": "height",
       "line": 41,
       "cyclomatic": 2.0,
@@ -3155,7 +3155,7 @@
       ]
     },
     {
-      "file": "./src/ui/queue_tray.rs",
+      "file": "./src/adapters/inbound/desktop/ui/queue_tray.rs",
       "function": "paint_delete_icon",
       "line": 298,
       "cyclomatic": 2.0,
@@ -3169,7 +3169,7 @@
       ]
     },
     {
-      "file": "./src/ui/queue_tray.rs",
+      "file": "./src/adapters/inbound/desktop/ui/queue_tray.rs",
       "function": "paint_glass",
       "line": 194,
       "cyclomatic": 4.0,
@@ -3183,7 +3183,7 @@
       ]
     },
     {
-      "file": "./src/ui/queue_tray.rs",
+      "file": "./src/adapters/inbound/desktop/ui/queue_tray.rs",
       "function": "paint_glass_circle",
       "line": 224,
       "cyclomatic": 4.0,
@@ -3197,7 +3197,7 @@
       ]
     },
     {
-      "file": "./src/ui/queue_tray.rs",
+      "file": "./src/adapters/inbound/desktop/ui/queue_tray.rs",
       "function": "paint_playback_icon",
       "line": 268,
       "cyclomatic": 4.0,
@@ -3211,7 +3211,7 @@
       ]
     },
     {
-      "file": "./src/ui/queue_tray.rs",
+      "file": "./src/adapters/inbound/desktop/ui/queue_tray.rs",
       "function": "paint_state_dot",
       "line": 256,
       "cyclomatic": 6.0,
@@ -3225,7 +3225,7 @@
       ]
     },
     {
-      "file": "./src/ui/queue_tray.rs",
+      "file": "./src/adapters/inbound/desktop/ui/queue_tray.rs",
       "function": "playback_action",
       "line": 185,
       "cyclomatic": 5.0,
@@ -3239,7 +3239,7 @@
       ]
     },
     {
-      "file": "./src/ui/queue_tray.rs",
+      "file": "./src/adapters/inbound/desktop/ui/queue_tray.rs",
       "function": "playback_label",
       "line": 174,
       "cyclomatic": 7.0,
@@ -3257,7 +3257,7 @@
       ]
     },
     {
-      "file": "./src/ui/queue_tray.rs",
+      "file": "./src/adapters/inbound/desktop/ui/queue_tray.rs",
       "function": "show",
       "line": 49,
       "cyclomatic": 13.0,
@@ -3271,7 +3271,7 @@
       ]
     },
     {
-      "file": "./src/ui/queue_tray.rs",
+      "file": "./src/adapters/inbound/desktop/ui/queue_tray.rs",
       "function": "tinted_glass",
       "line": 247,
       "cyclomatic": 1.0,
@@ -3285,7 +3285,7 @@
       ]
     },
     {
-      "file": "./src/ui/queue_tray.rs",
+      "file": "./src/adapters/inbound/desktop/ui/queue_tray.rs",
       "function": "visible_rows",
       "line": 37,
       "cyclomatic": 1.0,
@@ -3293,7 +3293,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "SettingsSection::label",
       "line": 24,
       "cyclomatic": 5.0,
@@ -3307,7 +3307,7 @@
       ]
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "action_row",
       "line": 552,
       "cyclomatic": 1.0,
@@ -3321,7 +3321,7 @@
       ]
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "card_background",
       "line": 747,
       "cyclomatic": 2.0,
@@ -3335,7 +3335,7 @@
       ]
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "choice_row",
       "line": 599,
       "cyclomatic": 14.0,
@@ -3349,7 +3349,7 @@
       ]
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "info_row",
       "line": 580,
       "cyclomatic": 1.0,
@@ -3363,7 +3363,7 @@
       ]
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "language_chip",
       "line": 339,
       "cyclomatic": 7.0,
@@ -3377,7 +3377,7 @@
       ]
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "model",
       "line": 406,
       "cyclomatic": 5.0,
@@ -3391,7 +3391,7 @@
       ]
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "model_provider_rows",
       "line": 468,
       "cyclomatic": 1.0,
@@ -3399,7 +3399,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "model_restart_notice_rect",
       "line": 473,
       "cyclomatic": 1.0,
@@ -3407,7 +3407,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "page_header",
       "line": 480,
       "cyclomatic": 1.0,
@@ -3421,7 +3421,7 @@
       ]
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "performance_icon",
       "line": 692,
       "cyclomatic": 5.0,
@@ -3435,7 +3435,7 @@
       ]
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "playback",
       "line": 112,
       "cyclomatic": 3.0,
@@ -3449,7 +3449,7 @@
       ]
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "privacy",
       "line": 223,
       "cyclomatic": 3.0,
@@ -3463,7 +3463,7 @@
       ]
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "provider_name",
       "line": 460,
       "cyclomatic": 1.0,
@@ -3477,7 +3477,7 @@
       ]
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "row",
       "line": 506,
       "cyclomatic": 1.0,
@@ -3485,7 +3485,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "row_text",
       "line": 765,
       "cyclomatic": 3.0,
@@ -3499,7 +3499,7 @@
       ]
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "sidebar",
       "line": 40,
       "cyclomatic": 7.0,
@@ -3513,7 +3513,7 @@
       ]
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "speed_row",
       "line": 181,
       "cyclomatic": 4.0,
@@ -3527,7 +3527,7 @@
       ]
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "toggle_row",
       "line": 510,
       "cyclomatic": 4.0,
@@ -3541,7 +3541,7 @@
       ]
     },
     {
-      "file": "./src/ui/settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/settings.rs",
       "function": "voice_language",
       "line": 273,
       "cyclomatic": 4.0,
@@ -3555,7 +3555,7 @@
       ]
     },
     {
-      "file": "./src/ui/system_settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/system_settings.rs",
       "function": "open_accessibility_settings",
       "line": 2,
       "cyclomatic": 1.0,
@@ -3569,7 +3569,7 @@
       ]
     },
     {
-      "file": "./src/ui/system_settings.rs",
+      "file": "./src/adapters/inbound/desktop/ui/system_settings.rs",
       "function": "open_accessibility_settings",
       "line": 11,
       "cyclomatic": 1.0,
@@ -3577,7 +3577,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/ui/theme.rs",
+      "file": "./src/adapters/inbound/desktop/ui/theme.rs",
       "function": "configure_interface",
       "line": 19,
       "cyclomatic": 1.0,
@@ -3585,7 +3585,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/ui/theme.rs",
+      "file": "./src/adapters/inbound/desktop/ui/theme.rs",
       "function": "install_system_font",
       "line": 36,
       "cyclomatic": 3.0,
@@ -3599,7 +3599,7 @@
       ]
     },
     {
-      "file": "./src/ui/theme.rs",
+      "file": "./src/adapters/inbound/desktop/ui/theme.rs",
       "function": "palette_color",
       "line": 15,
       "cyclomatic": 1.0,
@@ -3613,7 +3613,7 @@
       ]
     },
     {
-      "file": "./src/ui/theme.rs",
+      "file": "./src/adapters/inbound/desktop/ui/theme.rs",
       "function": "with_alpha",
       "line": 11,
       "cyclomatic": 1.0,
@@ -3627,7 +3627,7 @@
       ]
     },
     {
-      "file": "./src/ui/tray.rs",
+      "file": "./src/adapters/inbound/desktop/ui/tray.rs",
       "function": "TrayAdapter::new",
       "line": 25,
       "cyclomatic": 9.0,
@@ -3641,7 +3641,7 @@
       ]
     },
     {
-      "file": "./src/ui/tray.rs",
+      "file": "./src/adapters/inbound/desktop/ui/tray.rs",
       "function": "TrayAdapter::poll",
       "line": 89,
       "cyclomatic": 5.0,
@@ -3655,7 +3655,7 @@
       ]
     },
     {
-      "file": "./src/ui/tray.rs",
+      "file": "./src/adapters/inbound/desktop/ui/tray.rs",
       "function": "TrayAdapter::select_voice",
       "line": 110,
       "cyclomatic": 3.0,
@@ -3669,7 +3669,7 @@
       ]
     },
     {
-      "file": "./src/ui/tray.rs",
+      "file": "./src/adapters/inbound/desktop/ui/tray.rs",
       "function": "TrayAdapter::set_status",
       "line": 121,
       "cyclomatic": 9.0,
@@ -3683,7 +3683,7 @@
       ]
     },
     {
-      "file": "./src/ui/tray.rs",
+      "file": "./src/adapters/inbound/desktop/ui/tray.rs",
       "function": "TrayAdapter::set_warning",
       "line": 136,
       "cyclomatic": 1.0,
@@ -3697,7 +3697,7 @@
       ]
     },
     {
-      "file": "./src/ui/tray.rs",
+      "file": "./src/adapters/inbound/desktop/ui/tray.rs",
       "function": "mist_icon",
       "line": 142,
       "cyclomatic": 3.0,
@@ -3711,7 +3711,7 @@
       ]
     },
     {
-      "file": "./src/ui/voice_gallery.rs",
+      "file": "./src/adapters/inbound/desktop/ui/voice_gallery.rs",
       "function": "GalleryMode::hint",
       "line": 38,
       "cyclomatic": 5.0,
@@ -3725,7 +3725,7 @@
       ]
     },
     {
-      "file": "./src/ui/voice_gallery.rs",
+      "file": "./src/adapters/inbound/desktop/ui/voice_gallery.rs",
       "function": "GalleryMode::interaction_enabled",
       "line": 34,
       "cyclomatic": 1.0,
@@ -3739,7 +3739,7 @@
       ]
     },
     {
-      "file": "./src/ui/voice_gallery.rs",
+      "file": "./src/adapters/inbound/desktop/ui/voice_gallery.rs",
       "function": "show",
       "line": 48,
       "cyclomatic": 15.0,
@@ -3753,7 +3753,7 @@
       ]
     },
     {
-      "file": "./src/worker.rs",
+      "file": "./src/runtime/worker.rs",
       "function": "PreviewDispatcher::new",
       "line": 133,
       "cyclomatic": 1.0,
@@ -3761,7 +3761,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/worker.rs",
+      "file": "./src/runtime/worker.rs",
       "function": "PreviewDispatcher::request",
       "line": 139,
       "cyclomatic": 3.0,
@@ -3775,7 +3775,7 @@
       ]
     },
     {
-      "file": "./src/worker.rs",
+      "file": "./src/runtime/worker.rs",
       "function": "PreviewRequests::request",
       "line": 149,
       "cyclomatic": 1.0,
@@ -3783,7 +3783,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/worker.rs",
+      "file": "./src/runtime/worker.rs",
       "function": "PreviewRequests::take_latest",
       "line": 153,
       "cyclomatic": 1.0,
@@ -3791,7 +3791,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/worker.rs",
+      "file": "./src/runtime/worker.rs",
       "function": "WorkerCommands::try_send",
       "line": 52,
       "cyclomatic": 4.0,
@@ -3805,7 +3805,7 @@
       ]
     },
     {
-      "file": "./src/worker.rs",
+      "file": "./src/runtime/worker.rs",
       "function": "ensure_session",
       "line": 438,
       "cyclomatic": 4.0,
@@ -3819,7 +3819,7 @@
       ]
     },
     {
-      "file": "./src/worker.rs",
+      "file": "./src/runtime/worker.rs",
       "function": "install_model",
       "line": 333,
       "cyclomatic": 1.0,
@@ -3833,7 +3833,7 @@
       ]
     },
     {
-      "file": "./src/worker.rs",
+      "file": "./src/runtime/worker.rs",
       "function": "playback_was_stopped",
       "line": 466,
       "cyclomatic": 1.0,
@@ -3847,7 +3847,7 @@
       ]
     },
     {
-      "file": "./src/worker.rs",
+      "file": "./src/runtime/worker.rs",
       "function": "preview_voice",
       "line": 356,
       "cyclomatic": 3.0,
@@ -3861,7 +3861,7 @@
       ]
     },
     {
-      "file": "./src/worker.rs",
+      "file": "./src/runtime/worker.rs",
       "function": "run",
       "line": 211,
       "cyclomatic": 13.0,
@@ -3891,7 +3891,7 @@
       ]
     },
     {
-      "file": "./src/worker.rs",
+      "file": "./src/runtime/worker.rs",
       "function": "run_speech",
       "line": 386,
       "cyclomatic": 4.0,
@@ -3905,7 +3905,7 @@
       ]
     },
     {
-      "file": "./src/worker.rs",
+      "file": "./src/runtime/worker.rs",
       "function": "select_voice",
       "line": 319,
       "cyclomatic": 3.0,
@@ -3919,7 +3919,7 @@
       ]
     },
     {
-      "file": "./src/worker.rs",
+      "file": "./src/runtime/worker.rs",
       "function": "send_result_status",
       "line": 476,
       "cyclomatic": 4.0,
@@ -3937,7 +3937,7 @@
       ]
     },
     {
-      "file": "./src/worker.rs",
+      "file": "./src/runtime/worker.rs",
       "function": "send_status",
       "line": 472,
       "cyclomatic": 1.0,
@@ -3945,7 +3945,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/worker.rs",
+      "file": "./src/runtime/worker.rs",
       "function": "spawn",
       "line": 161,
       "cyclomatic": 1.0,
@@ -3953,7 +3953,7 @@
       "crap": 1.0
     },
     {
-      "file": "./src/worker.rs",
+      "file": "./src/runtime/worker.rs",
       "function": "speak",
       "line": 338,
       "cyclomatic": 1.0,
@@ -3974,9 +3974,9 @@
     "source_only": {
       "count": 3,
       "examples": [
-        "./src/adapters/linux_selection.rs",
-        "./src/adapters/wayland_shortcut.rs",
-        "./src/adapters/windows_selection.rs"
+        "./src/adapters/inbound/os/linux/selection.rs",
+        "./src/adapters/inbound/os/linux/shortcut.rs",
+        "./src/adapters/inbound/os/windows/selection.rs"
       ]
     },
     "lcov_only": {
