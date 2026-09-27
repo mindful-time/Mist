@@ -25,7 +25,11 @@ const AX_ERROR_API_DISABLED: AXError = -25_211;
 const AX_ERROR_ATTRIBUTE_UNSUPPORTED: AXError = -25_205;
 const AX_ERROR_NO_VALUE: AXError = -25_212;
 const AX_VALUE_CF_RANGE_TYPE: u32 = 4;
-const AX_MESSAGING_TIMEOUT_SECONDS: f32 = 1.0;
+const AX_MESSAGING_TIMEOUT_SECONDS: f32 = 0.25;
+const MAX_DESCENDANT_NODES: usize = 128;
+const MAX_DESCENDANT_DEPTH: usize = 12;
+const DESCENDANT_SEARCH_BUDGET: std::time::Duration = std::time::Duration::from_millis(300);
+const SELECTION_ROLES: [&str; 4] = ["AXTextArea", "AXTextField", "AXDocument", "AXWebArea"];
 
 #[derive(Debug)]
 struct AccessibilityAttributeError(AXError);
@@ -385,26 +389,22 @@ fn ensure_not_protected(element: &CFType) -> anyhow::Result<()> {
 }
 
 fn selected_text_in_descendants(root: &CFType) -> anyhow::Result<Option<SelectedText>> {
-    const MAX_NODES: usize = 512;
-    const MAX_DEPTH: usize = 16;
-
+    let started = std::time::Instant::now();
     let mut pending = std::collections::VecDeque::from([(root.clone(), 0)]);
     let mut visited = 0;
     while let Some((element, depth)) = pending.pop_front() {
-        if visited >= MAX_NODES {
+        if descendant_budget_exhausted(visited, started) {
             break;
         }
         visited += 1;
 
         ensure_not_protected(&element)?;
 
-        if depth > 0
-            && let Some(selection) = selected_text(&element)?
-        {
+        if let Some(selection) = selected_text_candidate(&element, depth)? {
             return Ok(Some(selection));
         }
 
-        if depth >= MAX_DEPTH {
+        if depth >= MAX_DESCENDANT_DEPTH {
             continue;
         }
         let Some(children) = copy_attribute(&element, "AXChildren")
@@ -420,6 +420,26 @@ fn selected_text_in_descendants(root: &CFType) -> anyhow::Result<Option<Selected
         }
     }
     Ok(None)
+}
+
+fn descendant_budget_exhausted(visited: usize, started: std::time::Instant) -> bool {
+    visited >= MAX_DESCENDANT_NODES || started.elapsed() >= DESCENDANT_SEARCH_BUDGET
+}
+
+fn selected_text_candidate(element: &CFType, depth: usize) -> anyhow::Result<Option<SelectedText>> {
+    (depth > 0 && element_can_expose_selection(element))
+        .then(|| selected_text(element))
+        .transpose()
+        .map(Option::flatten)
+}
+
+fn element_can_expose_selection(element: &CFType) -> bool {
+    string_attribute(element, "AXRole")
+        .is_some_and(|role| role_can_expose_selection(&role.to_string()))
+}
+
+fn role_can_expose_selection(role: &str) -> bool {
+    SELECTION_ROLES.contains(&role)
 }
 
 fn copy_attribute(element: &CFType, attribute: &str) -> anyhow::Result<CFType> {
@@ -569,6 +589,16 @@ mod tests {
         );
 
         assert_eq!(selection.as_deref(), Some("🌫\nmist"));
+    }
+
+    #[test]
+    fn fallback_tree_search_only_probes_text_bearing_roles() {
+        for role in ["AXTextArea", "AXTextField", "AXDocument", "AXWebArea"] {
+            assert!(role_can_expose_selection(role), "{role}");
+        }
+        for role in ["AXButton", "AXImage", "AXMenuItem", "AXWindow"] {
+            assert!(!role_can_expose_selection(role), "{role}");
+        }
     }
 
     #[test]
