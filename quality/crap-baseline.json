@@ -1,0 +1,3987 @@
+{
+  "$schema": "https://raw.githubusercontent.com/minikin/cargo-crap/main/schemas/report-v1.json",
+  "version": "0.5.0",
+  "entries": [
+    {
+      "file": "./src/adapters/clipboard_fallback.rs",
+      "function": "ClipboardLease::new",
+      "line": 20,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/clipboard_fallback.rs",
+      "function": "ClipboardLease::still_owns",
+      "line": 27,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/adapters/clipboard_fallback.rs",
+      "function": "ClipboardLease::version_matches",
+      "line": 31,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/clipboard_fallback.rs",
+      "function": "clear_if_owned",
+      "line": 84,
+      "cyclomatic": 7.0,
+      "coverage": 0.0,
+      "crap": 56.0,
+      "uncovered": [
+        {
+          "start": 84,
+          "end": 103
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/clipboard_fallback.rs",
+      "function": "clipboard_version",
+      "line": 162,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 162,
+          "end": 166
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/clipboard_fallback.rs",
+      "function": "clipboard_version",
+      "line": 169,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/clipboard_fallback.rs",
+      "function": "clipboard_version",
+      "line": 181,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/clipboard_fallback.rs",
+      "function": "copy_selected_text",
+      "line": 46,
+      "cyclomatic": 10.0,
+      "coverage": 0.0,
+      "crap": 110.0,
+      "uncovered": [
+        {
+          "start": 46,
+          "end": 76
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/clipboard_fallback.rs",
+      "function": "fingerprint",
+      "line": 157,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/clipboard_fallback.rs",
+      "function": "read_clipboard_text",
+      "line": 105,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 105,
+          "end": 110
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/clipboard_fallback.rs",
+      "function": "read_current_text",
+      "line": 78,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 78,
+          "end": 80
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/clipboard_fallback.rs",
+      "function": "send_copy_shortcut",
+      "line": 113,
+      "cyclomatic": 6.0,
+      "coverage": 0.0,
+      "crap": 42.0,
+      "uncovered": [
+        {
+          "start": 113,
+          "end": 139
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/clipboard_fallback.rs",
+      "function": "send_copy_shortcut",
+      "line": 142,
+      "cyclomatic": 5.0,
+      "coverage": 100.0,
+      "crap": 5.0
+    },
+    {
+      "file": "./src/adapters/kokoro.rs",
+      "function": "InferencePolicy::label",
+      "line": 179,
+      "cyclomatic": 5.0,
+      "coverage": 0.0,
+      "crap": 30.0,
+      "uncovered": [
+        {
+          "start": 179,
+          "end": 186
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/kokoro.rs",
+      "function": "KokoroEngineFactory::load",
+      "line": 46,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 46,
+          "end": 53
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/kokoro.rs",
+      "function": "KokoroEngineFactory::new",
+      "line": 37,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/kokoro.rs",
+      "function": "KokoroSynthesizer::inference_policy_label",
+      "line": 213,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 213,
+          "end": 215
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/kokoro.rs",
+      "function": "KokoroSynthesizer::load",
+      "line": 190,
+      "cyclomatic": 3.0,
+      "coverage": 0.0,
+      "crap": 12.0,
+      "uncovered": [
+        {
+          "start": 190,
+          "end": 211
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/kokoro.rs",
+      "function": "KokoroSynthesizer::synthesize",
+      "line": 219,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 219,
+          "end": 232
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/kokoro.rs",
+      "function": "KokoroSynthesizer::synthesize_streaming",
+      "line": 234,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 234,
+          "end": 282
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/kokoro.rs",
+      "function": "capabilities_for",
+      "line": 87,
+      "cyclomatic": 7.0,
+      "coverage": 92.6829268292683,
+      "crap": 7.019195890947606,
+      "uncovered": [
+        {
+          "start": 95,
+          "end": 96
+        },
+        {
+          "start": 127,
+          "end": 127
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/kokoro.rs",
+      "function": "configure_inference_provider",
+      "line": 60,
+      "cyclomatic": 5.0,
+      "coverage": 0.0,
+      "crap": 30.0,
+      "uncovered": [
+        {
+          "start": 60,
+          "end": 75
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/kokoro.rs",
+      "function": "cuda_device_present",
+      "line": 77,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 77,
+          "end": 85
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/kokoro.rs",
+      "function": "detect_inference_policy",
+      "line": 323,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 323,
+          "end": 328
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/kokoro.rs",
+      "function": "policy_for",
+      "line": 331,
+      "cyclomatic": 6.0,
+      "coverage": 100.0,
+      "crap": 6.0
+    },
+    {
+      "file": "./src/adapters/kokoro.rs",
+      "function": "provider",
+      "line": 154,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/kokoro.rs",
+      "function": "provider_capabilities",
+      "line": 56,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 56,
+          "end": 58
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/kokoro.rs",
+      "function": "requested_device",
+      "line": 285,
+      "cyclomatic": 5.0,
+      "coverage": 0.0,
+      "crap": 30.0,
+      "uncovered": [
+        {
+          "start": 285,
+          "end": 296
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/kokoro.rs",
+      "function": "speech_chunks",
+      "line": 298,
+      "cyclomatic": 6.0,
+      "coverage": 95.45454545454545,
+      "crap": 6.0033809166040575,
+      "uncovered": [
+        {
+          "start": 318,
+          "end": 318
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/kokoro_catalog.rs",
+      "function": "KokoroVoiceCatalog::default_voice_for",
+      "line": 358,
+      "cyclomatic": 11.0,
+      "coverage": 92.3076923076923,
+      "crap": 11.055075102412381,
+      "uncovered": [
+        {
+          "start": 369,
+          "end": 369
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/kokoro_catalog.rs",
+      "function": "KokoroVoiceCatalog::default_voice_id",
+      "line": 354,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/kokoro_catalog.rs",
+      "function": "KokoroVoiceCatalog::languages",
+      "line": 346,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/kokoro_catalog.rs",
+      "function": "KokoroVoiceCatalog::preview_text",
+      "line": 373,
+      "cyclomatic": 10.0,
+      "coverage": 92.3076923076923,
+      "crap": 10.04551661356395,
+      "uncovered": [
+        {
+          "start": 385,
+          "end": 385
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/kokoro_catalog.rs",
+      "function": "KokoroVoiceCatalog::voices",
+      "line": 350,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/linux_selection.rs",
+      "function": "capture_selected_text",
+      "line": 13,
+      "cyclomatic": 2.0,
+      "coverage": null,
+      "crap": 6.0
+    },
+    {
+      "file": "./src/adapters/linux_selection.rs",
+      "function": "capture_wayland_selection",
+      "line": 21,
+      "cyclomatic": 4.0,
+      "coverage": null,
+      "crap": 20.0
+    },
+    {
+      "file": "./src/adapters/linux_selection.rs",
+      "function": "capture_x11_selection",
+      "line": 35,
+      "cyclomatic": 6.0,
+      "coverage": null,
+      "crap": 42.0
+    },
+    {
+      "file": "./src/adapters/linux_selection.rs",
+      "function": "is_wayland_session",
+      "line": 7,
+      "cyclomatic": 1.0,
+      "coverage": null,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "AccessibilityAttributeError::fmt",
+      "line": 30,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 30,
+          "end": 32
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "accessibility_error",
+      "line": 366,
+      "cyclomatic": 4.0,
+      "coverage": 83.33333333333334,
+      "crap": 4.0740740740740735,
+      "uncovered": [
+        {
+          "start": 374,
+          "end": 374
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "application_element",
+      "line": 126,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 126,
+          "end": 130
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "attribute_error_code",
+      "line": 346,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 346,
+          "end": 350
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "attribute_unavailable",
+      "line": 352,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 352,
+          "end": 357
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "capture_selected_text",
+      "line": 78,
+      "cyclomatic": 16.0,
+      "coverage": 0.0,
+      "crap": 272.0,
+      "uncovered": [
+        {
+          "start": 78,
+          "end": 114
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "copy_attribute",
+      "line": 323,
+      "cyclomatic": 3.0,
+      "coverage": 0.0,
+      "crap": 12.0,
+      "uncovered": [
+        {
+          "start": 323,
+          "end": 344
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "enable_manual_accessibility",
+      "line": 132,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 132,
+          "end": 144
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "ensure_not_protected",
+      "line": 259,
+      "cyclomatic": 7.0,
+      "coverage": 0.0,
+      "crap": 56.0,
+      "uncovered": [
+        {
+          "start": 259,
+          "end": 283
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "focused_element",
+      "line": 243,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 243,
+          "end": 246
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "frontmost_application_pid",
+      "line": 119,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 119,
+          "end": 124
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "is_accessibility_trusted",
+      "line": 71,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 71,
+          "end": 74
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "optional_focused_element",
+      "line": 248,
+      "cyclomatic": 5.0,
+      "coverage": 0.0,
+      "crap": 30.0,
+      "uncovered": [
+        {
+          "start": 248,
+          "end": 257
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "request_accessibility_permission",
+      "line": 61,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 61,
+          "end": 69
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "selected_text",
+      "line": 160,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 160,
+          "end": 170
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "selected_text_from_application",
+      "line": 146,
+      "cyclomatic": 8.0,
+      "coverage": 0.0,
+      "crap": 72.0,
+      "uncovered": [
+        {
+          "start": 146,
+          "end": 158
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "selected_text_from_focus_chain",
+      "line": 227,
+      "cyclomatic": 5.0,
+      "coverage": 0.0,
+      "crap": 30.0,
+      "uncovered": [
+        {
+          "start": 227,
+          "end": 241
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "selected_text_from_range",
+      "line": 172,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 172,
+          "end": 209
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "selected_text_from_tree",
+      "line": 219,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 219,
+          "end": 225
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "selected_text_in_descendants",
+      "line": 285,
+      "cyclomatic": 9.0,
+      "coverage": 0.0,
+      "crap": 90.0,
+      "uncovered": [
+        {
+          "start": 285,
+          "end": 321
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "should_retry_accessibility_route",
+      "line": 359,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/macos_selection.rs",
+      "function": "utf16_range",
+      "line": 211,
+      "cyclomatic": 5.0,
+      "coverage": 100.0,
+      "crap": 5.0
+    },
+    {
+      "file": "./src/adapters/macos_service.rs",
+      "function": "ServiceProvider::new",
+      "line": 70,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 70,
+          "end": 74
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_service.rs",
+      "function": "register",
+      "line": 78,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 78,
+          "end": 85
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_service.rs",
+      "function": "set_service_error",
+      "line": 58,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 58,
+          "end": 67
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_shortcut.rs",
+      "function": "ShortcutState::finish_if_released",
+      "line": 52,
+      "cyclomatic": 5.0,
+      "coverage": 100.0,
+      "crap": 5.0
+    },
+    {
+      "file": "./src/adapters/macos_shortcut.rs",
+      "function": "ShortcutState::new",
+      "line": 43,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/macos_shortcut.rs",
+      "function": "ShortcutState::reenable_tap",
+      "line": 66,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 66,
+          "end": 78
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_shortcut.rs",
+      "function": "is_control_space",
+      "line": 173,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/adapters/macos_shortcut.rs",
+      "function": "run",
+      "line": 94,
+      "cyclomatic": 5.0,
+      "coverage": 0.0,
+      "crap": 30.0,
+      "uncovered": [
+        {
+          "start": 94,
+          "end": 169
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/macos_shortcut.rs",
+      "function": "spawn",
+      "line": 85,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 85,
+          "end": 92
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/model_preferences.rs",
+      "function": "ModelPreferencesStore::at",
+      "line": 13,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/model_preferences.rs",
+      "function": "ModelPreferencesStore::load",
+      "line": 17,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/model_preferences.rs",
+      "function": "ModelPreferencesStore::path",
+      "line": 48,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/model_preferences.rs",
+      "function": "ModelPreferencesStore::save",
+      "line": 33,
+      "cyclomatic": 5.0,
+      "coverage": 85.71428571428571,
+      "crap": 5.072886297376093,
+      "uncovered": [
+        {
+          "start": 41,
+          "end": 42
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/playback_preferences.rs",
+      "function": "PlaybackPreferencesStore::at",
+      "line": 13,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/playback_preferences.rs",
+      "function": "PlaybackPreferencesStore::load",
+      "line": 17,
+      "cyclomatic": 6.0,
+      "coverage": 88.46153846153845,
+      "crap": 6.0553026854802,
+      "uncovered": [
+        {
+          "start": 26,
+          "end": 26
+        },
+        {
+          "start": 30,
+          "end": 30
+        },
+        {
+          "start": 32,
+          "end": 32
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/playback_preferences.rs",
+      "function": "PlaybackPreferencesStore::path",
+      "line": 73,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/playback_preferences.rs",
+      "function": "PlaybackPreferencesStore::save",
+      "line": 49,
+      "cyclomatic": 5.0,
+      "coverage": 88.88888888888889,
+      "crap": 5.034293552812072,
+      "uncovered": [
+        {
+          "start": 66,
+          "end": 67
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/playback_preferences.rs",
+      "function": "parse_bool",
+      "line": 78,
+      "cyclomatic": 4.0,
+      "coverage": 100.0,
+      "crap": 4.0
+    },
+    {
+      "file": "./src/adapters/system_audio.rs",
+      "function": "MciSession::drop",
+      "line": 433,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/system_audio.rs",
+      "function": "SystemAudioPlayer::new",
+      "line": 27,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 27,
+          "end": 38
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/system_audio.rs",
+      "function": "SystemAudioPlayer::play",
+      "line": 163,
+      "cyclomatic": 7.0,
+      "coverage": 0.0,
+      "crap": 56.0,
+      "uncovered": [
+        {
+          "start": 163,
+          "end": 180
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/system_audio.rs",
+      "function": "SystemAudioPlayer::play_file",
+      "line": 67,
+      "cyclomatic": 8.0,
+      "coverage": 100.0,
+      "crap": 8.0
+    },
+    {
+      "file": "./src/adapters/system_audio.rs",
+      "function": "SystemAudioPlayer::play_windows",
+      "line": 109,
+      "cyclomatic": 16.0,
+      "coverage": 100.0,
+      "crap": 16.0
+    },
+    {
+      "file": "./src/adapters/system_audio.rs",
+      "function": "SystemAudioPlayer::start_player",
+      "line": 59,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 59,
+          "end": 64
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/system_audio.rs",
+      "function": "SystemAudioPlayer::write_wav",
+      "line": 40,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 40,
+          "end": 56
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/system_audio.rs",
+      "function": "mci_command",
+      "line": 386,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/adapters/system_audio.rs",
+      "function": "monitor_playback",
+      "line": 183,
+      "cyclomatic": 13.0,
+      "coverage": 82.22222222222221,
+      "crap": 13.949552812071332,
+      "uncovered": [
+        {
+          "start": 193,
+          "end": 194
+        },
+        {
+          "start": 205,
+          "end": 205
+        },
+        {
+          "start": 220,
+          "end": 221
+        },
+        {
+          "start": 229,
+          "end": 230
+        },
+        {
+          "start": 238,
+          "end": 238
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/system_audio.rs",
+      "function": "nul_position",
+      "line": 421,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/system_audio.rs",
+      "function": "playback_error_was_stopped",
+      "line": 378,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/system_audio.rs",
+      "function": "set_process_paused",
+      "line": 250,
+      "cyclomatic": 3.0,
+      "coverage": 77.77777777777779,
+      "crap": 3.0987654320987654,
+      "uncovered": [
+        {
+          "start": 256,
+          "end": 257
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/system_audio.rs",
+      "function": "stop_child",
+      "line": 244,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/voice_preferences.rs",
+      "function": "VoicePreferencesStore::at",
+      "line": 15,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/voice_preferences.rs",
+      "function": "VoicePreferencesStore::load",
+      "line": 19,
+      "cyclomatic": 2.0,
+      "coverage": 85.71428571428571,
+      "crap": 2.011661807580175,
+      "uncovered": [
+        {
+          "start": 29,
+          "end": 29
+        },
+        {
+          "start": 32,
+          "end": 32
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/voice_preferences.rs",
+      "function": "VoicePreferencesStore::path",
+      "line": 58,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/adapters/voice_preferences.rs",
+      "function": "VoicePreferencesStore::save",
+      "line": 37,
+      "cyclomatic": 6.0,
+      "coverage": 84.21052631578947,
+      "crap": 6.141711619769646,
+      "uncovered": [
+        {
+          "start": 39,
+          "end": 39
+        },
+        {
+          "start": 51,
+          "end": 52
+        }
+      ]
+    },
+    {
+      "file": "./src/adapters/wayland_shortcut.rs",
+      "function": "run",
+      "line": 41,
+      "cyclomatic": 16.0,
+      "coverage": null,
+      "crap": 272.0
+    },
+    {
+      "file": "./src/adapters/wayland_shortcut.rs",
+      "function": "spawn",
+      "line": 16,
+      "cyclomatic": 2.0,
+      "coverage": null,
+      "crap": 6.0
+    },
+    {
+      "file": "./src/adapters/windows_selection.rs",
+      "function": "capture_selected_text",
+      "line": 8,
+      "cyclomatic": 11.0,
+      "coverage": null,
+      "crap": 132.0
+    },
+    {
+      "file": "./src/adapters/windows_selection.rs",
+      "function": "selected_text_from",
+      "line": 41,
+      "cyclomatic": 7.0,
+      "coverage": null,
+      "crap": 56.0
+    },
+    {
+      "file": "./src/application.rs",
+      "function": "InstallModel::execute",
+      "line": 27,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/application.rs",
+      "function": "InstallModel::new",
+      "line": 23,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/application.rs",
+      "function": "SpeakSelection::execute",
+      "line": 49,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/application.rs",
+      "function": "SpeakSelection::execute_with_playback_cues",
+      "line": 86,
+      "cyclomatic": 7.0,
+      "coverage": 88.46153846153845,
+      "crap": 7.075273099681384,
+      "uncovered": [
+        {
+          "start": 98,
+          "end": 98
+        },
+        {
+          "start": 108,
+          "end": 108
+        },
+        {
+          "start": 112,
+          "end": 112
+        }
+      ]
+    },
+    {
+      "file": "./src/application.rs",
+      "function": "SpeakSelection::execute_with_playback_started",
+      "line": 73,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/application.rs",
+      "function": "SpeakSelection::new",
+      "line": 40,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/application.rs",
+      "function": "SpeakSelection::preview_voice_with_playback_cues",
+      "line": 63,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/application.rs",
+      "function": "SpeakSelection::set_playback_mode",
+      "line": 57,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/application.rs",
+      "function": "SpeakSelection::set_voice",
+      "line": 53,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "Audio::energy",
+      "line": 400,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "Audio::features_at",
+      "line": 406,
+      "cyclomatic": 3.0,
+      "coverage": 71.42857142857143,
+      "crap": 3.2099125364431487,
+      "uncovered": [
+        {
+          "start": 408,
+          "end": 411
+        }
+      ]
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "Audio::new",
+      "line": 392,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "InferenceProviderId::as_str",
+      "line": 288,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "InferenceProviderId::new",
+      "line": 283,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "LanguageId::as_str",
+      "line": 359,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 359,
+          "end": 361
+        }
+      ]
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "LanguageId::new",
+      "line": 355,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 355,
+          "end": 357
+        }
+      ]
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "PlaybackMode::streams_audio",
+      "line": 236,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "PlaybackPreferences::default",
+      "line": 311,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "PlaybackSpeed::default",
+      "line": 266,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "PlaybackSpeed::from_percent",
+      "line": 248,
+      "cyclomatic": 3.0,
+      "coverage": 80.0,
+      "crap": 3.072,
+      "uncovered": [
+        {
+          "start": 252,
+          "end": 252
+        }
+      ]
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "PlaybackSpeed::multiplier",
+      "line": 260,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "PlaybackSpeed::percent",
+      "line": 256,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "QueueItemId::get",
+      "line": 68,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "SelectedText::as_str",
+      "line": 31,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "SelectedText::new",
+      "line": 12,
+      "cyclomatic": 3.0,
+      "coverage": 73.33333333333333,
+      "crap": 3.1706666666666665,
+      "uncovered": [
+        {
+          "start": 22,
+          "end": 25
+        }
+      ]
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "SelectedText::preview",
+      "line": 35,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "SpeechQueue::active_id",
+      "line": 124,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "SpeechQueue::complete",
+      "line": 197,
+      "cyclomatic": 2.0,
+      "coverage": 87.5,
+      "crap": 2.0078125,
+      "uncovered": [
+        {
+          "start": 200,
+          "end": 200
+        }
+      ]
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "SpeechQueue::fail",
+      "line": 208,
+      "cyclomatic": 1.0,
+      "coverage": 80.0,
+      "crap": 1.008,
+      "uncovered": [
+        {
+          "start": 211,
+          "end": 211
+        },
+        {
+          "start": 216,
+          "end": 216
+        }
+      ]
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "SpeechQueue::items",
+      "line": 120,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "SpeechQueue::mark_playing",
+      "line": 156,
+      "cyclomatic": 1.0,
+      "coverage": 88.88888888888889,
+      "crap": 1.0013717421124828,
+      "uncovered": [
+        {
+          "start": 162,
+          "end": 162
+        }
+      ]
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "SpeechQueue::pause",
+      "line": 168,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "SpeechQueue::push",
+      "line": 106,
+      "cyclomatic": 2.0,
+      "coverage": 92.3076923076923,
+      "crap": 2.0018206645425582,
+      "uncovered": [
+        {
+          "start": 108,
+          "end": 108
+        }
+      ]
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "SpeechQueue::remove",
+      "line": 192,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "SpeechQueue::resume",
+      "line": 180,
+      "cyclomatic": 1.0,
+      "coverage": 88.88888888888889,
+      "crap": 1.0013717421124828,
+      "uncovered": [
+        {
+          "start": 186,
+          "end": 186
+        }
+      ]
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "SpeechQueue::start",
+      "line": 145,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "SpeechQueue::start_next",
+      "line": 136,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "VoiceId::as_str",
+      "line": 330,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "VoiceId::new",
+      "line": 325,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "VoiceSettings::new",
+      "line": 371,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/domain.rs",
+      "function": "features",
+      "line": 422,
+      "cyclomatic": 4.0,
+      "coverage": 86.20689655172413,
+      "crap": 4.041986141293206,
+      "uncovered": [
+        {
+          "start": 424,
+          "end": 427
+        }
+      ]
+    },
+    {
+      "file": "./src/main.rs",
+      "function": "main",
+      "line": 8,
+      "cyclomatic": 3.0,
+      "coverage": 0.0,
+      "crap": 12.0,
+      "uncovered": [
+        {
+          "start": 8,
+          "end": 121
+        }
+      ]
+    },
+    {
+      "file": "./src/model_store.rs",
+      "function": "ModelStore::at",
+      "line": 41,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/model_store.rs",
+      "function": "ModelStore::discover",
+      "line": 27,
+      "cyclomatic": 3.0,
+      "coverage": 0.0,
+      "crap": 12.0,
+      "uncovered": [
+        {
+          "start": 27,
+          "end": 39
+        }
+      ]
+    },
+    {
+      "file": "./src/model_store.rs",
+      "function": "ModelStore::install",
+      "line": 62,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 62,
+          "end": 73
+        }
+      ]
+    },
+    {
+      "file": "./src/model_store.rs",
+      "function": "ModelStore::install",
+      "line": 81,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 81,
+          "end": 83
+        }
+      ]
+    },
+    {
+      "file": "./src/model_store.rs",
+      "function": "ModelStore::is_ready",
+      "line": 57,
+      "cyclomatic": 2.0,
+      "coverage": 75.0,
+      "crap": 2.0625,
+      "uncovered": [
+        {
+          "start": 59,
+          "end": 59
+        }
+      ]
+    },
+    {
+      "file": "./src/model_store.rs",
+      "function": "ModelStore::is_ready",
+      "line": 77,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/model_store.rs",
+      "function": "ModelStore::model_path",
+      "line": 49,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/model_store.rs",
+      "function": "ModelStore::root",
+      "line": 45,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/model_store.rs",
+      "function": "ModelStore::voices_path",
+      "line": 53,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/model_store.rs",
+      "function": "artifact_is_valid",
+      "line": 86,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/model_store.rs",
+      "function": "download",
+      "line": 115,
+      "cyclomatic": 8.0,
+      "coverage": 0.0,
+      "crap": 72.0,
+      "uncovered": [
+        {
+          "start": 115,
+          "end": 152
+        }
+      ]
+    },
+    {
+      "file": "./src/model_store.rs",
+      "function": "sha256",
+      "line": 97,
+      "cyclomatic": 5.0,
+      "coverage": 100.0,
+      "crap": 5.0
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "CaptureControl::begin_fallback",
+      "line": 42,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "CaptureControl::cancel_native",
+      "line": 53,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "CaptureControl::fallback_started",
+      "line": 64,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 64,
+          "end": 66
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "CaptureControl::new",
+      "line": 38,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "PlatformBridge::accessibility_required",
+      "line": 297,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 297,
+          "end": 299
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "PlatformBridge::accessibility_required",
+      "line": 302,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "PlatformBridge::capture_error",
+      "line": 360,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 360,
+          "end": 367
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "PlatformBridge::capture_error",
+      "line": 370,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "PlatformBridge::clear_temporary_clipboard",
+      "line": 318,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 318,
+          "end": 320
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "PlatformBridge::default",
+      "line": 108,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 108,
+          "end": 110
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "PlatformBridge::drop",
+      "line": 376,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 376,
+          "end": 380
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "PlatformBridge::new",
+      "line": 114,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 114,
+          "end": 166
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "PlatformBridge::poll",
+      "line": 168,
+      "cyclomatic": 31.0,
+      "coverage": 0.0,
+      "crap": 992.0,
+      "uncovered": [
+        {
+          "start": 168,
+          "end": 286
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "PlatformBridge::registration_error",
+      "line": 306,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 306,
+          "end": 308
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "PlatformBridge::request_clipboard_text",
+      "line": 314,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 314,
+          "end": 316
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "PlatformBridge::retry_deferred_clipboard_cleanup",
+      "line": 354,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 354,
+          "end": 357
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "PlatformBridge::set_automatic_clipboard_fallback",
+      "line": 310,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 310,
+          "end": 312
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "PlatformBridge::shortcut_label",
+      "line": 292,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 292,
+          "end": 294
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "PlatformBridge::start_capture",
+      "line": 330,
+      "cyclomatic": 3.0,
+      "coverage": 0.0,
+      "crap": 12.0,
+      "uncovered": [
+        {
+          "start": 330,
+          "end": 352
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "PlatformBridge::start_selection_capture",
+      "line": 322,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 322,
+          "end": 328
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "PlatformBridge::usage_hint",
+      "line": 288,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 288,
+          "end": 290
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "allows_clipboard_fallback",
+      "line": 456,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "capture",
+      "line": 392,
+      "cyclomatic": 10.0,
+      "coverage": 0.0,
+      "crap": 110.0,
+      "uncovered": [
+        {
+          "start": 392,
+          "end": 424
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "capture_native_selected_text",
+      "line": 439,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 439,
+          "end": 444
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "capture_native_selected_text",
+      "line": 447,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "capture_native_selected_text",
+      "line": 452,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "current_selection_target",
+      "line": 427,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 427,
+          "end": 431
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "current_selection_target",
+      "line": 434,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "is_wayland",
+      "line": 484,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "is_wayland",
+      "line": 489,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "macos_registration_error",
+      "line": 494,
+      "cyclomatic": 5.0,
+      "coverage": 0.0,
+      "crap": 30.0,
+      "uncovered": [
+        {
+          "start": 494,
+          "end": 506
+        }
+      ]
+    },
+    {
+      "file": "./src/platform.rs",
+      "function": "register_hotkey",
+      "line": 468,
+      "cyclomatic": 5.0,
+      "coverage": 100.0,
+      "crap": 5.0
+    },
+    {
+      "file": "./src/playback.rs",
+      "function": "PlaybackControlState::default",
+      "line": 47,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/playback.rs",
+      "function": "PlaybackController::begin_playback",
+      "line": 99,
+      "cyclomatic": 3.0,
+      "coverage": 93.33333333333333,
+      "crap": 3.002666666666667,
+      "uncovered": [
+        {
+          "start": 106,
+          "end": 106
+        }
+      ]
+    },
+    {
+      "file": "./src/playback.rs",
+      "function": "PlaybackController::begin_session",
+      "line": 82,
+      "cyclomatic": 4.0,
+      "coverage": 93.75,
+      "crap": 4.00390625,
+      "uncovered": [
+        {
+          "start": 89,
+          "end": 89
+        }
+      ]
+    },
+    {
+      "file": "./src/playback.rs",
+      "function": "PlaybackController::cancel",
+      "line": 123,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/playback.rs",
+      "function": "PlaybackController::finish_session",
+      "line": 137,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/playback.rs",
+      "function": "PlaybackController::pause",
+      "line": 115,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/playback.rs",
+      "function": "PlaybackController::phase",
+      "line": 149,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/playback.rs",
+      "function": "PlaybackController::register",
+      "line": 67,
+      "cyclomatic": 2.0,
+      "coverage": 92.85714285714286,
+      "crap": 2.001457725947522,
+      "uncovered": [
+        {
+          "start": 74,
+          "end": 74
+        }
+      ]
+    },
+    {
+      "file": "./src/playback.rs",
+      "function": "PlaybackController::resume",
+      "line": 119,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/playback.rs",
+      "function": "PlaybackController::transition",
+      "line": 181,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/playback.rs",
+      "function": "PlaybackController::wait_for_phase_change",
+      "line": 160,
+      "cyclomatic": 2.0,
+      "coverage": 95.0,
+      "crap": 2.0005,
+      "uncovered": [
+        {
+          "start": 171,
+          "end": 171
+        }
+      ]
+    },
+    {
+      "file": "./src/playback.rs",
+      "function": "PlaybackToken::queue_item",
+      "line": 16,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/ports.rs",
+      "function": "DynSpeechSynthesizer::new",
+      "line": 22,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 22,
+          "end": 24
+        }
+      ]
+    },
+    {
+      "file": "./src/ports.rs",
+      "function": "DynSpeechSynthesizer::synthesize",
+      "line": 28,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 28,
+          "end": 30
+        }
+      ]
+    },
+    {
+      "file": "./src/ports.rs",
+      "function": "DynSpeechSynthesizer::synthesize_streaming",
+      "line": 32,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 32,
+          "end": 39
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::clear_clipboard_lease",
+      "line": 413,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 413,
+          "end": 428
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::clear_color",
+      "line": 1103,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 1103,
+          "end": 1105
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::complete_active_queue",
+      "line": 406,
+      "cyclomatic": 3.0,
+      "coverage": 0.0,
+      "crap": 12.0,
+      "uncovered": [
+        {
+          "start": 406,
+          "end": 411
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::context_menu",
+      "line": 964,
+      "cyclomatic": 6.0,
+      "coverage": 0.0,
+      "crap": 42.0,
+      "uncovered": [
+        {
+          "start": 964,
+          "end": 1026
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::delete_queue_item",
+      "line": 361,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 361,
+          "end": 374
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::dispatch_queue_item",
+      "line": 385,
+      "cyclomatic": 5.0,
+      "coverage": 0.0,
+      "crap": 30.0,
+      "uncovered": [
+        {
+          "start": 385,
+          "end": 404
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::drain_statuses",
+      "line": 194,
+      "cyclomatic": 13.0,
+      "coverage": 0.0,
+      "crap": 182.0,
+      "uncovered": [
+        {
+          "start": 194,
+          "end": 237
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::drop",
+      "line": 1109,
+      "cyclomatic": 3.0,
+      "coverage": 0.0,
+      "crap": 12.0,
+      "uncovered": [
+        {
+          "start": 1109,
+          "end": 1116
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::enqueue",
+      "line": 281,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 281,
+          "end": 292
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::enqueue_preview",
+      "line": 495,
+      "cyclomatic": 3.0,
+      "coverage": 0.0,
+      "crap": 12.0,
+      "uncovered": [
+        {
+          "start": 495,
+          "end": 505
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::enqueue_voice_command",
+      "line": 481,
+      "cyclomatic": 3.0,
+      "coverage": 0.0,
+      "crap": 12.0,
+      "uncovered": [
+        {
+          "start": 481,
+          "end": 493
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::handle_queue_action",
+      "line": 376,
+      "cyclomatic": 5.0,
+      "coverage": 0.0,
+      "crap": 30.0,
+      "uncovered": [
+        {
+          "start": 376,
+          "end": 383
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::handle_tray",
+      "line": 521,
+      "cyclomatic": 7.0,
+      "coverage": 0.0,
+      "crap": 56.0,
+      "uncovered": [
+        {
+          "start": 521,
+          "end": 546
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::logic",
+      "line": 1030,
+      "cyclomatic": 8.0,
+      "coverage": 0.0,
+      "crap": 72.0,
+      "uncovered": [
+        {
+          "start": 1030,
+          "end": 1052
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::maybe_start_automatic_queue",
+      "line": 328,
+      "cyclomatic": 5.0,
+      "coverage": 0.0,
+      "crap": 30.0,
+      "uncovered": [
+        {
+          "start": 328,
+          "end": 338
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::mist_rect",
+      "line": 564,
+      "cyclomatic": 6.0,
+      "coverage": 0.0,
+      "crap": 42.0,
+      "uncovered": [
+        {
+          "start": 564,
+          "end": 582
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::new",
+      "line": 121,
+      "cyclomatic": 5.0,
+      "coverage": 0.0,
+      "crap": 30.0,
+      "uncovered": [
+        {
+          "start": 121,
+          "end": 192
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::paint_mist_only",
+      "line": 584,
+      "cyclomatic": 3.0,
+      "coverage": 0.0,
+      "crap": 12.0,
+      "uncovered": [
+        {
+          "start": 584,
+          "end": 614
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::paint_panel",
+      "line": 681,
+      "cyclomatic": 28.0,
+      "coverage": 0.0,
+      "crap": 812.0,
+      "uncovered": [
+        {
+          "start": 681,
+          "end": 962
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::paint_queue_window",
+      "line": 616,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 616,
+          "end": 679
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::pause_queue_item",
+      "line": 349,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 349,
+          "end": 353
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::perform_action",
+      "line": 507,
+      "cyclomatic": 5.0,
+      "coverage": 0.0,
+      "crap": 30.0,
+      "uncovered": [
+        {
+          "start": 507,
+          "end": 519
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::persist_playback_preferences",
+      "line": 435,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 435,
+          "end": 445
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::play_queue_item",
+      "line": 340,
+      "cyclomatic": 3.0,
+      "coverage": 0.0,
+      "crap": 12.0,
+      "uncovered": [
+        {
+          "start": 340,
+          "end": 347
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::preview_voice",
+      "line": 456,
+      "cyclomatic": 9.0,
+      "coverage": 0.0,
+      "crap": 90.0,
+      "uncovered": [
+        {
+          "start": 456,
+          "end": 479
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::queue_capture",
+      "line": 294,
+      "cyclomatic": 6.0,
+      "coverage": 0.0,
+      "crap": 42.0,
+      "uncovered": [
+        {
+          "start": 294,
+          "end": 317
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::resume_queue_item",
+      "line": 355,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 355,
+          "end": 359
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::retry_deferred_clipboard_cleanup",
+      "line": 430,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 430,
+          "end": 433
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::select_voice",
+      "line": 447,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 447,
+          "end": 454
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::set_error",
+      "line": 262,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 262,
+          "end": 264
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::set_status",
+      "line": 239,
+      "cyclomatic": 9.0,
+      "coverage": 0.0,
+      "crap": 90.0,
+      "uncovered": [
+        {
+          "start": 239,
+          "end": 260
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::sync_platform_status",
+      "line": 266,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 266,
+          "end": 279
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::sync_window_size",
+      "line": 548,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 548,
+          "end": 562
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::ui",
+      "line": 1054,
+      "cyclomatic": 5.0,
+      "coverage": 0.0,
+      "crap": 30.0,
+      "uncovered": [
+        {
+          "start": 1054,
+          "end": 1101
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "PetApp::worker_available_for_queue",
+      "line": 319,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 319,
+          "end": 326
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "ViewportMode::mist_center",
+      "line": 71,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "ViewportMode::size",
+      "line": 62,
+      "cyclomatic": 5.0,
+      "coverage": 85.71428571428571,
+      "crap": 5.072886297376093,
+      "uncovered": [
+        {
+          "start": 67,
+          "end": 67
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "VoicePreviewActivity::after_status",
+      "line": 1182,
+      "cyclomatic": 4.0,
+      "coverage": 100.0,
+      "crap": 4.0
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "authoritative_voice_after_enqueue",
+      "line": 1166,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "gallery_mode",
+      "line": 1195,
+      "cyclomatic": 8.0,
+      "coverage": 68.42105263157895,
+      "crap": 10.015454147834962,
+      "uncovered": [
+        {
+          "start": 1205,
+          "end": 1205
+        },
+        {
+          "start": 1207,
+          "end": 1208
+        },
+        {
+          "start": 1213,
+          "end": 1216
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "language_voice_id",
+      "line": 1249,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 1249,
+          "end": 1257
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "queue_position_below",
+      "line": 1147,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 1147,
+          "end": 1152
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "queue_viewport_id",
+      "line": 1139,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 1139,
+          "end": 1141
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "queue_window_size",
+      "line": 1143,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "queue_worker_available",
+      "line": 1259,
+      "cyclomatic": 4.0,
+      "coverage": 100.0,
+      "crap": 4.0
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "required_panel_visible",
+      "line": 1154,
+      "cyclomatic": 3.0,
+      "coverage": 100.0,
+      "crap": 3.0
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "selected_voice_index",
+      "line": 1119,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 1119,
+          "end": 1125
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "should_preview_language",
+      "line": 1271,
+      "cyclomatic": 2.0,
+      "coverage": 100.0,
+      "crap": 2.0
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "status_opens_panel",
+      "line": 1158,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "viewport_mode",
+      "line": 1127,
+      "cyclomatic": 4.0,
+      "coverage": 100.0,
+      "crap": 4.0
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "viewport_origin_for_mist_center",
+      "line": 1162,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "voice_preview_available",
+      "line": 1220,
+      "cyclomatic": 5.0,
+      "coverage": 92.3076923076923,
+      "crap": 5.011379153390988,
+      "uncovered": [
+        {
+          "start": 1230,
+          "end": 1230
+        }
+      ]
+    },
+    {
+      "file": "./src/ui.rs",
+      "function": "voice_preview_settings",
+      "line": 1240,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/ui/mist.rs",
+      "function": "MistRenderer::new",
+      "line": 23,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 23,
+          "end": 31
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/mist.rs",
+      "function": "MistRenderer::paint",
+      "line": 33,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 33,
+          "end": 101
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/mist.rs",
+      "function": "MistRenderer::paint_swatch",
+      "line": 103,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 103,
+          "end": 126
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/mist.rs",
+      "function": "audio_reactivity",
+      "line": 129,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/ui/mist.rs",
+      "function": "motion_for",
+      "line": 133,
+      "cyclomatic": 5.0,
+      "coverage": 42.857142857142854,
+      "crap": 9.66472303206997,
+      "uncovered": [
+        {
+          "start": 141,
+          "end": 152
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/mist.rs",
+      "function": "textured_quad",
+      "line": 156,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 156,
+          "end": 184
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/mist.rs",
+      "function": "with_alpha",
+      "line": 186,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 186,
+          "end": 188
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/presentation.rs",
+      "function": "MistSmoother::update",
+      "line": 26,
+      "cyclomatic": 3.0,
+      "coverage": 92.85714285714286,
+      "crap": 3.003279883381924,
+      "uncovered": [
+        {
+          "start": 42,
+          "end": 42
+        },
+        {
+          "start": 52,
+          "end": 52
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/presentation.rs",
+      "function": "busy",
+      "line": 124,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/ui/presentation.rs",
+      "function": "copy_for_status",
+      "line": 136,
+      "cyclomatic": 10.0,
+      "coverage": 23.52941176470588,
+      "crap": 54.718094850396916,
+      "uncovered": [
+        {
+          "start": 143,
+          "end": 191
+        },
+        {
+          "start": 195,
+          "end": 200
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/presentation.rs",
+      "function": "ease",
+      "line": 63,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/ui/presentation.rs",
+      "function": "features",
+      "line": 132,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/ui/presentation.rs",
+      "function": "mist_for_status",
+      "line": 81,
+      "cyclomatic": 9.0,
+      "coverage": 75.60975609756098,
+      "crap": 10.175258629445306,
+      "uncovered": [
+        {
+          "start": 94,
+          "end": 94
+        },
+        {
+          "start": 101,
+          "end": 104
+        },
+        {
+          "start": 116,
+          "end": 120
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/presentation.rs",
+      "function": "shorten",
+      "line": 213,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 213,
+          "end": 221
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/queue_tray.rs",
+      "function": "height",
+      "line": 41,
+      "cyclomatic": 2.0,
+      "coverage": 85.71428571428571,
+      "crap": 2.011661807580175,
+      "uncovered": [
+        {
+          "start": 44,
+          "end": 44
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/queue_tray.rs",
+      "function": "paint_delete_icon",
+      "line": 298,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 298,
+          "end": 306
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/queue_tray.rs",
+      "function": "paint_glass",
+      "line": 194,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 194,
+          "end": 222
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/queue_tray.rs",
+      "function": "paint_glass_circle",
+      "line": 224,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 224,
+          "end": 245
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/queue_tray.rs",
+      "function": "paint_playback_icon",
+      "line": 268,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 268,
+          "end": 296
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/queue_tray.rs",
+      "function": "paint_state_dot",
+      "line": 256,
+      "cyclomatic": 6.0,
+      "coverage": 0.0,
+      "crap": 42.0,
+      "uncovered": [
+        {
+          "start": 256,
+          "end": 266
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/queue_tray.rs",
+      "function": "playback_action",
+      "line": 185,
+      "cyclomatic": 5.0,
+      "coverage": 85.71428571428571,
+      "crap": 5.072886297376093,
+      "uncovered": [
+        {
+          "start": 189,
+          "end": 189
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/queue_tray.rs",
+      "function": "playback_label",
+      "line": 174,
+      "cyclomatic": 7.0,
+      "coverage": 55.55555555555556,
+      "crap": 11.301783264746227,
+      "uncovered": [
+        {
+          "start": 175,
+          "end": 176
+        },
+        {
+          "start": 180,
+          "end": 181
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/queue_tray.rs",
+      "function": "show",
+      "line": 49,
+      "cyclomatic": 13.0,
+      "coverage": 0.0,
+      "crap": 182.0,
+      "uncovered": [
+        {
+          "start": 49,
+          "end": 172
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/queue_tray.rs",
+      "function": "tinted_glass",
+      "line": 247,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 247,
+          "end": 254
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/queue_tray.rs",
+      "function": "visible_rows",
+      "line": 37,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "SettingsSection::label",
+      "line": 24,
+      "cyclomatic": 5.0,
+      "coverage": 0.0,
+      "crap": 30.0,
+      "uncovered": [
+        {
+          "start": 24,
+          "end": 31
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "action_row",
+      "line": 552,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 552,
+          "end": 578
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "card_background",
+      "line": 747,
+      "cyclomatic": 2.0,
+      "coverage": 0.0,
+      "crap": 6.0,
+      "uncovered": [
+        {
+          "start": 747,
+          "end": 763
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "choice_row",
+      "line": 599,
+      "cyclomatic": 14.0,
+      "coverage": 0.0,
+      "crap": 210.0,
+      "uncovered": [
+        {
+          "start": 599,
+          "end": 690
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "info_row",
+      "line": 580,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 580,
+          "end": 597
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "language_chip",
+      "line": 339,
+      "cyclomatic": 7.0,
+      "coverage": 0.0,
+      "crap": 56.0,
+      "uncovered": [
+        {
+          "start": 339,
+          "end": 404
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "model",
+      "line": 406,
+      "cyclomatic": 5.0,
+      "coverage": 0.0,
+      "crap": 30.0,
+      "uncovered": [
+        {
+          "start": 406,
+          "end": 458
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "model_provider_rows",
+      "line": 468,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "model_restart_notice_rect",
+      "line": 473,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "page_header",
+      "line": 480,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 480,
+          "end": 504
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "performance_icon",
+      "line": 692,
+      "cyclomatic": 5.0,
+      "coverage": 0.0,
+      "crap": 30.0,
+      "uncovered": [
+        {
+          "start": 692,
+          "end": 745
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "playback",
+      "line": 112,
+      "cyclomatic": 3.0,
+      "coverage": 0.0,
+      "crap": 12.0,
+      "uncovered": [
+        {
+          "start": 112,
+          "end": 179
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "privacy",
+      "line": 223,
+      "cyclomatic": 3.0,
+      "coverage": 0.0,
+      "crap": 12.0,
+      "uncovered": [
+        {
+          "start": 223,
+          "end": 269
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "provider_name",
+      "line": 460,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 460,
+          "end": 466
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "row",
+      "line": 506,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "row_text",
+      "line": 765,
+      "cyclomatic": 3.0,
+      "coverage": 0.0,
+      "crap": 12.0,
+      "uncovered": [
+        {
+          "start": 765,
+          "end": 781
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "sidebar",
+      "line": 40,
+      "cyclomatic": 7.0,
+      "coverage": 0.0,
+      "crap": 56.0,
+      "uncovered": [
+        {
+          "start": 40,
+          "end": 110
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "speed_row",
+      "line": 181,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 181,
+          "end": 221
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "toggle_row",
+      "line": 510,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 510,
+          "end": 550
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/settings.rs",
+      "function": "voice_language",
+      "line": 273,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 273,
+          "end": 337
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/system_settings.rs",
+      "function": "open_accessibility_settings",
+      "line": 2,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 2,
+          "end": 8
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/system_settings.rs",
+      "function": "open_accessibility_settings",
+      "line": 11,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/ui/theme.rs",
+      "function": "configure_interface",
+      "line": 19,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/ui/theme.rs",
+      "function": "install_system_font",
+      "line": 36,
+      "cyclomatic": 3.0,
+      "coverage": 96.42857142857143,
+      "crap": 3.0004099854227406,
+      "uncovered": [
+        {
+          "start": 79,
+          "end": 79
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/theme.rs",
+      "function": "palette_color",
+      "line": 15,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 15,
+          "end": 17
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/theme.rs",
+      "function": "with_alpha",
+      "line": 11,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 11,
+          "end": 13
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/tray.rs",
+      "function": "TrayAdapter::new",
+      "line": 25,
+      "cyclomatic": 9.0,
+      "coverage": 0.0,
+      "crap": 90.0,
+      "uncovered": [
+        {
+          "start": 25,
+          "end": 87
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/tray.rs",
+      "function": "TrayAdapter::poll",
+      "line": 89,
+      "cyclomatic": 5.0,
+      "coverage": 0.0,
+      "crap": 30.0,
+      "uncovered": [
+        {
+          "start": 89,
+          "end": 108
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/tray.rs",
+      "function": "TrayAdapter::select_voice",
+      "line": 110,
+      "cyclomatic": 3.0,
+      "coverage": 0.0,
+      "crap": 12.0,
+      "uncovered": [
+        {
+          "start": 110,
+          "end": 119
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/tray.rs",
+      "function": "TrayAdapter::set_status",
+      "line": 121,
+      "cyclomatic": 9.0,
+      "coverage": 0.0,
+      "crap": 90.0,
+      "uncovered": [
+        {
+          "start": 121,
+          "end": 134
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/tray.rs",
+      "function": "TrayAdapter::set_warning",
+      "line": 136,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 136,
+          "end": 139
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/tray.rs",
+      "function": "mist_icon",
+      "line": 142,
+      "cyclomatic": 3.0,
+      "coverage": 0.0,
+      "crap": 12.0,
+      "uncovered": [
+        {
+          "start": 142,
+          "end": 156
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/voice_gallery.rs",
+      "function": "GalleryMode::hint",
+      "line": 38,
+      "cyclomatic": 5.0,
+      "coverage": 0.0,
+      "crap": 30.0,
+      "uncovered": [
+        {
+          "start": 38,
+          "end": 45
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/voice_gallery.rs",
+      "function": "GalleryMode::interaction_enabled",
+      "line": 34,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 34,
+          "end": 36
+        }
+      ]
+    },
+    {
+      "file": "./src/ui/voice_gallery.rs",
+      "function": "show",
+      "line": 48,
+      "cyclomatic": 15.0,
+      "coverage": 0.0,
+      "crap": 240.0,
+      "uncovered": [
+        {
+          "start": 48,
+          "end": 253
+        }
+      ]
+    },
+    {
+      "file": "./src/worker.rs",
+      "function": "PreviewDispatcher::new",
+      "line": 133,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/worker.rs",
+      "function": "PreviewDispatcher::request",
+      "line": 139,
+      "cyclomatic": 3.0,
+      "coverage": 83.33333333333334,
+      "crap": 3.0416666666666665,
+      "uncovered": [
+        {
+          "start": 143,
+          "end": 143
+        }
+      ]
+    },
+    {
+      "file": "./src/worker.rs",
+      "function": "PreviewRequests::request",
+      "line": 149,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/worker.rs",
+      "function": "PreviewRequests::take_latest",
+      "line": 153,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/worker.rs",
+      "function": "WorkerCommands::try_send",
+      "line": 52,
+      "cyclomatic": 4.0,
+      "coverage": 66.66666666666666,
+      "crap": 4.5925925925925934,
+      "uncovered": [
+        {
+          "start": 55,
+          "end": 56
+        }
+      ]
+    },
+    {
+      "file": "./src/worker.rs",
+      "function": "ensure_session",
+      "line": 438,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 438,
+          "end": 464
+        }
+      ]
+    },
+    {
+      "file": "./src/worker.rs",
+      "function": "install_model",
+      "line": 333,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 333,
+          "end": 336
+        }
+      ]
+    },
+    {
+      "file": "./src/worker.rs",
+      "function": "playback_was_stopped",
+      "line": 466,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 466,
+          "end": 470
+        }
+      ]
+    },
+    {
+      "file": "./src/worker.rs",
+      "function": "preview_voice",
+      "line": 356,
+      "cyclomatic": 3.0,
+      "coverage": 0.0,
+      "crap": 12.0,
+      "uncovered": [
+        {
+          "start": 356,
+          "end": 384
+        }
+      ]
+    },
+    {
+      "file": "./src/worker.rs",
+      "function": "run",
+      "line": 211,
+      "cyclomatic": 13.0,
+      "coverage": 53.01204819277109,
+      "crap": 30.532596928576545,
+      "uncovered": [
+        {
+          "start": 230,
+          "end": 230
+        },
+        {
+          "start": 250,
+          "end": 260
+        },
+        {
+          "start": 275,
+          "end": 279
+        },
+        {
+          "start": 284,
+          "end": 291
+        },
+        {
+          "start": 297,
+          "end": 310
+        }
+      ]
+    },
+    {
+      "file": "./src/worker.rs",
+      "function": "run_speech",
+      "line": 386,
+      "cyclomatic": 4.0,
+      "coverage": 0.0,
+      "crap": 20.0,
+      "uncovered": [
+        {
+          "start": 386,
+          "end": 436
+        }
+      ]
+    },
+    {
+      "file": "./src/worker.rs",
+      "function": "select_voice",
+      "line": 319,
+      "cyclomatic": 3.0,
+      "coverage": 92.3076923076923,
+      "crap": 3.0040964952207556,
+      "uncovered": [
+        {
+          "start": 328,
+          "end": 328
+        }
+      ]
+    },
+    {
+      "file": "./src/worker.rs",
+      "function": "send_result_status",
+      "line": 476,
+      "cyclomatic": 4.0,
+      "coverage": 77.77777777777779,
+      "crap": 4.175582990397805,
+      "uncovered": [
+        {
+          "start": 481,
+          "end": 481
+        },
+        {
+          "start": 486,
+          "end": 486
+        }
+      ]
+    },
+    {
+      "file": "./src/worker.rs",
+      "function": "send_status",
+      "line": 472,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/worker.rs",
+      "function": "spawn",
+      "line": 161,
+      "cyclomatic": 1.0,
+      "coverage": 100.0,
+      "crap": 1.0
+    },
+    {
+      "file": "./src/worker.rs",
+      "function": "speak",
+      "line": 338,
+      "cyclomatic": 1.0,
+      "coverage": 0.0,
+      "crap": 2.0,
+      "uncovered": [
+        {
+          "start": 338,
+          "end": 354
+        }
+      ]
+    }
+  ],
+  "diagnostics": {
+    "analyzed_files": 30,
+    "lcov_files": 27,
+    "matched_files": 27,
+    "source_only": {
+      "count": 3,
+      "examples": [
+        "./src/adapters/linux_selection.rs",
+        "./src/adapters/wayland_shortcut.rs",
+        "./src/adapters/windows_selection.rs"
+      ]
+    },
+    "lcov_only": {
+      "count": 0,
+      "examples": []
+    }
+  }
+}

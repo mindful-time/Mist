@@ -1,4 +1,4 @@
 [[IgnoredVulns]]
 id = "RUSTSEC-2025-0141"
 ignoreUntil = 2027-03-31
-reason = "Informational unmaintained advisory for bincode 2.0.1, pulled by kokoro-en 0.1.5. No patched bincode release exists; review when kokoro-en offers a maintained serialization backend."
+reason = "Informational unmaintained advisory for bincode 2.0.1, pulled transitively by kokoro-micro 1.3.0 through jpreprocess 0.15.0. No patched bincode release exists; review when the speech adapter offers a maintained serialization backend."

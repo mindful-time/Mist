@@ -4,4 +4,5 @@
 /.DS_Store
 *.wav
 *.download
-
+smells-findings.log
+smells-report.json
