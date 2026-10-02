@@ -5,6 +5,16 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to validate (all builds the complete candidate bundle)
+        type: choice
+        default: all
+        options:
+          - all
+          - macos
+          - windows
+          - linux
 
 concurrency:
   group: release-${{ github.ref }}
@@ -51,6 +61,7 @@ jobs:
           fi
 
   macos:
+    if: github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos'
     needs: preflight
     strategy:
       fail-fast: false
@@ -98,6 +109,7 @@ jobs:
           binary=dist/packages/Mist.app/Contents/MacOS/mist
           test "$(lipo -archs "$binary")" = "${{ matrix.binary_architecture }}"
           test -f dist/packages/Mist.app/Contents/Resources/licenses/kokoro-micro-NOTICE
+          test -f dist/packages/Mist.app/Contents/Resources/licenses/kokoro-micro-THIRD_PARTY_LICENSES
           test -f dist/packages/Mist.app/Contents/Resources/licenses/NotoSansDevanagariUI-OFL
       - name: Import Developer ID certificate
         id: keychain
@@ -178,6 +190,7 @@ jobs:
           if-no-files-found: error
 
   windows:
+    if: github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'windows'
     needs: preflight
     runs-on: windows-2025
     environment: release-signing
@@ -276,6 +289,7 @@ jobs:
           if-no-files-found: error
 
   linux:
+    if: github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'linux'
     needs: preflight
     runs-on: ubuntu-22.04
     steps:
@@ -321,6 +335,7 @@ jobs:
           dpkg-deb --extract dist/release/Mist-linux-x86_64.deb "$deb_root"
           file "$deb_root/usr/bin/mist" | grep -F 'ELF 64-bit LSB pie executable, x86-64' >/dev/null
           test -f "$deb_root/usr/lib/mist/licenses/kokoro-micro-NOTICE"
+          test -f "$deb_root/usr/lib/mist/licenses/kokoro-micro-THIRD_PARTY_LICENSES"
           test -f "$deb_root/usr/lib/mist/licenses/NotoSansDevanagariUI-OFL"
           if ldd "$deb_root/usr/bin/mist" | grep -F 'not found'; then
             echo "The DEB executable has unresolved runtime libraries." >&2
@@ -344,6 +359,7 @@ jobs:
           if-no-files-found: error
 
   assemble:
+    if: github.event_name == 'push' || inputs.platform == 'all'
     needs: [macos, windows, linux]
     runs-on: ubuntu-22.04
     steps:
@@ -373,10 +389,12 @@ jobs:
           sed -i "s/__MIST_WINDOWS_SIGNER_SHA256__/${WINDOWS_SIGNER_SHA256^^}/g" release-assets/mist-installer.ps1
           cp assets/mist-orb-512-v1.png release-assets/Mist.png
           cd release-assets
+          checksums=$(mktemp "$RUNNER_TEMP/mist-checksums.XXXXXX")
           find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 |
             sort -z |
             xargs -0 sha256sum |
-            sed 's#  \./#  #' > SHA256SUMS
+            sed 's#  \./#  #' > "$checksums"
+          mv "$checksums" SHA256SUMS
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mist-release-bundle-${{ github.sha }}

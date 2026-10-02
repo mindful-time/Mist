@@ -1,0 +1,98 @@
+Additional MIT notices for material incorporated by kokoro-micro 1.3.0
+
+These notices supplement, and do not replace, this directory's Apache-2.0
+LICENSE and upstream NOTICE. Each component retains its own license.
+
+The upstream NOTICE and generation instructions identify incorporated material:
+https://github.com/DavidValin/kokoro-micro/blob/5381b4f7f0e3bb20e9412b16fc0d13a6920ca656/NOTICE
+https://github.com/DavidValin/kokoro-micro/blob/5381b4f7f0e3bb20e9412b16fc0d13a6920ca656/tools/README.md
+
+Notice provenance checked 2026-10-02: the license-file revisions below are the
+last revisions before the vendored upstream snapshot dated 2026-09-13. They
+identify the exact notice text reproduced here, not the revisions of generated
+table inputs. Upstream generation instructions use floating master/main URLs
+and do not record the original component revisions; those revisions remain
+unknown. No generated data or dependency implementation is changed by this file.
+
+--------------------------------------------------------------------------------
+cutlet - https://github.com/polm/cutlet
+Notice source revision: 8503424854f02214b3a2f5a6ed50461561314907
+Notice source URL:
+https://raw.githubusercontent.com/polm/cutlet/8503424854f02214b3a2f5a6ed50461561314907/LICENSE
+
+MIT License
+
+Copyright (c) 2020 Paul O'Leary McCann
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--------------------------------------------------------------------------------
+python-pinyin - https://github.com/mozillazg/python-pinyin
+Notice source revision: 03f0d4224d396919fdc3fda5498578fd6988dc74
+Notice source URL:
+https://raw.githubusercontent.com/mozillazg/python-pinyin/03f0d4224d396919fdc3fda5498578fd6988dc74/LICENSE.txt
+
+The MIT License (MIT)
+
+Copyright (c) 2016 mozillazg, 闲耘 <hotoo.cn@gmail.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+--------------------------------------------------------------------------------
+pinyin-to-ipa - https://github.com/stefantaubert/pinyin-to-ipa
+Notice source revision: 66999f87ddefd1e43268929fb37efe7f52e2ce04
+Notice source URL:
+https://raw.githubusercontent.com/stefantaubert/pinyin-to-ipa/66999f87ddefd1e43268929fb37efe7f52e2ce04/LICENSE
+
+MIT License
+
+Copyright (c) 2025 Stefan Taubert
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

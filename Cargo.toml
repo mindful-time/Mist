@@ -24,6 +24,7 @@ resources = [
     { src = "LICENSE", target = "licenses/Mist-LICENSE" },
     { src = "third_party/kokoro-micro/LICENSE", target = "licenses/kokoro-micro-LICENSE" },
     { src = "third_party/kokoro-micro/NOTICE", target = "licenses/kokoro-micro-NOTICE" },
+    { src = "third_party/kokoro-micro/THIRD_PARTY_LICENSES", target = "licenses/kokoro-micro-THIRD_PARTY_LICENSES" },
     { src = "assets/fonts/OFL-NotoSansDevanagariUI.txt", target = "licenses/NotoSansDevanagariUI-OFL" },
 ]
 

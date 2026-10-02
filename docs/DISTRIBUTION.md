@@ -135,11 +135,17 @@ to modify assets after a draft has been published.
 
 ## Testing a release candidate
 
-After the signing environments are configured, run **Actions → Release → Run
-workflow** on `main`. A manual run builds, signs, notarizes, and validates every
-platform artifact, then uploads `mist-release-bundle-<commit>` as a normal
-Actions artifact. It does not create a tag or GitHub Release and cannot publish
-anything. Use this path to fix packaging failures before choosing a version tag.
+Run **Actions → Release → Run workflow** on `main`. Choose `linux`, `macos`, or
+`windows` to validate one platform and download its individual Actions artifacts.
+macOS requires the Apple signing credentials; Windows requires the Windows
+signing credentials. Linux can be tested while either signing setup is pending.
+
+After both signing setups are configured, choose `all` to build, sign, notarize,
+and validate every platform artifact, then upload
+`mist-release-bundle-<commit>` as a normal Actions artifact. Manual runs do not
+create a tag or GitHub Release and cannot publish anything. Tagged releases
+always require all five packages. Use candidate runs to fix packaging failures
+before choosing a version tag.
 
 ## Publishing a release
 
