@@ -85,7 +85,9 @@ pub(super) fn mist_for_status(
     accessibility_required: bool,
     shell_error: Option<&str>,
 ) -> MistPresentation {
-    if accessibility_required {
+    // Selection permission cannot hide audio that is already playing (for
+    // example a local voice preview or manually queued text).
+    if accessibility_required && !matches!(status, AppStatus::Speaking { .. }) {
         return MistPresentation {
             activity: MistActivity::Attention,
             features: features(18, 20),
@@ -246,6 +248,47 @@ mod tests {
         );
         assert_eq!(presentation.activity, MistActivity::Speaking);
         assert_eq!(presentation.features.energy, 147);
+    }
+
+    #[test]
+    fn voice_playback_animates_even_without_selection_accessibility_permission() {
+        let presentation = mist_for_status(
+            &AppStatus::Speaking {
+                text: "A local voice preview".to_owned(),
+                runtime_backend: "CPU".to_owned(),
+                features: features(147, 83),
+            },
+            true,
+            None,
+        );
+
+        assert_eq!(presentation.activity, MistActivity::Speaking);
+        assert_eq!(presentation.features, features(147, 83));
+        assert!(!presentation.requires_panel);
+    }
+
+    #[test]
+    fn checking_and_recoverable_warnings_do_not_activate_speaking_motion() {
+        for (status, warning, activity, expected_energy) in [
+            (AppStatus::CheckingModel, None, MistActivity::Busy, 32),
+            (
+                AppStatus::Ready,
+                Some("The shortcut is already in use"),
+                MistActivity::Attention,
+                18,
+            ),
+            (
+                AppStatus::Error("Could not start playback".to_owned()),
+                None,
+                MistActivity::Attention,
+                24,
+            ),
+        ] {
+            let presentation = mist_for_status(&status, false, warning);
+            assert_eq!(presentation.activity, activity);
+            assert_eq!(presentation.features.energy, expected_energy);
+            assert!(!presentation.requires_panel);
+        }
     }
 
     #[test]

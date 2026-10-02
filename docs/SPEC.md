@@ -34,12 +34,18 @@ text-to-speech model.
 - The native mist is a soft circular vapor volume, not the website's horizontal
   field. A translucent circular texture provides volume while independent fine
   wisps flow through a feathered round envelope, with no hard border or backing
-  disk. The installed application icon is a still of this same text-free design;
+  disk. Audible playback advects the texture locally inside that circle and
+  accelerates individual wisps; quiet speech still activates flow, louder audio
+  strengthens it, and pause/completion gently settle it. Synthesis and idle
+  galleries do not activate or reset the playback flow clock. A missing
+  selection permission must not suppress animation of audio already playing.
+  The installed application icon is a still of this same text-free design;
   the floating surface and voice swatches animate it.
 - The mist changes movement and intensity with speech lifecycle and audio
   energy. Audio features are eased between playback windows so movement never
   jumps at the 40 ms sampling boundary; when idle, the compact mist keeps a
-  clearly visible fluid breath without becoming visually intrusive. Speaking
+  clearly visible fluid breath and gentle internal texture drift without
+  becoming visually intrusive. Speaking
   is visibly more expressive than idle—using stronger
   expansion, density, and directional flow—without abrupt phase changes. Each
   voice has a stable, recognisable color palette, texture crop, and flow pattern.

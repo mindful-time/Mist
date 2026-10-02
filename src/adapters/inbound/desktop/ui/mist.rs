@@ -1,6 +1,6 @@
 //! Living-mist renderer.
 
-use std::f32::consts::TAU;
+use std::{cell::Cell, f32::consts::TAU};
 
 use crate::MistPalette;
 use anyhow::{Context, Result};
@@ -34,6 +34,32 @@ const ORB_VERTICES: usize = 1 + ORB_RINGS.len() * ORB_SEGMENTS;
 pub(super) struct MistRenderer {
     volume: TextureHandle,
     wisps: TextureHandle,
+    flow: Cell<TextureFlow>,
+}
+
+#[derive(Clone, Copy, Default)]
+struct TextureFlow {
+    phase: f32,
+    strength: f32,
+    last_time: Option<f32>,
+}
+
+impl TextureFlow {
+    fn advance(&mut self, time: f32, presentation: MistPresentation) {
+        let delta = self
+            .last_time
+            .replace(time)
+            .map_or(0.0, |last| (time - last).clamp(0.0, 0.05));
+        let target = if presentation.activity == MistActivity::Speaking {
+            0.45 + audio_reactivity(presentation.features.energy) * 0.55
+        } else {
+            0.0
+        };
+        let response = if target > self.strength { 8.0 } else { 3.0 };
+        self.strength += (target - self.strength) * (1.0 - (-response * delta).exp());
+        // Integrate velocity: changing audio intensity must not jump a particle's phase.
+        self.phase += delta * (0.34 + self.strength * 2.6);
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -95,6 +121,7 @@ struct PaintScene {
     presentation: MistPresentation,
     palette: MistPalette,
     voice_seed: f32,
+    flow: TextureFlow,
 }
 
 impl MistRenderer {
@@ -110,6 +137,7 @@ impl MistRenderer {
                 "mist-orb-wisps",
                 include_bytes!("../../../../../assets/mist-field-alpha-v1.webp"),
             )?,
+            flow: Cell::default(),
         })
     }
 
@@ -122,12 +150,16 @@ impl MistRenderer {
         palette: MistPalette,
         voice_seed: f32,
     ) {
+        let mut flow = self.flow.get();
+        flow.advance(time, presentation);
+        self.flow.set(flow);
         let scene = PaintScene {
             rect,
             time,
             presentation,
             palette,
             voice_seed,
+            flow,
         };
         self.paint_volume(ui, scene);
         self.paint_wisps(ui, scene);
@@ -144,8 +176,12 @@ impl MistRenderer {
         );
         let mut mesh = Mesh::with_texture(self.volume.id());
         append_circular_layer(&mut mesh, scene.rect, |point| {
+            let drift = texture_drift(point, scene.flow, scene.voice_seed);
             let point = rotate(point, -angle) / scale;
-            (Pos2::new(0.5 + point.x * 0.5, 0.5 + point.y * 0.5), color)
+            (
+                Pos2::new(0.5 + point.x * 0.5, 0.5 + point.y * 0.5) + drift,
+                color,
+            )
         });
         ui.painter().add(Shape::mesh(mesh));
     }
@@ -169,9 +205,10 @@ impl MistRenderer {
         // belongs to the same feathered disk, including rectangular swatches.
         for index in 0..count {
             let seed = wisp_seed(index, scene.voice_seed);
-            let pose = wisp_pose(seed, scene.time, motion, reactivity);
+            let pose = wisp_pose(seed, scene.flow.phase, motion, reactivity);
             let color = colors[(index + seed.band) % colors.len()];
-            let color = with_alpha(color, (pose.opacity * 255.0).round() as u8);
+            let alpha = pose.opacity * (1.0 + scene.flow.strength * 0.65);
+            let color = with_alpha(color, (alpha * 255.0).round() as u8);
             append_circular_layer(&mut mesh, scene.rect, |point| {
                 wisp_sample(point, pose, color, WISP_UVS[seed.sprite], seed.mirrored)
             });
@@ -188,11 +225,10 @@ impl MistRenderer {
         palette: MistPalette,
         seed: f32,
     ) {
-        self.paint(
-            ui,
+        let scene = PaintScene {
             rect,
             time,
-            MistPresentation {
+            presentation: MistPresentation {
                 activity: MistActivity::Idle,
                 features: crate::AudioFeatures {
                     energy: 12,
@@ -201,9 +237,26 @@ impl MistRenderer {
                 requires_panel: false,
             },
             palette,
-            seed,
-        );
+            voice_seed: seed,
+            // Gallery swatches never advance or reset the live playback clock.
+            flow: TextureFlow {
+                phase: time * 0.34,
+                ..Default::default()
+            },
+        };
+        self.paint_volume(ui, scene);
+        self.paint_wisps(ui, scene);
     }
+}
+
+fn texture_drift(point: Vec2, flow: TextureFlow, voice_seed: f32) -> Vec2 {
+    let phase = flow.phase + voice_seed * 0.43;
+    let curl = Vec2::new(
+        (point.y * 4.2 + phase).sin() + (point.x * 5.1 - phase * 0.73).cos(),
+        (point.x * 3.8 + phase * 0.87).cos() - (point.y * 4.7 - phase * 0.61).sin(),
+    );
+    let interior = 1.0 - smoothstep(0.45, 0.94, point.length());
+    curl * (0.010 + flow.strength * 0.04) * interior
 }
 
 fn load_texture(context: &egui::Context, name: &str, bytes: &[u8]) -> Result<TextureHandle> {
@@ -513,12 +566,22 @@ mod tests {
                 glow: [255, 224, 239],
             },
             voice_seed: 0.0,
+            flow: TextureFlow::default(),
         }
     }
 
     fn painted_meshes(scene: PaintScene, swatch: bool) -> Vec<Mesh> {
         let context = egui::Context::default();
         let renderer = MistRenderer::new(&context).unwrap();
+        paint_frame(&context, &renderer, scene, swatch)
+    }
+
+    fn paint_frame(
+        context: &egui::Context,
+        renderer: &MistRenderer,
+        scene: PaintScene,
+        swatch: bool,
+    ) -> Vec<Mesh> {
         let mut output = context.run_ui(
             egui::RawInput {
                 screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::splat(400.0))),
@@ -554,6 +617,118 @@ mod tests {
             .collect();
         output.drop_without_applying_deltas();
         meshes
+    }
+
+    fn volume_deformation(mesh: &Mesh) -> Vec2 {
+        // Any whole-image translation, rotation or scale keeps opposing UVs
+        // symmetric about the center. A changing residual proves internal flow.
+        let center = mesh.vertices[0].uv;
+        let left = mesh.vertices[1].uv;
+        let right = mesh.vertices[1 + ORB_SEGMENTS / 2].uv;
+        (left - center) + (right - center)
+    }
+
+    fn texture_movement(activity: MistActivity, energy: u8, seconds: f32) -> f32 {
+        let context = egui::Context::default();
+        let renderer = MistRenderer::new(&context).unwrap();
+        let mut scene = scene(super::super::MIST_WINDOW);
+        scene.presentation.activity = activity;
+        scene.presentation.features.energy = energy;
+        for frame in 0..=20 {
+            scene.time = frame as f32 * 0.05;
+            paint_frame(&context, &renderer, scene, false);
+        }
+        let before = paint_frame(&context, &renderer, scene, false);
+        for frame in 21..=20 + (seconds / 0.05).round() as usize {
+            scene.time = frame as f32 * 0.05;
+            paint_frame(&context, &renderer, scene, false);
+        }
+        let after = paint_frame(&context, &renderer, scene, false);
+        assert_eq!(
+            before[0]
+                .vertices
+                .iter()
+                .map(|vertex| vertex.pos)
+                .collect::<Vec<_>>(),
+            after[0]
+                .vertices
+                .iter()
+                .map(|vertex| vertex.pos)
+                .collect::<Vec<_>>()
+        );
+        (volume_deformation(&after[0]) - volume_deformation(&before[0])).length()
+    }
+
+    #[test]
+    fn compact_idle_texture_has_noticeable_gentle_internal_drift() {
+        // The real painted mesh must deform internally at the compact size;
+        // a rotating/breathing image alone has zero opposing-UV residual.
+        let pixels = texture_movement(MistActivity::Idle, 12, 5.0) * super::super::MIST_WINDOW.x;
+
+        assert!(
+            (1.0..=3.0).contains(&pixels),
+            "compact idle texture must visibly drift without churning: {pixels}"
+        );
+    }
+
+    #[test]
+    fn audible_playback_moves_the_texture_itself_more_than_idle_or_synthesis() {
+        let idle = texture_movement(MistActivity::Idle, 12, 0.25);
+        let synthesizing = texture_movement(MistActivity::Busy, 32, 0.25);
+        let quiet_voice = texture_movement(MistActivity::Speaking, 0, 0.25);
+        let loud_voice = texture_movement(MistActivity::Speaking, 220, 0.25);
+
+        assert!(
+            quiet_voice > 0.002,
+            "quiet speech must have visible internal flow: {quiet_voice}"
+        );
+        assert!(
+            quiet_voice > idle * 3.0,
+            "speaking {quiet_voice}, idle {idle}"
+        );
+        assert!((synthesizing - idle).abs() < 0.0001);
+        assert!(
+            loud_voice > quiet_voice * 1.5,
+            "loud {loud_voice}, quiet {quiet_voice}"
+        );
+    }
+
+    #[test]
+    fn gallery_paint_does_not_reset_playback_flow_and_stopping_settles_it() {
+        let context = egui::Context::default();
+        let renderer = MistRenderer::new(&context).unwrap();
+        let other_context = egui::Context::default();
+        let reference_renderer = MistRenderer::new(&other_context).unwrap();
+        let mut scene = scene(super::super::MIST_WINDOW);
+        scene.presentation.activity = MistActivity::Speaking;
+        scene.presentation.features.energy = 220;
+        for frame in 0..=20 {
+            scene.time = 600.0 + frame as f32 * 0.05;
+            let actual = paint_frame(&context, &renderer, scene, false);
+            let reference = paint_frame(&other_context, &reference_renderer, scene, false);
+            assert_eq!(actual[0].vertices, reference[0].vertices);
+            assert_eq!(actual[1].vertices, reference[1].vertices);
+            paint_frame(&context, &renderer, scene, true);
+        }
+        let playing = paint_frame(&context, &renderer, scene, false);
+        scene.presentation.activity = MistActivity::Idle;
+        let stopped = paint_frame(&context, &renderer, scene, false);
+        assert_eq!(playing[0].vertices, stopped[0].vertices);
+
+        // Residual energy is intentionally retained by the audio smoother,
+        // but must not keep the stopped/pause texture in speaking motion.
+        for frame in 21..=100 {
+            scene.time = 600.0 + frame as f32 * 0.05;
+            paint_frame(&context, &renderer, scene, false);
+        }
+        let before = paint_frame(&context, &renderer, scene, false);
+        for frame in 101..=105 {
+            scene.time = 600.0 + frame as f32 * 0.05;
+            paint_frame(&context, &renderer, scene, false);
+        }
+        let after = paint_frame(&context, &renderer, scene, false);
+        let movement = (volume_deformation(&after[0]) - volume_deformation(&before[0])).length();
+        assert!(movement < 0.001, "stopped texture must settle: {movement}");
     }
 
     #[test]
