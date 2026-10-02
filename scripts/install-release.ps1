@@ -45,7 +45,7 @@ try {
 
     $signature = Get-AuthenticodeSignature $artifactPath
     if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
-        throw "Authenticode verification failed for $artifact: $($signature.StatusMessage)"
+        throw "Authenticode verification failed for ${artifact}: $($signature.StatusMessage)"
     }
     if ($expectedSignerSha256.StartsWith("__MIST_")) {
         throw "The Mist installer is missing its Windows signing identity."

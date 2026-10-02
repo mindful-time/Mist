@@ -73,6 +73,11 @@ For the simplest path, use the
 operating system and shows the matching verified download when a public release
 is available. macOS and Windows installers are also platform-signed.
 
+The download website and installers are not published yet. These commands
+will work after the first tested release is published. Linux binaries currently
+target x86_64 Ubuntu 24.04-compatible desktops with AVX2; see the
+[runtime requirements](docs/DISTRIBUTION.md#user-installation) before downloading.
+
 macOS and Linux:
 
 ```sh

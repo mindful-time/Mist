@@ -38,10 +38,10 @@ installer-mode = "currentUser"
 
 [package.metadata.packager.deb]
 depends = [
-    "libc6",
+    "libc6 (>= 2.39)",
     "libegl1",
     "libgl1",
-    "libstdc++6",
+    "libstdc++6 (>= 13.2)",
     "libwayland-client0",
     "libwayland-egl1",
     "libx11-6",

@@ -1,6 +1,9 @@
 name: Release
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     tags:
       - "v*"
@@ -55,7 +58,7 @@ jobs:
               echo "Release tag must point to a commit on main." >&2
               exit 1
             fi
-          elif [ "$GITHUB_REF" != refs/heads/main ]; then
+          elif [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ "$GITHUB_REF" != refs/heads/main ]; then
             echo "Manual release tests must run from main." >&2
             exit 1
           fi
@@ -289,9 +292,12 @@ jobs:
           if-no-files-found: error
 
   linux:
-    if: github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'linux'
+    name: Linux release packages
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || inputs.platform == 'all' || inputs.platform == 'linux'
     needs: preflight
-    runs-on: ubuntu-22.04
+    # ort-sys's locked prebuilt ONNX Runtime uses newer glibc/libstdc++ symbols.
+    # Keep the build image aligned with the documented Linux runtime baseline.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install Rust 1.95
@@ -302,13 +308,24 @@ jobs:
         run: >-
           sudo apt-get update && sudo apt-get install -y
           libx11-dev libxkbcommon-dev libwayland-dev libgl1-mesa-dev
-          libfuse2 patchelf fonts-dejavu-core fonts-noto-core fonts-noto-cjk
+          libfuse2t64 patchelf binutils fonts-dejavu-core fonts-noto-core fonts-noto-cjk
       - name: Install cargo-packager
         run: cargo install cargo-packager --version "$CARGO_PACKAGER_VERSION" --locked
       - name: Build Linux packages
         shell: bash
         run: |
           cargo build --release --locked
+          # Do not silently raise the published ABI baseline on dependency updates.
+          required_glibc=$(readelf --version-info target/release/mist |
+            grep -Eo 'GLIBC_[0-9.]+' | sort -Vu | tail -1)
+          required_glibcxx=$(readelf --version-info target/release/mist |
+            grep -Eo 'GLIBCXX_[0-9.]+' | sort -Vu | tail -1)
+          echo "Linux runtime requirements: $required_glibc, $required_glibcxx"
+          if ! dpkg --compare-versions "${required_glibc#GLIBC_}" le 2.39 ||
+             ! dpkg --compare-versions "${required_glibcxx#GLIBCXX_}" le 3.4.32; then
+            echo "The binary exceeds the documented Linux runtime baseline." >&2
+            exit 1
+          fi
           cargo packager --release --formats deb,appimage
           deb=$(find dist/packages -maxdepth 1 -type f -name '*.deb' -print -quit)
           appimage=$(find dist/packages -maxdepth 1 -type f -name '*.AppImage' -print -quit)
