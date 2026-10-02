@@ -138,23 +138,36 @@ impl TrayAdapter {
 }
 
 fn mist_icon() -> Result<Icon> {
-    let image = image::load_from_memory(include_bytes!("../../../../../assets/mist-v2.png"))
-        .context("the embedded mist texture is invalid")?
-        .into_rgba8();
-    let mut pixels = image::imageops::resize(&image, 32, 32, image::imageops::FilterType::Lanczos3);
-    for pixel in pixels.pixels_mut() {
-        let luminance =
-            ((u16::from(pixel[0]) + u16::from(pixel[1]) + u16::from(pixel[2])) / 3) as u8;
-        pixel[3] = ((u16::from(pixel[3]) * u16::from(luminance)) / 255) as u8;
-        pixel[0] = 255;
-        pixel[1] = 255;
-        pixel[2] = 255;
-    }
+    let pixels = mist_icon_pixels()?;
     Icon::from_rgba(pixels.into_raw(), 32, 32).context("could not create the tray icon")
+}
+
+fn mist_icon_pixels() -> Result<image::RgbaImage> {
+    let image =
+        image::load_from_memory(include_bytes!("../../../../../assets/mist-orb-512-v1.png"))
+            .context("the embedded app icon is invalid")?
+            .into_rgba8();
+    let pixels = image::imageops::resize(&image, 32, 32, image::imageops::FilterType::Lanczos3);
+    #[cfg(target_os = "macos")]
+    let pixels = {
+        // AppKit recolors template icons for light/dark menu bars; keep the fog's density.
+        let mut pixels = pixels;
+        for pixel in pixels.pixels_mut() {
+            let luminance =
+                ((u16::from(pixel[0]) + u16::from(pixel[1]) + u16::from(pixel[2])) / 3) as u8;
+            pixel[3] = ((u16::from(pixel[3]) * u16::from(luminance)) / 255) as u8;
+            pixel[0] = 255;
+            pixel[1] = 255;
+            pixel[2] = 255;
+        }
+        pixels
+    };
+    Ok(pixels)
 }
 
 #[cfg(test)]
 mod tests {
+    use super::mist_icon_pixels;
     use crate::{
         adapters::outbound::speech::kokoro::catalog::KokoroVoiceCatalog, ports::VoiceCatalog,
     };
@@ -168,5 +181,19 @@ mod tests {
             .count();
 
         assert_eq!(checked, 1);
+    }
+
+    #[test]
+    fn circular_tray_icon_stays_visible_at_small_size_without_a_backing_square() {
+        let pixels = mist_icon_pixels().expect("the shipped icon must decode");
+
+        assert_eq!(pixels.dimensions(), (32, 32));
+        for (x, y) in [(0, 0), (31, 0), (0, 31), (31, 31)] {
+            assert_eq!(pixels.get_pixel(x, y)[3], 0);
+        }
+        assert!(pixels.get_pixel(16, 16)[3] > 40);
+        assert!(pixels.pixels().filter(|pixel| pixel[3] > 40).count() > 250);
+        #[cfg(target_os = "macos")]
+        assert!(pixels.pixels().all(|pixel| pixel.0[..3] == [255, 255, 255]));
     }
 }

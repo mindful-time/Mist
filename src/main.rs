@@ -87,6 +87,10 @@ fn main() -> eframe::Result {
     let native_options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
             .with_title("Mist")
+            .with_icon(
+                eframe::icon_data::from_png_bytes(include_bytes!("../assets/mist-orb-512-v1.png"))
+                    .expect("the embedded app icon should decode"),
+            )
             .with_inner_size(ui::MIST_WINDOW)
             .with_min_inner_size(ui::MIST_WINDOW)
             .with_max_inner_size([860.0, 760.0])

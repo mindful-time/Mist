@@ -371,7 +371,7 @@ jobs:
           cp scripts/install-release.ps1 release-assets/mist-installer.ps1
           sed -i "s/__MIST_APPLE_TEAM_ID__/$APPLE_TEAM_ID/g" release-assets/mist-installer.sh
           sed -i "s/__MIST_WINDOWS_SIGNER_SHA256__/${WINDOWS_SIGNER_SHA256^^}/g" release-assets/mist-installer.ps1
-          cp assets/mist-512.png release-assets/Mist.png
+          cp assets/mist-orb-512-v1.png release-assets/Mist.png
           cd release-assets
           find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 |
             sort -z |

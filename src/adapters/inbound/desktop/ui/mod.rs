@@ -48,8 +48,8 @@ use self::{
     tray::{TrayAction, TrayAdapter},
 };
 
-pub const MIST_WINDOW: Vec2 = Vec2::new(164.0, 164.0);
-const SPEAKING_MIST_WINDOW: Vec2 = Vec2::new(232.0, 232.0);
+pub const MIST_WINDOW: Vec2 = Vec2::splat(164.0);
+const SPEAKING_MIST_WINDOW: Vec2 = Vec2::splat(212.0);
 const QUEUE_WINDOW_WIDTH: f32 = 282.0;
 const CONTEXT_MENU_WINDOW: Vec2 = Vec2::new(280.0, 420.0);
 const PANEL_WINDOW: Vec2 = Vec2::new(860.0, 760.0);
@@ -964,7 +964,6 @@ impl PetApp {
                     .first()
                     .expect("catalog is not empty")
             });
-        ui.label(RichText::new("MIST").small().color(TEXT_MUTED));
         ui.strong(format!("{} mist", profile.display_name));
         ui.label(
             RichText::new(self.platform.usage_hint())
@@ -1415,6 +1414,15 @@ mod tests {
         assert_eq!(viewport_mode(false, false, true), ViewportMode::Speaking);
         assert_eq!(viewport_mode(false, false, false), ViewportMode::Mist);
         assert!(ViewportMode::Speaking.size().x > ViewportMode::Mist.size().x);
+        assert_eq!(MIST_WINDOW.x, MIST_WINDOW.y);
+        assert_eq!(SPEAKING_MIST_WINDOW.x, SPEAKING_MIST_WINDOW.y);
+        let center = Pos2::new(-300.0, -200.0);
+        for mode in [ViewportMode::Mist, ViewportMode::Speaking] {
+            assert_eq!(
+                viewport_origin_for_mist_center(center, mode) + mode.mist_center(),
+                center,
+            );
+        }
     }
 
     #[test]
