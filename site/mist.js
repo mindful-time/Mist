@@ -2,14 +2,16 @@
   "use strict";
 
   const stage = document.querySelector("[data-mist-stage]");
+  const texture = stage?.querySelector(".mist-texture");
   const canvas = document.querySelector("[data-mist-canvas]");
   const context = canvas?.getContext("2d", { alpha: true, desynchronized: true });
-  if (!stage || !canvas || !context) return;
+  if (!stage || !texture || !canvas || !context) return;
 
   const TAU = Math.PI * 2;
   const MAX_PIXEL_RATIO = 1.5;
   const MIN_PARTICLES = 34;
   const MAX_PARTICLES = 88;
+  const SPRITE_VARIATIONS = 3;
   const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
   const depthBands = [
     { depth: 0.48, opacity: 0.052, scale: 0.67, phase: 5.4 },
@@ -28,6 +30,14 @@
   let previousTime = 0;
   let elapsedTime = 0;
   let isIntersecting = true;
+  const pointer = {
+    x: 0.5,
+    y: 0.5,
+    targetX: 0.5,
+    targetY: 0.5,
+    influence: 0,
+    targetInfluence: 0,
+  };
 
   function random() {
     randomState ^= randomState << 13;
@@ -76,7 +86,6 @@
     sprite.width = 320;
     sprite.height = 128;
     const spriteContext = sprite.getContext("2d");
-    const colors = ["186, 207, 244", "202, 214, 244", "166, 198, 238"];
     const shift = variation * 8;
     const lobes = [
       { x: 210, y: 62 + shift * 0.25, radius: 48, stretch: 1.36, rotation: -0.06, opacity: 0.76 },
@@ -86,24 +95,27 @@
       { x: 183, y: 88 - shift * 0.12, radius: 23, stretch: 1.4, rotation: -0.18, opacity: 0.28 },
     ];
 
+    const colors = ["186, 207, 244", "202, 214, 244", "166, 198, 238"];
     for (const [index, lobe] of lobes.entries()) {
       addLobe(spriteContext, lobe, colors[(index + variation) % colors.length]);
     }
     return sprite;
   }
 
-  function createParticle(spawnAtLeft = false) {
-    const bandIndex = Math.min(
+  function createParticle(spawnAtLeft = false, requestedBand = null) {
+    const bandIndex = requestedBand ?? Math.min(
       Math.floor(random() * depthBands.length),
       depthBands.length - 1,
     );
     const band = depthBands[bandIndex];
-    const size = (0.07 + random() * 0.095) * band.scale;
+    const foreground = bandIndex === depthBands.length - 1;
+    const size = (0.07 + random() * 0.095) * band.scale * (foreground ? 1.36 : 1);
+    const anchorY = (foreground ? 0.34 : 0.2) + random() * (foreground ? 0.32 : 0.6);
     const particle = {
       bandIndex,
       x: spawnAtLeft ? -size * (0.25 + random() * 0.7) : random() * (1 + size * 2) - size,
-      y: 0.2 + random() * 0.6,
-      anchorY: 0.2 + random() * 0.6,
+      y: anchorY,
+      anchorY,
       verticalVelocity: 0,
       speed: (0.015 + random() * 0.025) * (0.82 + band.depth * 0.24),
       lift: 0.001 + random() * 0.0035,
@@ -113,7 +125,7 @@
       secondaryPhase: random() * TAU,
       breathOffset: (random() - 0.5) * 0.9,
       opacity: band.opacity * (0.78 + random() * 0.46),
-      spriteIndex: Math.floor(random() * sprites.length),
+      spriteIndex: Math.floor(random() * SPRITE_VARIATIONS),
     };
     particle.y = particle.anchorY + (random() - 0.5) * 0.08;
     return particle;
@@ -125,7 +137,15 @@
 
   function reconcileParticles() {
     const count = desiredParticleCount();
-    while (particles.length < count) particles.push(createParticle());
+    while (particles.length < count) {
+      const index = particles.length;
+      const bandIndex = index % depthBands.length;
+      const bandOrdinal = Math.floor(index / depthBands.length);
+      const bandCount = Math.ceil((count - bandIndex) / depthBands.length);
+      const particle = createParticle(false, bandIndex);
+      particle.x = (bandOrdinal + 0.28 + random() * 0.44) / bandCount;
+      particles.push(particle);
+    }
     if (particles.length > count) particles.length = count;
     stage.dataset.particleCount = String(count);
   }
@@ -147,7 +167,7 @@
   }
 
   function recycleParticle(particle) {
-    const replacement = createParticle(true);
+    const replacement = createParticle(true, particle.bandIndex);
     Object.assign(particle, replacement);
   }
 
@@ -159,8 +179,16 @@
     const localCurl = Math.cos(
       (particle.x * 1.9 + particle.y * 0.8) * TAU - elapsedTime * 0.17 + particle.phase,
     );
-    const targetVerticalVelocity =
+    let targetVerticalVelocity =
       (coherentCurl * 0.009 + localCurl * 0.006 - particle.lift) * band.depth;
+
+    if (pointer.influence > 0.01) {
+      const pointerX = particle.x - pointer.x;
+      const pointerY = particle.y - pointer.y;
+      const pointerDistance = pointerX * pointerX + pointerY * pointerY;
+      const pointerCurl = Math.exp(-pointerDistance / 0.035) * pointer.influence;
+      targetVerticalVelocity += pointerX * pointerCurl * -0.018 * band.depth;
+    }
     const easing = 1 - Math.exp(-1.8 * deltaTime);
 
     particle.verticalVelocity +=
@@ -213,6 +241,36 @@
     context.restore();
   }
 
+  function drawTextureField() {
+    if (!texture.complete || !texture.naturalWidth || !texture.naturalHeight) return;
+
+    const scale = Math.max(
+      width / texture.naturalWidth,
+      height / texture.naturalHeight,
+    ) * 1.08;
+    const drawWidth = texture.naturalWidth * scale;
+    const drawHeight = texture.naturalHeight * scale;
+    const driftX = Math.sin(elapsedTime * 0.09) * width * 0.035;
+    const driftY = Math.cos(elapsedTime * 0.07) * height * 0.018;
+    const interactionX = (pointer.x - 0.5) * pointer.influence * width * 0.055;
+    const interactionY = (pointer.y - 0.5) * pointer.influence * height * 0.045;
+
+    context.save();
+    context.translate(
+      width * 0.5 + driftX + interactionX,
+      height * 0.5 + driftY + interactionY,
+    );
+    context.globalAlpha = 0.3;
+    context.drawImage(
+      texture,
+      -drawWidth * 0.5,
+      -drawHeight * 0.5,
+      drawWidth,
+      drawHeight,
+    );
+    context.restore();
+  }
+
   function renderFrame(currentTime) {
     animationFrame = 0;
     if (!shouldAnimate()) {
@@ -226,9 +284,15 @@
       : 0;
     previousTime = currentTime;
     elapsedTime += deltaTime;
+    const pointerEasing = 1 - Math.exp(-4.6 * deltaTime);
+    pointer.x += (pointer.targetX - pointer.x) * pointerEasing;
+    pointer.y += (pointer.targetY - pointer.y) * pointerEasing;
+    pointer.influence +=
+      (pointer.targetInfluence - pointer.influence) * pointerEasing;
 
     context.clearRect(0, 0, width, height);
-    context.globalCompositeOperation = "screen";
+    context.globalCompositeOperation = "source-over";
+    drawTextureField();
     for (const particle of particles) {
       advanceParticle(particle, deltaTime);
       drawParticle(particle);
@@ -263,7 +327,27 @@
   }
 
   sprites = [0, 1, 2].map(createWispSprite);
+  texture.addEventListener(
+    "load",
+    () => {
+      stage.dataset.texture = "ready";
+    },
+    { once: true },
+  );
+  if (texture.complete && texture.naturalWidth) stage.dataset.texture = "ready";
   resizeCanvas();
+
+  stage.addEventListener("pointermove", (event) => {
+    const bounds = stage.getBoundingClientRect();
+    pointer.targetX = clamp((event.clientX - bounds.left) / bounds.width, 0.08, 0.92);
+    pointer.targetY = clamp((event.clientY - bounds.top) / bounds.height, 0.18, 0.82);
+    pointer.targetInfluence = 1;
+    stage.dataset.interaction = "active";
+  }, { passive: true });
+  stage.addEventListener("pointerleave", () => {
+    pointer.targetInfluence = 0;
+    stage.dataset.interaction = "ambient";
+  });
 
   if ("ResizeObserver" in window) {
     new ResizeObserver(resizeCanvas).observe(canvas);
