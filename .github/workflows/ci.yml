@@ -4,7 +4,44 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
+  repository:
+    name: Repository metadata, workflows, and website
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify release metadata
+        run: ./scripts/release-check.sh
+      - name: Build website
+        run: ./scripts/build-site.sh
+      - name: Validate website output
+        shell: bash
+        run: |
+          node --check site/site.js
+          test -s dist/site/index.html
+          test -s dist/site/styles.css
+          test -s dist/site/site.js
+          test -s dist/site/assets/mist.png
+          test -f dist/site/.nojekyll
+      - name: Validate GitHub Actions workflows
+        shell: bash
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          archive="$RUNNER_TEMP/actionlint.tar.gz"
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            --output "$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          printf '%s  %s\n' "$ACTIONLINT_SHA256" "$archive" | sha256sum --check --status
+          tar --extract --gzip --file "$archive" --directory "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint"
+      - name: Test Linux release installer
+        run: ./scripts/test-install-release.sh
+
   check:
     strategy:
       fail-fast: false
@@ -12,7 +49,7 @@ jobs:
         os: [macos-latest, windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install Rust 1.95
         run: |
           rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt

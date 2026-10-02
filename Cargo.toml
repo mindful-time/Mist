@@ -1,6 +1,6 @@
 [package]
 name = "mist"
-version = "0.5.0"
+version = "0.1.0"
 edition = "2024"
 rust-version = "1.95"
 authors = ["Mist contributors"]
@@ -19,6 +19,13 @@ description = "A living desktop mist that speaks selected text locally with Koko
 long-description = "Mist is a cross-platform desktop companion that reads selected text locally with Kokoro TTS."
 out-dir = "dist/packages"
 icons = ["assets/mist-512.png"]
+license-file = "LICENSE"
+resources = [
+    { src = "LICENSE", target = "licenses/Mist-LICENSE" },
+    { src = "third_party/kokoro-micro/LICENSE", target = "licenses/kokoro-micro-LICENSE" },
+    { src = "third_party/kokoro-micro/NOTICE", target = "licenses/kokoro-micro-NOTICE" },
+    { src = "assets/fonts/OFL-NotoSansDevanagariUI.txt", target = "licenses/NotoSansDevanagariUI-OFL" },
+]
 
 [package.metadata.packager.macos]
 minimum-system-version = "13.0"
@@ -27,6 +34,20 @@ info-plist-path = "macos/Info.plist"
 
 [package.metadata.packager.nsis]
 installer-mode = "currentUser"
+
+[package.metadata.packager.deb]
+depends = [
+    "libc6",
+    "libgl1",
+    "libwayland-client0",
+    "libx11-6",
+    "libxkbcommon0",
+    "xdg-desktop-portal",
+    "fonts-dejavu-core",
+    "fonts-noto-core",
+    "fonts-noto-cjk",
+    "pipewire-bin | pulseaudio-utils | alsa-utils | ffmpeg",
+]
 
 [dependencies]
 anyhow = "1.0"

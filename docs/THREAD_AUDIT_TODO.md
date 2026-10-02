@@ -67,7 +67,7 @@ either defects, stale records, or verification work still required.
 - [x] Add deterministic regression checks for each defect and observe them fail
   before the corresponding fix.
 - [x] Run formatting, native checks, strict Clippy, all tests, OSV, Gitleaks,
-  and the 0.5.0 release-version gate.
+  and the 0.1.0 release-version gate.
 - [ ] Compile-check the supported Windows and Linux targets when their Rust
   target toolchains are installed; record unavailable native runtime coverage
   honestly.

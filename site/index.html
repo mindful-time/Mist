@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0a0e18">
+    <meta
+      name="description"
+      content="Download Mist, a local text-to-speech desktop app for macOS, Windows, and Linux."
+    >
+    <link rel="icon" type="image/png" href="assets/mist.png">
+    <noscript><style>.checking-state { display: none; }</style></noscript>
+    <title>Download Mist</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="site.js" defer></script>
+  </head>
+  <body data-repository="mindful-time/Mist">
+    <a class="skip-link" href="#download">Skip to download</a>
+
+    <div class="hero-shell">
+      <header class="site-header">
+        <a class="brand" href="#top" aria-label="Mist home">
+          <span class="brand-icon" aria-hidden="true">
+            <img src="assets/mist.png" alt="" width="1280" height="1280">
+          </span>
+          Mist
+        </a>
+        <a class="header-link" href="https://github.com/mindful-time/Mist">View on GitHub</a>
+      </header>
+
+      <section class="product-hero" id="top" aria-labelledby="product-title">
+        <div class="hero-content">
+          <img
+            class="mist-logo"
+            src="assets/mist.png"
+            alt=""
+            width="1280"
+            height="1280"
+          >
+          <h1 id="product-title">Mist</h1>
+          <p class="hero-tagline">Select text. Hear it aloud. Keep it on your device.</p>
+        </div>
+        <a class="hero-download" href="#download">Download Mist</a>
+      </section>
+    </div>
+
+    <main>
+      <section class="download-section" id="download" tabindex="-1">
+        <div class="download-intro">
+          <p class="overline">Step 1 of 2</p>
+          <h2>Download Mist</h2>
+          <p>Choose the computer you are using. The page will show only compatible packages.</p>
+        </div>
+        <div class="download-panel" aria-labelledby="download-title">
+          <div class="panel-heading">
+            <h3 id="download-title">Choose your platform</h3>
+          </div>
+
+          <div class="platform-picker" role="group" aria-label="Choose your operating system">
+            <button type="button" data-platform="mac" aria-pressed="false">Mac</button>
+            <button type="button" data-platform="windows" aria-pressed="false">Windows</button>
+            <button type="button" data-platform="linux" aria-pressed="false">Linux</button>
+          </div>
+
+          <div class="package-area" data-package-area aria-live="polite" aria-busy="true">
+            <div class="checking-state">
+              <span class="spinner" aria-hidden="true"></span>
+              Checking available downloads…
+            </div>
+            <noscript>
+              <div class="release-notice">
+                <strong>Choose a download on GitHub.</strong>
+                <span>This page needs JavaScript to match an installer to your computer.</span>
+                <a href="https://github.com/mindful-time/Mist/releases">View all releases</a>
+              </div>
+            </noscript>
+          </div>
+
+          <p class="release-status" data-release-status role="status">
+            Looking for the latest public release.
+          </p>
+          <p class="setup-expectation">
+            First setup needs internet to download the speech model and voices (about 338 MiB).
+            Speech stays local after setup.
+          </p>
+        </div>
+      </section>
+
+      <section class="next-steps" id="install" aria-labelledby="install-title">
+        <div class="section-title">
+          <p class="step-label">Step 2 of 2</p>
+          <h2 id="install-title">After it downloads</h2>
+        </div>
+        <ol class="instruction-list" data-instructions>
+          <li><span aria-hidden="true">1</span><p>Open the downloaded installer.</p></li>
+          <li><span aria-hidden="true">2</span><p>Open Mist and download the voices.</p></li>
+          <li><span aria-hidden="true">3</span><p>Select text, press <kbd>Ctrl</kbd> + <kbd>Space</kbd>, and listen.</p></li>
+        </ol>
+      </section>
+
+      <section class="essentials" aria-labelledby="essentials-title">
+        <div>
+          <p class="overline">What it does</p>
+          <h2 id="essentials-title">Reading help without sending your text away.</h2>
+        </div>
+        <ul>
+          <li>54 natural voices across nine language groups</li>
+          <li>Pause, resume, replay, and adjust reading speed</li>
+          <li>Selected text is not sent to a speech service</li>
+        </ul>
+      </section>
+    </main>
+
+    <footer>
+      <p>Mist is open source under the MIT License.</p>
+      <nav aria-label="Footer navigation">
+        <a href="https://github.com/mindful-time/Mist/releases">All releases</a>
+        <a href="https://github.com/mindful-time/Mist/tree/main/docs">Documentation</a>
+        <a href="https://github.com/mindful-time/Mist/issues">Get help</a>
+      </nav>
+    </footer>
+  </body>
+</html>

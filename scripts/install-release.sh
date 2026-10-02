@@ -218,7 +218,7 @@ case "$platform" in
         releases_directory="$application_directory/releases"
         release_directory="$releases_directory/$actual_checksum"
         current_path="$application_directory/current"
-        application_path="$current_path/Mist.AppImage"
+        application_path="$current_path/squashfs-root/AppRun"
         icon_name=dev.akshobhya.SelectToSpeak.png
 
         icon_path="$temporary_directory/$icon_name"
@@ -288,10 +288,24 @@ case "$platform" in
         staged_appimage=
         staged_icon=
 
+        (
+            unset APPIMAGE_EXTRACT_AND_RUN
+            cd "$staged_release_directory"
+            ./Mist.AppImage --appimage-extract >/dev/null
+        )
+        staged_apprun="$staged_release_directory/squashfs-root/AppRun"
+        if [ ! -x "$staged_apprun" ]; then
+            printf '%s\n' "The downloaded AppImage does not contain an executable AppRun." >&2
+            exit 1
+        fi
+        expected_apprun_checksum=$(checksum "$staged_apprun")
+
         if [ -d "$release_directory" ]; then
             if [ ! -x "$release_directory/Mist.AppImage" ] ||
                 [ "$(checksum "$release_directory/Mist.AppImage")" != "$actual_checksum" ] ||
-                [ "$(checksum "$release_directory/Mist.png")" != "$actual_icon_checksum" ]; then
+                [ "$(checksum "$release_directory/Mist.png")" != "$actual_icon_checksum" ] ||
+                [ ! -x "$release_directory/squashfs-root/AppRun" ] ||
+                [ "$(checksum "$release_directory/squashfs-root/AppRun")" != "$expected_apprun_checksum" ]; then
                 printf '%s\n' "Existing Mist release directory failed verification." >&2
                 exit 1
             fi
@@ -305,12 +319,11 @@ case "$platform" in
         staged_icon="$icon_directory/.${icon_name}.new.$$"
         staged_desktop="$desktop_directory/.dev.akshobhya.SelectToSpeak.desktop.new.$$"
         staged_current="$application_directory/.current.new.$$"
-        escaped_appimage=$(escape_double_quoted "$application_path")
+        escaped_application=$(escape_double_quoted "$application_path")
         {
             printf '%s\n' '#!/bin/sh'
             printf '%s\n' '# Managed by the Mist installer.'
-            printf '%s\n' 'export APPIMAGE_EXTRACT_AND_RUN=1'
-            printf 'exec "%s" "$@"\n' "$escaped_appimage"
+            printf 'exec "%s" "$@"\n' "$escaped_application"
         } > "$staged_launcher"
         chmod 755 "$staged_launcher"
         ln -s "$current_path/Mist.png" "$staged_icon"

@@ -68,6 +68,11 @@ See [inference backend research](docs/INFERENCE_BACKEND_RESEARCH.md) for provide
 
 ## Install
 
+For the simplest path, use the
+[Mist download page](https://mindful-time.github.io/Mist/). It chooses your
+operating system and shows the correct signed installer when a public release is
+available.
+
 macOS and Linux:
 
 ```sh
@@ -206,7 +211,8 @@ make smells
 make security
 ```
 
-Mist is prepared as SemVer release `0.5.0`. `VERSION`, `Cargo.toml`, `Cargo.lock`, and bundle metadata must move together.
+Mist is prepared for its first public SemVer release, `0.1.0`. `VERSION`,
+`Cargo.toml`, `Cargo.lock`, and bundle metadata must move together.
 
 Only the repository owner may push directly to `main`. Every other change must arrive through a pull request, and pull requests are squash-merged.
 

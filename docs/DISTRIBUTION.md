@@ -38,13 +38,14 @@ shell can download the same files directly from the release page:
 
 The Linux artifact is an AppImage, not an Android APK. Mist's desktop selection,
 global shortcut, tray, and accessibility integrations do not target Android.
-The one-command installer launches the AppImage in extract-and-run mode, so it
-does not require FUSE 2. For a directly downloaded AppImage on a system without
-FUSE 2, run it with `APPIMAGE_EXTRACT_AND_RUN=1`.
+The one-command installer extracts the AppImage once and launches its extracted
+`AppRun`, so it does not require FUSE 2 and does not re-extract on every launch.
+For a directly downloaded AppImage on a system without FUSE 2, run it with
+`APPIMAGE_EXTRACT_AND_RUN=1`.
 
 ### Installer options
 
-- `MIST_RELEASE=v0.5.0` installs a specific release instead of the latest.
+- `MIST_RELEASE=v0.1.0` installs a specific release instead of the latest.
 - `MIST_RELEASE_BASE_URL=https://example.invalid/release` uses another asset
   host with the same file names.
 - `MIST_DOWNLOAD_ONLY=1` verifies and downloads without installing.
@@ -69,6 +70,26 @@ existing architecture with a differently built binary.
 Public installation requires a public download host. Releases in a private
 GitHub repository require authentication and therefore cannot support the
 anonymous commands above.
+
+## Download website
+
+The nontechnical download page lives in `site/` and is deployed by the Pages
+workflow. Build it locally with:
+
+```sh
+./scripts/build-site.sh
+```
+
+The generated site is written to `dist/site`. It detects the visitor's desktop
+platform, but never guesses a Mac processor or Linux package: those choices stay
+visible. It enables a link only when the latest public GitHub Release contains
+the exact asset name from the release contract. Before the first public release,
+it shows an explicit unavailable state instead of a broken download.
+
+To publish the site, set **Settings → Pages → Build and deployment → Source** to
+**GitHub Actions**. A push to `main` that changes the site then deploys
+`https://mindful-time.github.io/Mist/`. The repository or the Pages site and its
+release asset host must be public for anonymous users.
 
 ## Packaging
 
@@ -112,21 +133,31 @@ repository ruleset, and enable GitHub's immutable-releases setting before the
 first public release. The workflow also refuses tags outside `main` and refuses
 to modify assets after a draft has been published.
 
+## Testing a release candidate
+
+After the signing environments are configured, run **Actions → Release → Run
+workflow** on `main`. A manual run builds, signs, notarizes, and validates every
+platform artifact, then uploads `mist-release-bundle-<commit>` as a normal
+Actions artifact. It does not create a tag or GitHub Release and cannot publish
+anything. Use this path to fix packaging failures before choosing a version tag.
+
 ## Publishing a release
 
 1. Synchronize `VERSION`, `Cargo.toml`, `Cargo.lock`, and the macOS bundle
    version, then run `./scripts/release-check.sh`.
-2. Push a `v<version>` tag. The release workflow packages each operating system
-   on its native runner and creates or updates a draft GitHub Release.
-3. Confirm every file in the release asset contract is present and matches
+2. Complete a successful manual release-candidate run for the commit on `main`.
+3. Create and push the matching `v<version>` tag. The release workflow packages
+   each operating system on its native runner and creates or updates a draft
+   GitHub Release.
+4. Confirm every file in the release asset contract is present and matches
    `SHA256SUMS`.
-4. Exercise the draft on clean machines before publishing:
+5. Exercise the draft on clean machines before publishing:
    - Apple Silicon and Intel macOS: Gatekeeper, first install, update rollback,
      Accessibility permission, selection, hotkey, model download, and speech.
    - Windows x64: Authenticode, install, update, uninstall, UI Automation,
      hotkey, model download, speech, and available GPU/CPU fallbacks.
    - Linux x64: AppImage and DEB install, desktop entry, X11 and Wayland
      selection, portals, hotkey, model download, speech, and CPU fallback.
-5. Publish the draft only after the acceptance checks pass. Keep a failed draft
+6. Publish the draft only after the acceptance checks pass. Keep a failed draft
    private and fix it with a new version instead of replacing an already
    published release artifact.

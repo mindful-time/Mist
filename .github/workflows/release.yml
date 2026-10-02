@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 concurrency:
   group: release-${{ github.ref }}
@@ -31,16 +32,21 @@ jobs:
         run: |
           ./scripts/release-check.sh
           version=$(tr -d '[:space:]' < VERSION)
-          case "$GITHUB_REF_NAME" in
-            "v$version") ;;
-            *)
-              echo "Tag $GITHUB_REF_NAME does not match VERSION $version." >&2
-              exit 1
-              ;;
-          esac
           git fetch --no-tags origin main
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-            echo "Release tag must point to a commit on main." >&2
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            case "$GITHUB_REF_NAME" in
+              "v$version") ;;
+              *)
+                echo "Tag $GITHUB_REF_NAME does not match VERSION $version." >&2
+                exit 1
+                ;;
+            esac
+            if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+              echo "Release tag must point to a commit on main." >&2
+              exit 1
+            fi
+          elif [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "Manual release tests must run from main." >&2
             exit 1
           fi
 
@@ -52,8 +58,10 @@ jobs:
         include:
           - runner: macos-15
             architecture: aarch64
+            binary_architecture: arm64
           - runner: macos-15-intel
             architecture: x86_64
+            binary_architecture: x86_64
     runs-on: ${{ matrix.runner }}
     environment: release-signing
     env:
@@ -87,6 +95,10 @@ jobs:
           cargo build --release --locked
           cargo packager --release --formats app
           /usr/libexec/PlistBuddy -c "Print :NSServices" dist/packages/Mist.app/Contents/Info.plist >/dev/null
+          binary=dist/packages/Mist.app/Contents/MacOS/mist
+          test "$(lipo -archs "$binary")" = "${{ matrix.binary_architecture }}"
+          test -f dist/packages/Mist.app/Contents/Resources/licenses/kokoro-micro-NOTICE
+          test -f dist/packages/Mist.app/Contents/Resources/licenses/NotoSansDevanagariUI-OFL
       - name: Import Developer ID certificate
         id: keychain
         shell: bash
@@ -116,6 +128,12 @@ jobs:
           app=dist/packages/Mist.app
           codesign --force --deep --options runtime --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$app"
           codesign --verify --deep --strict --verbose=2 "$app"
+          actual_team_id=$(codesign -dv --verbose=4 "$app" 2>&1 |
+            awk -F= '$1 == "TeamIdentifier" { print $2; exit }')
+          if [ "$actual_team_id" != "$APPLE_TEAM_ID" ]; then
+            echo "Signed app TeamIdentifier $actual_team_id does not match APPLE_TEAM_ID." >&2
+            exit 1
+          fi
           archive="$RUNNER_TEMP/Mist.zip"
           ditto -c -k --keepParent "$app" "$archive"
           xcrun notarytool submit "$archive" \
@@ -194,6 +212,12 @@ jobs:
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
           cargo build --release --locked
+          $binary = [IO.File]::ReadAllBytes("target\release\mist.exe")
+          $peOffset = [BitConverter]::ToInt32($binary, 0x3c)
+          $machine = [BitConverter]::ToUInt16($binary, $peOffset + 4)
+          if ($machine -ne 0x8664) {
+            throw "Expected an x64 PE executable, found machine type 0x$($machine.ToString('X4'))."
+          }
       - name: Import certificate and sign executable
         id: certificate
         shell: pwsh
@@ -281,7 +305,28 @@ jobs:
           cp "$appimage" dist/release/Mist-linux-x86_64.AppImage
           chmod 755 dist/release/Mist-linux-x86_64.AppImage
           dpkg-deb --info dist/release/Mist-linux-x86_64.deb >/dev/null
-          dist/release/Mist-linux-x86_64.AppImage --appimage-extract >/dev/null
+          dependencies=$(dpkg-deb --field dist/release/Mist-linux-x86_64.deb Depends)
+          printf '%s\n' "$dependencies" | grep -F libx11-6 >/dev/null
+          printf '%s\n' "$dependencies" | grep -F fonts-noto-core >/dev/null
+          deb_root="$RUNNER_TEMP/mist-deb"
+          mkdir -p "$deb_root"
+          dpkg-deb --extract dist/release/Mist-linux-x86_64.deb "$deb_root"
+          file "$deb_root/usr/bin/mist" | grep -F 'ELF 64-bit LSB pie executable, x86-64' >/dev/null
+          test -f "$deb_root/usr/lib/mist/licenses/kokoro-micro-NOTICE"
+          test -f "$deb_root/usr/lib/mist/licenses/NotoSansDevanagariUI-OFL"
+          if ldd "$deb_root/usr/bin/mist" | grep -F 'not found'; then
+            echo "The DEB executable has unresolved runtime libraries." >&2
+            exit 1
+          fi
+          appimage_root="$RUNNER_TEMP/mist-appimage"
+          mkdir -p "$appimage_root"
+          (
+            cd "$appimage_root"
+            "$GITHUB_WORKSPACE/dist/release/Mist-linux-x86_64.AppImage" --appimage-extract >/dev/null
+          )
+          appimage_binary=$(find "$appimage_root/squashfs-root" -type f -name mist -perm -111 -print -quit)
+          test -n "$appimage_binary"
+          file "$appimage_binary" | grep -F 'ELF 64-bit LSB pie executable, x86-64' >/dev/null
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mist-linux-x86_64
@@ -290,15 +335,9 @@ jobs:
             dist/release/Mist-linux-x86_64.AppImage
           if-no-files-found: error
 
-  release:
+  assemble:
     needs: [macos, windows, linux]
     runs-on: ubuntu-22.04
-    environment: release-publishing
-    permissions:
-      contents: write
-      id-token: write
-      attestations: write
-      artifact-metadata: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -330,6 +369,27 @@ jobs:
             sort -z |
             xargs -0 sha256sum |
             sed 's#  \./#  #' > SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mist-release-bundle-${{ github.sha }}
+          path: release-assets
+          if-no-files-found: error
+
+  publish:
+    if: github.event_name == 'push'
+    needs: assemble
+    runs-on: ubuntu-22.04
+    environment: release-publishing
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: mist-release-bundle-${{ github.sha }}
+          path: release-assets
       - name: Attest public release artifacts
         if: github.event.repository.visibility == 'public'
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
