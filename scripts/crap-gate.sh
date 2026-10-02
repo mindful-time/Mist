@@ -96,7 +96,7 @@ if [ "$blocking_count" -ne 0 ]; then
         '  "policy": "new or regressed functions above 10 block; existing debt is ratcheted",' \
         '  "why": "CRAP combines decision complexity with missing test coverage.",' \
         '  "remediation": "Reduce decision complexity and add focused tests for uncovered branches.",' \
-        '  "evidence_report": "target/quality/crap-delta.json"' \
+        "  \"evidence_report\": $(jq -Rn --arg report "$delta_report" '$report')" \
         '}' >&2
     jq -r '.entries[] | select((.status == "new" or .status == "regressed") and .crap > 10) | "BLOCK \(.file):\(.line) \(.function) CRAP=\(.crap) status=\(.status)"' "$delta_report" >&2
 fi

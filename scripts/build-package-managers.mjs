@@ -11,7 +11,13 @@ try {
   const assets = path.resolve(assetDirectory);
   const output = path.resolve(outputDirectory);
   const root = path.resolve(import.meta.dirname, '..');
-  const manifest = readFileSync(path.join(assets, 'SHA256SUMS'), 'utf8').split(/\r?\n/);
+  const manifest = readFileSync(path.join(assets, 'SHA256SUMS'), 'utf8').split(/\r?\n/).filter(Boolean).map(line => {
+    // Accept both GNU text (two spaces) and binary (space/star) records. Reject
+    // malformed records rather than overlooking a conflicting artifact entry.
+    const record = /^([a-fA-F0-9]{64}) [ *](\S+)$/.exec(line);
+    if (!record) throw new Error('Malformed release checksum record.');
+    return { hash: record[1].toLowerCase(), name: record[2] };
+  });
   const replacements = { VERSION: version, WINDOWS_SIGNER: signer.toUpperCase() };
   for (const [key, name] of [
     ['ARM_SHA256', 'Mist-macos-aarch64.dmg'],
@@ -21,8 +27,8 @@ try {
     const file = path.join(assets, name);
     if (!lstatSync(file).isFile()) throw new Error(`Not a regular release artifact: ${name}`);
     const hash = createHash('sha256').update(readFileSync(file)).digest('hex');
-    const matches = manifest.filter(line => line.slice(66) === name && /^[a-fA-F0-9]{64}  /.test(line));
-    if (matches.length !== 1 || matches[0].slice(0, 64).toLowerCase() !== hash) {
+    const matches = manifest.filter(record => record.name === name);
+    if (matches.length !== 1 || matches[0].hash !== hash) {
       throw new Error(`Missing, duplicate, or incorrect release checksum: ${name}`);
     }
     replacements[key] = hash;

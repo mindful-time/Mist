@@ -69,3 +69,11 @@ test('ambiguous checksum entries are rejected', t => {
   assert.notEqual(f.run().status, 0);
   assert.equal(existsSync(f.output), false);
 });
+
+test('conflicting binary and text checksum records are also ambiguous', t => {
+  const f = fixture(t);
+  const manifest = path.join(f.root, 'SHA256SUMS');
+  writeFileSync(manifest, `${'0'.repeat(64)} *${assets[0]}\n` + readFileSync(manifest, 'utf8'));
+  assert.notEqual(f.run().status, 0);
+  assert.equal(existsSync(f.output), false);
+});
