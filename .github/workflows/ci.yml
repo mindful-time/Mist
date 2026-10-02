@@ -27,3 +27,21 @@ jobs:
       - run: cargo check --locked --all-targets
       - run: cargo test --locked --all-targets
       - run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Validate POSIX release installer
+        if: runner.os != 'Windows'
+        run: sh -n scripts/install-release.sh
+      - name: Validate PowerShell release installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path scripts/install-release.ps1),
+            [ref] $tokens,
+            [ref] $errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List | Out-String | Write-Error
+            exit 1
+          }

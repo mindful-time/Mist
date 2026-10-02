@@ -66,7 +66,34 @@ Windows and Linux builds, tests, and CPU fallbacks run in CI. CUDA and DirectML 
 
 See [inference backend research](docs/INFERENCE_BACKEND_RESEARCH.md) for provider details and validation gates.
 
-## Install and run
+## Install
+
+macOS and Linux:
+
+```sh
+(
+  set -eu
+  installer=$(mktemp "${TMPDIR:-/tmp}/mist-bootstrap.XXXXXX")
+  trap 'rm -f "$installer"' 0
+  curl --proto '=https' --tlsv1.2 -LsSf \
+    https://github.com/mindful-time/Mist/releases/latest/download/mist-installer.sh \
+    --output "$installer"
+  sh "$installer"
+)
+```
+
+Windows PowerShell:
+
+```powershell
+& ([scriptblock]::Create((irm -ErrorAction Stop https://github.com/mindful-time/Mist/releases/latest/download/mist-installer.ps1)))
+```
+
+The installers verify release checksums before installing. Direct DMG, EXE,
+AppImage, and DEB downloads are also available on the release page. See the
+[distribution guide](docs/DISTRIBUTION.md) for exact artifact names, version
+pinning, download-only mode, and release requirements.
+
+## Build and run from source
 
 Requirements: Rust 1.95+ and internet access for the first build and model download.
 
@@ -183,4 +210,8 @@ Mist is prepared as SemVer release `0.5.0`. `VERSION`, `Cargo.toml`, `Cargo.lock
 
 Only the repository owner may push directly to `main`. Every other change must arrive through a pull request, and pull requests are squash-merged.
 
-Launch at login, graphical installers, and production signing or notarization remain outside the current scope. Native selection and GPU acceleration still require release testing on every supported operating system.
+Launch at login remains outside the current scope. Tagged releases build draft,
+signed installers for macOS and Windows plus AppImage and DEB packages for
+Linux. Native selection, GPU acceleration, installation, and uninstall behavior
+still require release acceptance testing on every supported operating system
+before a draft is published.

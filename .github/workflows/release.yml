@@ -1,0 +1,360 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_PACKAGER_VERSION: 0.11.8
+
+jobs:
+  preflight:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Install Rust 1.95
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup default 1.95.0
+      - name: Verify release version
+        shell: bash
+        run: |
+          ./scripts/release-check.sh
+          version=$(tr -d '[:space:]' < VERSION)
+          case "$GITHUB_REF_NAME" in
+            "v$version") ;;
+            *)
+              echo "Tag $GITHUB_REF_NAME does not match VERSION $version." >&2
+              exit 1
+              ;;
+          esac
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "Release tag must point to a commit on main." >&2
+            exit 1
+          fi
+
+  macos:
+    needs: preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            architecture: aarch64
+          - runner: macos-15-intel
+            architecture: x86_64
+    runs-on: ${{ matrix.runner }}
+    environment: release-signing
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "13.0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Rust 1.95
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup default 1.95.0
+      - name: Require Apple release credentials
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          for variable in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!variable:-}" ]; then
+              echo "Repository secret $variable is required." >&2
+              exit 1
+            fi
+          done
+      - name: Install cargo-packager
+        run: cargo install cargo-packager --version "$CARGO_PACKAGER_VERSION" --locked
+      - name: Build app bundle
+        run: |
+          cargo build --release --locked
+          cargo packager --release --formats app
+          /usr/libexec/PlistBuddy -c "Print :NSServices" dist/packages/Mist.app/Contents/Info.plist >/dev/null
+      - name: Import Developer ID certificate
+        id: keychain
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          certificate_path="$RUNNER_TEMP/mist-certificate.p12"
+          keychain_path="$RUNNER_TEMP/mist-signing.keychain-db"
+          keychain_password=$(openssl rand -hex 24)
+          printf '%s' "$APPLE_CERTIFICATE" | openssl base64 -d -A -out "$certificate_path"
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+          echo "path=$keychain_path" >> "$GITHUB_OUTPUT"
+      - name: Sign and notarize app
+        shell: bash
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          app=dist/packages/Mist.app
+          codesign --force --deep --options runtime --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          archive="$RUNNER_TEMP/Mist.zip"
+          ditto -c -k --keepParent "$app" "$archive"
+          xcrun notarytool submit "$archive" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple "$app"
+          xcrun stapler validate "$app"
+          spctl --assess --type execute --verbose=2 "$app"
+      - name: Create signed DMG
+        shell: bash
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          image_root="$RUNNER_TEMP/mist-image"
+          mkdir -p "$image_root" dist/release
+          ditto dist/packages/Mist.app "$image_root/Mist.app"
+          ln -s /Applications "$image_root/Applications"
+          image="dist/release/Mist-macos-${{ matrix.architecture }}.dmg"
+          hdiutil create -volname Mist -srcfolder "$image_root" -ov -format UDZO "$image"
+          codesign --force --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$image"
+          xcrun notarytool submit "$image" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple "$image"
+          xcrun stapler validate "$image"
+          codesign --verify --verbose=2 "$image"
+          spctl --assess --type open --context context:primary-signature --verbose=2 "$image"
+      - name: Remove temporary keychain
+        if: always() && steps.keychain.outputs.path != ''
+        run: security delete-keychain "${{ steps.keychain.outputs.path }}" || true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mist-macos-${{ matrix.architecture }}
+          path: dist/release/Mist-macos-${{ matrix.architecture }}.dmg
+          if-no-files-found: error
+
+  windows:
+    needs: preflight
+    runs-on: windows-2025
+    environment: release-signing
+    env:
+      WINDOWS_TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL || 'http://timestamp.digicert.com' }}
+      WINDOWS_SIGNER_SHA256: ${{ vars.WINDOWS_SIGNER_SHA256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Rust 1.95
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup default 1.95.0
+      - name: Require Windows release credentials
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if (-not $env:WINDOWS_CERTIFICATE) { throw "Repository secret WINDOWS_CERTIFICATE is required." }
+          if (-not $env:WINDOWS_CERTIFICATE_PASSWORD) { throw "Repository secret WINDOWS_CERTIFICATE_PASSWORD is required." }
+          if ($env:WINDOWS_SIGNER_SHA256 -notmatch '^[a-fA-F0-9]{64}$') { throw "Repository variable WINDOWS_SIGNER_SHA256 must be a SHA-256 certificate fingerprint." }
+      - name: Install packaging tools
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          choco install nsis --no-progress -y
+          cargo install cargo-packager --version $env:CARGO_PACKAGER_VERSION --locked
+      - name: Build executable
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          cargo build --release --locked
+      - name: Import certificate and sign executable
+        id: certificate
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $certificate = Join-Path $env:RUNNER_TEMP "mist-certificate.pfx"
+          [IO.File]::WriteAllBytes($certificate, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          $certificateObject = [Security.Cryptography.X509Certificates.X509Certificate2]::new(
+            $certificate,
+            $env:WINDOWS_CERTIFICATE_PASSWORD,
+            [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+          )
+          $actualFingerprint = $certificateObject.GetCertHashString([Security.Cryptography.HashAlgorithmName]::SHA256)
+          if ($actualFingerprint -ne $env:WINDOWS_SIGNER_SHA256) {
+            throw "WINDOWS_SIGNER_SHA256 does not match the signing certificate."
+          }
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $signtool) { throw "signtool.exe was not found." }
+          & $signtool sign /fd SHA256 /td SHA256 /tr $env:WINDOWS_TIMESTAMP_URL /f $certificate /p $env:WINDOWS_CERTIFICATE_PASSWORD target\release\mist.exe
+          & $signtool verify /pa /v target\release\mist.exe
+          "certificate=$certificate" >> $env:GITHUB_OUTPUT
+          "signtool=$signtool" >> $env:GITHUB_OUTPUT
+      - name: Package installer
+        id: package
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          cargo packager --release --formats nsis
+          $installer = Get-ChildItem dist\packages -Filter "*.exe" | Select-Object -First 1
+          if (-not $installer) { throw "cargo-packager did not produce an NSIS installer." }
+          "installer=$($installer.FullName)" >> $env:GITHUB_OUTPUT
+      - name: Sign installer
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $installer = "${{ steps.package.outputs.installer }}"
+          & "${{ steps.certificate.outputs.signtool }}" sign /fd SHA256 /td SHA256 /tr $env:WINDOWS_TIMESTAMP_URL /f "${{ steps.certificate.outputs.certificate }}" /p $env:WINDOWS_CERTIFICATE_PASSWORD $installer
+          & "${{ steps.certificate.outputs.signtool }}" verify /pa /v $installer
+          New-Item -ItemType Directory -Force dist\release | Out-Null
+          Copy-Item $installer dist\release\Mist-windows-x86_64-setup.exe
+      - name: Remove certificate
+        if: always() && steps.certificate.outputs.certificate != ''
+        shell: pwsh
+        run: Remove-Item -Force "${{ steps.certificate.outputs.certificate }}" -ErrorAction SilentlyContinue
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mist-windows-x86_64
+          path: dist/release/Mist-windows-x86_64-setup.exe
+          if-no-files-found: error
+
+  linux:
+    needs: preflight
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Rust 1.95
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup default 1.95.0
+      - name: Install desktop packaging dependencies
+        run: >-
+          sudo apt-get update && sudo apt-get install -y
+          libx11-dev libxkbcommon-dev libwayland-dev libgl1-mesa-dev
+          libfuse2 patchelf fonts-dejavu-core fonts-noto-core fonts-noto-cjk
+      - name: Install cargo-packager
+        run: cargo install cargo-packager --version "$CARGO_PACKAGER_VERSION" --locked
+      - name: Build Linux packages
+        shell: bash
+        run: |
+          cargo build --release --locked
+          cargo packager --release --formats deb,appimage
+          deb=$(find dist/packages -maxdepth 1 -type f -name '*.deb' -print -quit)
+          appimage=$(find dist/packages -maxdepth 1 -type f -name '*.AppImage' -print -quit)
+          test -n "$deb"
+          test -n "$appimage"
+          mkdir -p dist/release
+          cp "$deb" dist/release/Mist-linux-x86_64.deb
+          cp "$appimage" dist/release/Mist-linux-x86_64.AppImage
+          chmod 755 dist/release/Mist-linux-x86_64.AppImage
+          dpkg-deb --info dist/release/Mist-linux-x86_64.deb >/dev/null
+          dist/release/Mist-linux-x86_64.AppImage --appimage-extract >/dev/null
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mist-linux-x86_64
+          path: |
+            dist/release/Mist-linux-x86_64.deb
+            dist/release/Mist-linux-x86_64.AppImage
+          if-no-files-found: error
+
+  release:
+    needs: [macos, windows, linux]
+    runs-on: ubuntu-22.04
+    environment: release-publishing
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: mist-*
+          path: release-assets
+          merge-multiple: true
+      - name: Add installers and checksums
+        shell: bash
+        env:
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          WINDOWS_SIGNER_SHA256: ${{ vars.WINDOWS_SIGNER_SHA256 }}
+        run: |
+          if [[ ! "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]; then
+            echo "Repository variable APPLE_TEAM_ID must be a 10-character Team ID." >&2
+            exit 1
+          fi
+          if [[ ! "$WINDOWS_SIGNER_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]; then
+            echo "Repository variable WINDOWS_SIGNER_SHA256 must be a SHA-256 certificate fingerprint." >&2
+            exit 1
+          fi
+          cp scripts/install-release.sh release-assets/mist-installer.sh
+          cp scripts/install-release.ps1 release-assets/mist-installer.ps1
+          sed -i "s/__MIST_APPLE_TEAM_ID__/$APPLE_TEAM_ID/g" release-assets/mist-installer.sh
+          sed -i "s/__MIST_WINDOWS_SIGNER_SHA256__/${WINDOWS_SIGNER_SHA256^^}/g" release-assets/mist-installer.ps1
+          cp assets/mist-512.png release-assets/Mist.png
+          cd release-assets
+          find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 |
+            sort -z |
+            xargs -0 sha256sum |
+            sed 's#  \./#  #' > SHA256SUMS
+      - name: Attest public release artifacts
+        if: github.event.repository.visibility == 'public'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: release-assets/SHA256SUMS
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          release_state=$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft 2>/dev/null || true)
+          if [ "$release_state" = false ]; then
+            echo "Refusing to replace assets on published release $GITHUB_REF_NAME." >&2
+            exit 1
+          fi
+          if [ -z "$release_state" ]; then
+            release_flags=()
+            case "$GITHUB_REF_NAME" in
+              *-*) release_flags+=(--prerelease --latest=false) ;;
+            esac
+            gh release create "$GITHUB_REF_NAME" \
+              --draft \
+              --verify-tag \
+              --title "Mist $GITHUB_REF_NAME" \
+              --notes "Draft desktop release. Complete the macOS, Windows, X11, and Wayland acceptance checklist before publishing." \
+              "${release_flags[@]}"
+          fi
+          gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
