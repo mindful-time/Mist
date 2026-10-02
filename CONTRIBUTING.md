@@ -1,0 +1,69 @@
+# Contributing to Mist
+
+All changes go through a feature branch and pull request, including the
+maintainer's changes. Only `mindful-time` can merge to `main`; the maintainer
+has no direct-push or quality-check bypass. Contributions from other accounts
+should use forks. Do not push tags or publish releases as part of a contribution.
+
+## Install the local checks
+
+Use Rust 1.95 with rustfmt and Clippy, Node.js 24+, uv, jq, OSV-Scanner 2.3.8,
+and Gitleaks 8.30.1. Install the Rust analysis tools and hooks:
+
+```sh
+rustup component add rustfmt clippy llvm-tools-preview
+cargo install cargo-llvm-cov --version 0.8.7 --locked
+cargo install cargo-crap --version 0.5.0 --locked
+make hooks
+```
+
+Homebrew Rust users need Homebrew LLVM instead of rustup's LLVM component.
+The coverage script discovers `/opt/homebrew/opt/llvm` automatically.
+Smells is run through `uvx --from smells==0.5.0`; no unpinned global scanner
+is used. Linux also needs the desktop headers listed in the CI workflow.
+
+## What commit and push check
+
+Both hooks run formatting, compile checks, strict Clippy, an actual build,
+Rust tests, distribution regression tests, release-version checks, website
+build/syntax checks, coverage-backed CRAP, Smells, OSV, and redacted Gitleaks.
+These are deliberately comprehensive and can take several minutes.
+
+Pre-commit freezes the entire Git index in a disposable local clone. Unstaged
+and untracked files cannot repair or mask staged code. It leaves your working
+tree and index untouched. Pre-push reads Git's stdin revisions and checks each
+non-deleted pushed tip, not the current working tree; it scans newly pushed
+history for secrets (full history for a new ref). Fetch first if the remote
+base commit is missing locally. Intermediate commits receive the history secret
+scan, not separate build/coverage runs. `make quality` checks the working tree
+directly; `make test` runs Rust and distribution tests.
+
+Reports from hooks remain under `target/quality/index-<tree>` or
+`target/quality/commit-<commit>`. Smells exit 1 and exit 2 both block. Read its
+Issue Index and evidence before acting on findings, following `AGENTS.md`.
+Review signals are not proven bugs. The published 0.5.0 scanner checks the
+complete staged snapshot; it does not implement the proposed debt-envelope
+comparison from the separate Smells project.
+
+CRAP uses actual LLVM test coverage. Scores above 5 warn; new or regressed
+scores above 10 block against `quality/crap-baseline.json`. Do not update that
+baseline, weaken policy, or suppress findings merely to make checks pass.
+Rust CRAP/Smells do not measure JavaScript, shell, or PowerShell; those have
+explicit CLI, syntax, and installer trust-decision tests instead.
+
+Local hooks are opt-in and can be bypassed with Git options. GitHub's required
+CI checks are the merge enforcement. The `Quality and security gates` job runs
+the same suite with pinned scanners, full Git history, and retained evidence.
+Coverage runs on Apple Silicon to match the committed CRAP baseline; native
+builds and tests are separate required jobs on macOS, Linux, and Windows.
+Fork PRs do not receive signing credentials. Only the owner may apply changes
+to the existing server rulesets; editing `.github/rulesets/` alone does not
+change GitHub enforcement.
+
+## Release work
+
+See [distribution](docs/DISTRIBUTION.md),
+[package managers](docs/PACKAGE_MANAGER_DISTRIBUTION.md), and
+[Apple signing](docs/APPLE_SIGNING.md). A successful PR is not evidence of a
+signed release or clean-machine acceptance. Never commit credentials, publish
+an unsigned stable release, or enable the download website before acceptance.

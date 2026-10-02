@@ -43,7 +43,7 @@ jobs:
           tar --extract --gzip --file "$archive" --directory "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint"
       - name: Test Linux release installer
-        run: ./scripts/test-install-release.sh
+        run: sh scripts/test-distribution.sh
 
   check:
     strategy:
@@ -53,6 +53,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
       - name: Install Rust 1.95
         run: |
           rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
@@ -65,6 +68,7 @@ jobs:
           fonts-dejavu-core fonts-noto-core fonts-noto-cjk
       - run: cargo fmt --all -- --check
       - run: cargo check --locked --all-targets
+      - run: cargo build --locked --all-targets
       - run: cargo test --locked --all-targets
       - run: cargo clippy --locked --all-targets -- -D warnings
       - name: Validate POSIX release installer
@@ -85,3 +89,53 @@ jobs:
             $errors | Format-List | Out-String | Write-Error
             exit 1
           }
+      - name: Test Chocolatey package and installer trust decisions
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/test-chocolatey.ps1
+
+  quality:
+    name: Quality and security gates
+    # The committed coverage-backed CRAP baseline was captured on Apple Silicon.
+    # Native compile/build/tests still run on all three OSes above.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          version: '0.11.10'
+      - name: Install Rust and coverage tools
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt,llvm-tools-preview
+          rustup default 1.95.0
+          cargo install cargo-crap --version 0.5.0 --locked
+          cargo install cargo-llvm-cov --version 0.8.7 --locked
+      - name: Install checksum-pinned security scanners
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/mist-tools"
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            https://github.com/google/osv-scanner/releases/download/v2.3.8/osv-scanner_darwin_arm64 \
+            --output "$RUNNER_TEMP/mist-tools/osv-scanner"
+          printf '%s  %s\n' a8cd6507b06239f463a7642430cfd2d154882f150f6e30cdc0653e28dfc34216 "$RUNNER_TEMP/mist-tools/osv-scanner" | shasum -a 256 --check --status
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_darwin_arm64.tar.gz \
+            --output "$RUNNER_TEMP/mist-tools/gitleaks.tar.gz"
+          printf '%s  %s\n' b40ab0ae55c505963e365f271a8d3846efbc170aa17f2607f13df610a9aeb6a5 "$RUNNER_TEMP/mist-tools/gitleaks.tar.gz" | shasum -a 256 --check --status
+          tar --extract --gzip --file "$RUNNER_TEMP/mist-tools/gitleaks.tar.gz" --directory "$RUNNER_TEMP/mist-tools" gitleaks
+          chmod 755 "$RUNNER_TEMP/mist-tools/osv-scanner"
+          echo "$RUNNER_TEMP/mist-tools" >> "$GITHUB_PATH"
+      - name: Run full quality and security gates
+        run: sh scripts/check-quality.sh
+      - name: Retain coverage, CRAP, and Smells evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: quality-evidence-${{ github.sha }}
+          path: target/quality
+          if-no-files-found: warn

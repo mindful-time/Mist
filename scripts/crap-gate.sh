@@ -18,26 +18,32 @@ if [ "$crap_version" != "cargo-crap 0.5.0" ]; then
     exit 1
 fi
 
-mkdir -p target/quality
+report_directory=${MIST_QUALITY_REPORT_DIR:-target/quality}
+mkdir -p "$report_directory"
 warning_threshold=5
 blocking_threshold=10
-coverage_report=target/quality/lcov.info
-crap_report=target/quality/crap-report.json
-delta_report=target/quality/crap-delta.json
+coverage_report=$report_directory/lcov.info
+crap_report=$report_directory/crap-report.json
+delta_report=$report_directory/crap-delta.json
 baseline_report=quality/crap-baseline.json
 coverage_cache=$(mktemp -d "${TMPDIR:-/tmp}/mist-coverage-cache.XXXXXX")
 trap 'rm -r "$coverage_cache"' EXIT HUP INT TERM
 SMELLS_CACHE_DIR=$coverage_cache
 export SMELLS_CACHE_DIR
 
-# rustup installations are discovered by cargo-llvm-cov. Homebrew Rust does
-# not ship llvm-tools-preview, so use Homebrew's matching LLVM when present.
-if [ -z "${LLVM_COV:-}" ] && [ -x /opt/homebrew/opt/llvm/bin/llvm-cov ]; then
-    LLVM_COV=/opt/homebrew/opt/llvm/bin/llvm-cov
+# Prefer LLVM tools from the actual Rust toolchain. Only fall back to Homebrew
+# for Homebrew Rust, which does not ship llvm-tools-preview.
+rust_host=$(rustc -vV | awk '/^host:/ { print $2 }')
+llvm_directory=$(rustc --print sysroot)/lib/rustlib/$rust_host/bin
+if [ ! -x "$llvm_directory/llvm-cov" ] && [ -x /opt/homebrew/opt/llvm/bin/llvm-cov ]; then
+    llvm_directory=/opt/homebrew/opt/llvm/bin
+fi
+if [ -z "${LLVM_COV:-}" ] && [ -x "$llvm_directory/llvm-cov" ]; then
+    LLVM_COV=$llvm_directory/llvm-cov
     export LLVM_COV
 fi
-if [ -z "${LLVM_PROFDATA:-}" ] && [ -x /opt/homebrew/opt/llvm/bin/llvm-profdata ]; then
-    LLVM_PROFDATA=/opt/homebrew/opt/llvm/bin/llvm-profdata
+if [ -z "${LLVM_PROFDATA:-}" ] && [ -x "$llvm_directory/llvm-profdata" ]; then
+    LLVM_PROFDATA=$llvm_directory/llvm-profdata
     export LLVM_PROFDATA
 fi
 

@@ -174,8 +174,8 @@ access-control rule.
 
 Once the plan supports rulesets (or the repository is made public), apply the
 two rulesets under `.github/rulesets/` in **Settings → Rules → Rulesets**. Their
-combined policy requires PRs, resolved review threads, all four CI checks, and
-the Linux release-package check;
+combined policy requires PRs, resolved review threads, repository validation,
+the three OS checks, full quality/security gates, and the Linux release-package check;
 blocks deletion and force pushes; and lets only `mindful-time` merge. The
 maintainer exception is PR-only and does not bypass the separate CI ruleset.
 Zero mandatory approving reviews allows the solo maintainer to merge their

@@ -1,0 +1,156 @@
+# Package-manager and direct-download distribution
+
+Checked on 2026-10-03. Package generation is implemented below, but no release,
+tag, tap, Chocolatey submission, signing setting, or website deployment has
+been created by this work. Preparation is not evidence of public downloads.
+
+## Recommendation
+
+Use public GitHub Release assets as the shared download host. Add a maintained
+Homebrew cask in our own tap for macOS and a Chocolatey package for Windows.
+Offer the same artifacts as ordinary browser and curl downloads. A download
+website is optional for this first distribution step.
+([GitHub direct release-asset links](https://docs.github.com/en/repositories/releasing-projects-on-github/linking-to-releases),
+[Homebrew taps](https://docs.brew.sh/Taps),
+[Chocolatey installer wrapper](https://docs.chocolatey.org/en-us/create/functions/install-chocolateypackage/))
+
+## Homebrew
+
+An independent tap is a Git repository containing package definitions; it is
+not the official `homebrew/cask` catalog. A proposed `mindful-time/homebrew-tap`
+repository would map to the tap name `mindful-time/tap`. Use a fully qualified
+cask name to identify our package rather than assuming the short name `mist`
+is available. Neither the repository nor a working install command exists yet.
+([Homebrew tap naming and installation](https://docs.brew.sh/Taps))
+
+For binary distribution, the cask can reference architecture-specific DMGs,
+declare checksums and install `Mist.app`. Publish tested DMGs before claiming
+the cask is usable. Official catalog inclusion is a separate submission and
+acceptance decision: assessed macOS artifacts must pass Homebrew's Gatekeeper
+checks without disabling or bypassing macOS protections.
+([Cask fields and app artifacts](https://docs.brew.sh/Cask-Cookbook),
+[official cask acceptance](https://docs.brew.sh/Acceptable-Casks))
+
+A custom tap is not a replacement for Developer ID signing and notarization.
+Apple documents that downloaded apps are assessed for those properties.
+Unnotarized or unidentified-developer apps can encounter security alerts.
+([Apple's downloaded-app protections](https://support.apple.com/en-us/102445))
+
+## Chocolatey and MSI
+
+Chocolatey can download and run native EXE or MSI installers. A package needs
+correct installer arguments and checksum metadata; the community feed adds
+validation, verification and moderation. Test silent installation, upgrades
+and uninstall behavior before submission. Do not promise instant approval.
+([Chocolatey EXE/MSI installation](https://docs.chocolatey.org/en-us/create/functions/install-chocolateypackage/),
+[community moderation requirements](https://docs.chocolatey.org/en-us/community-repository/moderation/))
+
+Mist currently builds `Mist-windows-x86_64-setup.exe` using NSIS, not an MSI.
+Chocolatey therefore does not require changing installer formats. If MSI is
+desired, the pinned cargo-packager 0.11.8 supports it through the `wix` format.
+Add and test that output, its signing and release-asset handling explicitly;
+renaming an EXE is not conversion.
+([Mist packaging configuration](../Cargo.toml),
+[current release workflow](../.github/workflows/release.yml),
+[cargo-packager formats](https://docs.rs/cargo-packager/0.11.8/cargo_packager/enum.PackageFormat.html))
+
+The reviewed Chocolatey moderation requirements do not state a blanket
+Authenticode certificate requirement. That is not a guarantee of package
+approval or Windows compatibility: unsigned downloads may warn or be blocked
+by Windows policy or Smart App Control. Newly signed downloads can also show
+SmartScreen warnings while reputation develops. A package manager does not
+itself establish our publisher identity.
+([Chocolatey requirements](https://docs.chocolatey.org/en-us/community-repository/moderation/),
+[Microsoft SmartScreen and Smart App Control guidance](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation))
+
+## Current readiness and next work
+
+Read-only GitHub checks returned a public repository, no GitHub Releases and
+no `release-signing` environment secret names. The latest successful Release
+workflow was a PR run, not publication. These are point-in-time checks, not a
+claim about credentials the maintainer may possess elsewhere.
+
+The existing workflow requires signing credentials and assembles all platform
+artifacts for tagged releases. Its macOS installation script checks codesign,
+Gatekeeper and the expected Apple team before installing; its Windows script
+checks Authenticode and the expected certificate before either installation or
+download-only completion. The macOS download-only mode checks the checksum,
+but does not perform those installation-time signature checks.
+([Release workflow](../.github/workflows/release.yml),
+[macOS/Linux installer](../scripts/install-release.sh),
+[Windows installer](../scripts/install-release.ps1),
+[existing release policy](DISTRIBUTION.md))
+
+## Implemented preparation
+
+`scripts/build-package-managers.mjs` generates a Homebrew cask and Chocolatey
+recipe from the actual release files and `SHA256SUMS`. It rejects missing,
+duplicate or wrong checksums and requires a Windows signer fingerprint.
+Homebrew selects the ARM/Intel DMG and pins each checksum. Chocolatey pins
+the EXE checksum and verifies Authenticode plus the exact publisher before
+silent NSIS installation. No quarantine/Gatekeeper bypass is added.
+
+The complete signed Release candidate assembles `mist.rb` and
+`mist-tts.<version>.nupkg` alongside the existing installers and includes both
+in `SHA256SUMS`. Only stable `x.y.z` versions generate package-manager recipes;
+prerelease installers keep their existing flow. Package generation and trust
+decisions have fixture tests; Windows CI also runs `choco pack`. None of those
+fixtures proves a native installer works or a real signature is trusted.
+
+For a signed candidate downloaded from Actions:
+
+```sh
+node scripts/build-package-managers.mjs 0.1.0 /absolute/candidate/assets \
+  /absolute/new/package-output WINDOWS_CERTIFICATE_SHA256
+```
+
+The last argument is the non-secret 64-hex certificate fingerprint, not a
+private key. Use a fresh output directory; the generator will not overwrite
+existing files. Templates live in `packaging/` and use the existing EXE, not MSI.
+
+## Remaining publication steps
+
+1. Complete Apple signing/notarization and Windows signing setup. Create a
+   draft candidate through the protected Release workflow.
+2. Test install, upgrade, uninstall, first launch, permissions, hotkey, and
+   speech on clean macOS ARM/Intel, Windows x64, and supported Linux desktops.
+   Specifically test Chocolatey's per-user install using the same Windows
+   account, upgrades, and automatic NSIS uninstall; do not submit until those
+   pass. Chocolatey's default uninstaller discovers registry changes, so also
+   confirm it tracks only Mist.
+   ([automatic uninstaller](https://docs.chocolatey.org/en-us/choco/features/auto-uninstaller/))
+3. After acceptance, publish the immutable signed assets. Create the proposed
+   `mindful-time/homebrew-tap`, copy the generated cask to `Casks/mist.rb`, and
+   validate it with Homebrew before advertising
+   `brew install --cask mindful-time/tap/mist`.
+4. Check availability of the proposed `mist-tts` package ID, then submit the
+   tested generated `.nupkg` to Chocolatey for moderation. Do not advertise
+   `choco install mist-tts` until that version is approved/available.
+5. Enable the download website only after those published URLs work.
+
+No tap repository is created automatically, and no Chocolatey API key or
+automatic community-feed push is added. Preserve the Linux DEB/AppImage route
+already described in the distribution guide. The existing verified bootstrap
+supports curl; direct download examples below avoid executing a remote script.
+
+After `v0.1.0` is actually published (these links do not exist yet):
+
+```sh
+# Apple Silicon; use x86_64 instead of aarch64 for an Intel Mac.
+curl --fail --location --proto '=https' --tlsv1.2 --remote-name \
+  https://github.com/mindful-time/Mist/releases/download/v0.1.0/Mist-macos-aarch64.dmg
+```
+
+```powershell
+curl.exe --fail --location --proto '=https' --tlsv1.2 --remote-name https://github.com/mindful-time/Mist/releases/download/v0.1.0/Mist-windows-x86_64-setup.exe
+```
+
+Direct curl downloads alone do not verify hashes or signatures. Check the
+release's `SHA256SUMS` and native publisher, or use the verified bootstraps in
+[DISTRIBUTION.md](DISTRIBUTION.md). DMG is for macOS, EXE for Windows;
+MSI packaging is not part of this change.
+
+An unsigned public tester preview would require an explicitly approved,
+separate preview flow; it must not silently weaken the stable-release checks.
+A macOS-first public release would likewise require changing the current
+all-platform publication contract. Neither policy change was made here.

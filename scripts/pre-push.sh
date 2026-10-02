@@ -3,15 +3,13 @@ set -eu
 
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 
-"$project_root/scripts/pre-commit.sh"
-
-printf '%s\n' 'Mist push gate: full Smells 0.5.0 scan'
-uvx --from smells==0.5.0 smells check \
-    --path "$project_root" \
-    --policy "$project_root/quality-policy.json" \
-    --format table \
-    --log "$project_root/smells-findings.log" \
-    --report "$project_root/smells-report.json"
-
-"$project_root/scripts/release-check.sh"
-gitleaks git --redact "$project_root"
+# Git supplies the exact revisions being pushed on stdin. Never substitute
+# HEAD or the local index: either can differ from an explicitly pushed ref.
+while read -r local_ref local_oid remote_ref remote_oid; do
+    for oid in "$local_oid" "$remote_oid"; do
+        case "$oid" in ''|*[!0-9a-f]*) printf '%s\n' 'Malformed push revision.' >&2; exit 2 ;; esac
+        case "${#oid}" in 40|64) ;; *) exit 2 ;; esac
+    done
+    case "$local_oid" in *[!0]*) ;; *) continue ;; esac
+    sh "$project_root/scripts/check-git-snapshot.sh" commit "$local_oid" "$remote_oid"
+done

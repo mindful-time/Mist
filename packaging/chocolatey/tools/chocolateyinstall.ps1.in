@@ -1,0 +1,29 @@
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+if (-not [Environment]::Is64BitOperatingSystem) { throw 'Mist requires 64-bit Windows.' }
+
+$toolsDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$installer = Join-Path $toolsDir 'Mist-windows-x86_64-setup.exe'
+$expectedChecksum = '__WINDOWS_SHA256__'
+$expectedSigner = '__WINDOWS_SIGNER__'
+try {
+    Get-ChocolateyWebFile -PackageName 'mist-tts' -FileFullPath $installer `
+        -Url64bit 'https://github.com/mindful-time/Mist/releases/download/v__VERSION__/Mist-windows-x86_64-setup.exe' `
+        -Checksum64 $expectedChecksum -ChecksumType64 'sha256' | Out-Null
+
+    # Independent checks remain mandatory even with Chocolatey's --ignore-checksums.
+    if ((Get-FileHash -Algorithm SHA256 $installer).Hash -ne $expectedChecksum) {
+        throw 'Mist installer checksum verification failed.'
+    }
+    $signature = Get-AuthenticodeSignature $installer
+    if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
+        throw 'Mist installer does not have a valid Authenticode signature.'
+    }
+    $publisher = $signature.SignerCertificate.GetCertHashString([System.Security.Cryptography.HashAlgorithmName]::SHA256)
+    if ($publisher -ne $expectedSigner) { throw 'Mist installer has an unexpected publisher.' }
+
+    Install-ChocolateyInstallPackage -PackageName 'mist-tts' -FileType 'exe' `
+        -SilentArgs '/S' -File64 $installer -ValidExitCodes @(0)
+} finally {
+    if (Test-Path $installer) { Remove-Item -LiteralPath $installer -Force }
+}
