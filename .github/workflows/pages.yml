@@ -22,7 +22,7 @@ concurrency:
 jobs:
   build:
     name: Build website
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event.repository.visibility == 'public' && vars.DOWNLOAD_SITE_ENABLED == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -43,6 +43,18 @@ The one-command installer extracts the AppImage once and launches its extracted
 For a directly downloaded AppImage on a system without FUSE 2, run it with
 `APPIMAGE_EXTRACT_AND_RUN=1`.
 
+The current Linux binaries target x86_64 desktops with an AVX2-capable CPU and
+an Ubuntu 24.04 runtime baseline: glibc 2.39+ and libstdc++ providing
+`GLIBCXX_3.4.32` (GCC 13.2+). The DEB declares these library minimums; the
+release build rejects binaries exceeding this ABI baseline. The bundled,
+locked ONNX Runtime archive failed the same linking probe on Ubuntu 22.04 and
+passed on 24.04. AppImage does not bundle glibc or make Ubuntu 22.04,
+Alpine/musl, or arbitrary older distributions compatible. Supporting them
+requires a separately built compatible inference runtime and native testing.
+([glibc symbol map](https://raw.githubusercontent.com/bminor/glibc/glibc-2.38/stdlib/Versions),
+[GCC ABI mapping](https://gcc.gnu.org/onlinedocs/libstdc++/manual/abi.html),
+[ORT prebuilt requirements](https://github.com/pykeio/ort/releases/tag/v2.0.0-rc.13))
+
 ### Installer options
 
 - `MIST_RELEASE=v0.1.0` installs a specific release instead of the latest.
@@ -72,6 +84,13 @@ GitHub repository require authentication and therefore cannot support the
 anonymous commands above.
 
 ## Download website
+
+Publishing the website is deliberately opt-in. The Pages workflow deploys only
+from public `main` when the repository variable `DOWNLOAD_SITE_ENABLED` is
+`true`. Keep it unset or `false` while preparing the first release. After the
+complete release passes acceptance testing and is published, enable the
+variable and run **Actions → Pages → Run workflow**. This gate prevents future
+deployments; it does not unpublish a site that is already deployed.
 
 The nontechnical download page lives in `site/` and is deployed by the Pages
 workflow. Build it locally with:
@@ -133,7 +152,54 @@ repository ruleset, and enable GitHub's immutable-releases setting before the
 first public release. The workflow also refuses tags outside `main` and refuses
 to modify assets after a draft has been published.
 
+### Main protection and GitHub plan requirements
+
+Mist remains public to enforce protections on the personal GitHub Free plan;
+the website is kept offline separately until the release is ready. If made
+private during preparation, anonymous downloads cannot work, and Free cannot
+enforce branch/tag rulesets, environment secrets, or environment protection
+rules. Existing public-repository environment rules are ignored while private;
+their mere presence is not evidence that signing is protected.
+GitHub Pro enables private branch/tag rulesets and environment secrets, but
+required environment reviewers on Free, Pro, and Team still require a public
+repository. Do not move signing values into unprotected repository secrets to
+work around these limits.
+([ruleset availability](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets),
+[environment availability](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments))
+
+Keep the maintainer as the only writer while private protections are
+unavailable, and use feature branches and PRs even before server enforcement
+is enabled. `.github/CODEOWNERS` requests maintainer review; it is not an
+access-control rule.
+
+Once the plan supports rulesets (or the repository is made public), apply the
+two rulesets under `.github/rulesets/` in **Settings → Rules → Rulesets**. Their
+combined policy requires PRs, resolved review threads, all four CI checks, and
+the Linux release-package check;
+blocks deletion and force pushes; and lets only `mindful-time` merge. The
+maintainer exception is PR-only and does not bypass the separate CI ruleset.
+Zero mandatory approving reviews allows the solo maintainer to merge their
+own PR without an impossible self-approval requirement. Other contributors
+still cannot merge, even when CI passes. These JSON files are desired
+configuration, not proof that GitHub has applied it.
+
+For a new configuration, apply each JSON with `gh api --method POST
+repos/mindful-time/Mist/rulesets --input <file>`. If a matching ruleset already
+exists, update that exact ruleset ID with `PUT` instead of creating a duplicate.
+Read back both rulesets and the effective rules for `main` before claiming
+protection is enabled.
+
+The public repository now has `Main PR and CI requirements` and `Main
+maintainer merges only` active. Apply future edits to the JSON files to these
+existing rulesets; editing a file does not update server configuration.
+
 ## Testing a release candidate
+
+PRs targeting `main` build and validate the Linux production packages without
+signing secrets. The signed macOS/Windows jobs, bundle assembly, and draft
+publication are skipped on PRs. This catches release-only linker and packaging
+failures before merging without allowing untrusted PR code to access signing
+credentials. PR artifacts are test candidates, not approved public downloads.
 
 Run **Actions → Release → Run workflow** on `main`. Choose `linux`, `macos`, or
 `windows` to validate one platform and download its individual Actions artifacts.

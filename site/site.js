@@ -52,15 +52,15 @@ const platforms = {
     packages: [
       {
         asset: "Mist-linux-x86_64.deb",
-        name: "Ubuntu, Debian, or Mint (x86_64)",
-        detail: "64-bit Intel/AMD Debian package (.deb)",
+        name: "Ubuntu 24.04+ / Mint 22+ (x86_64)",
+        detail: "Debian package (.deb) · AVX2 processor required",
         action: "Download package",
         primary: true,
       },
       {
         asset: "Mist-linux-x86_64.AppImage",
-        name: "Other Linux desktops (x86_64)",
-        detail: "Portable 64-bit Intel/AMD AppImage",
+        name: "Compatible Linux desktops (x86_64)",
+        detail: "AppImage · glibc 2.39+, GLIBCXX 3.4.32, AVX2",
         action: "Download AppImage",
       },
     ],
