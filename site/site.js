@@ -1,13 +1,14 @@
 const repository = document.body.dataset.repository;
 const packageArea = document.querySelector("[data-package-area]");
-const releaseStatus = document.querySelector("[data-release-status]");
 const platformButtons = [...document.querySelectorAll("[data-platform]")];
 const instructions = document.querySelector("[data-instructions]");
+const heroDownload = document.querySelector("[data-hero-download]");
 
 const releasesUrl = `https://github.com/${repository}/releases`;
 
 const platforms = {
   mac: {
+    label: "Mac",
     packages: [
       {
         asset: "Mist-macos-aarch64.dmg",
@@ -30,6 +31,7 @@ const platforms = {
     ],
   },
   windows: {
+    label: "Windows",
     packages: [
       {
         asset: "Mist-windows-x86_64-setup.exe",
@@ -46,23 +48,24 @@ const platforms = {
     ],
   },
   linux: {
+    label: "Linux",
     packages: [
       {
         asset: "Mist-linux-x86_64.deb",
-        name: "Ubuntu, Debian, or Mint",
-        detail: "Debian package (.deb)",
+        name: "Ubuntu, Debian, or Mint (x86_64)",
+        detail: "64-bit Intel/AMD Debian package (.deb)",
         action: "Download package",
         primary: true,
       },
       {
         asset: "Mist-linux-x86_64.AppImage",
-        name: "Other Linux desktops",
-        detail: "Portable AppImage for x86_64",
+        name: "Other Linux desktops (x86_64)",
+        detail: "Portable 64-bit Intel/AMD AppImage",
         action: "Download AppImage",
       },
     ],
     instructions: [
-      "Open the DEB with your software installer, or make the AppImage executable and open it.",
+      "Open the DEB with your software installer. For AppImage, make it executable and open it; if FUSE 2 is unavailable, launch it with APPIMAGE_EXTRACT_AND_RUN=1.",
       "Open Mist, approve the shortcut prompt if shown, and download the voices.",
       "Select text, then press Ctrl + Space to listen.",
     ],
@@ -70,7 +73,7 @@ const platforms = {
 };
 
 let selectedPlatform = detectPlatform();
-let releaseState = { kind: "checking", assets: new Map(), release: null };
+let releaseState = { kind: "checking", assets: new Map() };
 
 function detectPlatform() {
   const userAgent = navigator.userAgent.toLowerCase();
@@ -114,7 +117,7 @@ function renderInstructions() {
   }
 }
 
-function unavailableNotice(title, copy, linkLabel = "Check GitHub Releases") {
+function unavailableNotice(title, copy, linkLabel) {
   const notice = document.createElement("div");
   notice.className = "release-notice";
   const heading = document.createElement("strong");
@@ -133,12 +136,7 @@ function packageOption(packageInfo, url, available) {
   option.className = "package-option";
   if (packageInfo.primary && available) option.classList.add("package-option-primary");
   if (!available) option.classList.add("is-disabled");
-  if (available) {
-    option.href = url;
-    option.addEventListener("click", () => {
-      releaseStatus.textContent = "After the download begins, follow Step 2 below.";
-    });
-  }
+  if (available) option.href = url;
 
   const label = document.createElement("span");
   const name = document.createElement("span");
@@ -160,6 +158,7 @@ function renderPackages() {
     button.setAttribute("aria-pressed", String(button.dataset.platform === selectedPlatform));
   }
   renderInstructions();
+  updateHeroDownload();
   packageArea.replaceChildren();
 
   if (releaseState.kind === "checking") {
@@ -211,6 +210,24 @@ function renderPackages() {
   packageArea.append(list);
 }
 
+function updateHeroDownload() {
+  heroDownload.href = "#download";
+  heroDownload.removeAttribute("download");
+  heroDownload.textContent = selectedPlatform
+    ? `Choose ${platforms[selectedPlatform].label} download`
+    : "Choose your download";
+
+  if (releaseState.kind !== "ready" || !selectedPlatform) return;
+  const availablePackages = platforms[selectedPlatform].packages.filter((packageInfo) =>
+    releaseState.assets.has(packageInfo.asset)
+  );
+  if (platforms[selectedPlatform].packages.length !== 1 || availablePackages.length !== 1) return;
+
+  const packageInfo = availablePackages[0];
+  heroDownload.href = releaseState.assets.get(packageInfo.asset).browser_download_url;
+  heroDownload.textContent = `Download for ${platforms[selectedPlatform].label}`;
+}
+
 for (const button of platformButtons) {
   button.addEventListener("click", () => {
     selectedPlatform = button.dataset.platform;
@@ -226,8 +243,7 @@ async function loadLatestRelease() {
     });
 
     if (response.status === 404) {
-      releaseState = { kind: "none", assets: new Map(), release: null };
-      releaseStatus.textContent = "First public release in preparation.";
+      releaseState = { kind: "none", assets: new Map() };
       renderPackages();
       return;
     }
@@ -237,13 +253,9 @@ async function loadLatestRelease() {
     releaseState = {
       kind: "ready",
       assets: new Map(release.assets.map((asset) => [asset.name, asset])),
-      release,
     };
-    releaseStatus.textContent = `${release.name || release.tag_name} is available.`;
-    releaseStatus.classList.add("is-ready");
   } catch {
-    releaseState = { kind: "error", assets: new Map(), release: null };
-    releaseStatus.textContent = "Automatic download check unavailable.";
+    releaseState = { kind: "error", assets: new Map() };
   }
   renderPackages();
 }

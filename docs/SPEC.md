@@ -190,6 +190,9 @@ text-to-speech model.
 
 ## Deferred
 
-Launch at login, production signing/notarization, graphical installers, and
-native end-to-end validation on hardware not available to this macOS build
-machine are outside this version.
+Launch at login is outside this version. The release workflow builds graphical
+installers and enforces macOS notarization and Windows signing, but public
+publishing remains gated on signing credentials, protected release
+environments, and clean-machine acceptance on each supported operating system.
+Native end-to-end validation on hardware not available to this macOS build
+machine remains an external release prerequisite.

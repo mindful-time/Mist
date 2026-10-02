@@ -201,15 +201,20 @@ if grep -F APPIMAGE_EXTRACT_AND_RUN "$launcher" >/dev/null 2>&1; then
     fail 'launcher still enables per-launch AppImage extraction'
 fi
 
-# Reinstalling the same release validates a staging extraction, then keeps the
-# already-installed, checksum-addressed release rather than replacing it.
-printf '%s\n' keep > "$v1_release/reuse-marker"
+# Reinstalling the same release repairs damage anywhere in the extracted
+# payload, not only damage to AppRun.
+printf '%s\n' damaged > "$v1_release/squashfs-root/version"
+printf '%s\n' unexpected > "$v1_release/squashfs-root/unexpected-file"
 run_installer > "$test_root/reinstall-v1.out"
-[ -f "$v1_release/reuse-marker" ] || fail 'same-version reinstall replaced the existing release'
 assert_equal "$v1_release" "$(readlink "$install_directory/current")" \
     'same-version reinstall keeps the current release'
+[ ! -e "$v1_release/squashfs-root/unexpected-file" ] || \
+    fail 'same-version reinstall kept an unexpected extracted payload file'
 assert_equal 2 "$(line_count "$extract_log")" \
-    'same-version validation performs exactly one staging extraction'
+    'same-version repair performs exactly one staging extraction'
+MIST_TEST_RUN_LOG="$run_log" "$launcher" repaired > "$test_root/run-repaired-v1.out"
+assert_equal 'Mist fixture v1 <repaired>' "$(sed -n '1p' "$test_root/run-repaired-v1.out")" \
+    'same-version reinstall repairs a corrupted extracted payload'
 
 write_appimage v2
 write_checksums
@@ -226,7 +231,7 @@ MIST_TEST_RUN_LOG="$run_log" "$launcher" updated > "$test_root/run-v2.out"
 assert_equal 'Mist fixture v2 <updated>' "$(sed -n '1p' "$test_root/run-v2.out")" \
     'stable launcher follows current to the updated release'
 assert_equal 3 "$(line_count "$extract_log")" 'update performs one extraction'
-assert_equal v2 "$(sed -n '2p' "$run_log")" 'updated AppRun recorded its execution'
+assert_equal v2 "$(sed -n '3p' "$run_log")" 'updated AppRun recorded its execution'
 
 assert_contains "$curl_log" SHA256SUMS 'installer downloaded the checksum manifest'
 assert_contains "$curl_log" Mist-linux-x86_64.AppImage 'installer downloaded the AppImage'

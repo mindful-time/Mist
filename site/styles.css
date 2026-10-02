@@ -9,7 +9,6 @@
   --blue: #135dd8;
   --blue-dark: #0d47a8;
   --blue-soft: #eaf2ff;
-  --success: #16734a;
   --warning-bg: #fff7e3;
   --warning-border: #ecd395;
   --max: 1080px;
@@ -68,58 +67,19 @@ summary:focus-visible {
   transform: translateY(0);
 }
 
-.site-header,
 main,
 footer {
   width: min(calc(100% - 2rem), var(--max));
   margin-inline: auto;
 }
 
-.site-header {
-  display: flex;
-  min-height: 4.75rem;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid rgba(223, 237, 255, 0.16);
-  color: white;
-}
-
-.brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.65rem;
-  font-size: 1.05rem;
-  font-weight: 760;
-  text-decoration: none;
-}
-
-.brand-icon {
-  display: grid;
-  width: 2.25rem;
-  height: 2.25rem;
-  overflow: hidden;
-  border-radius: 0.62rem;
-  background: #151d2f;
-  place-items: center;
-}
-
-.brand-icon img {
-  width: 2rem;
-  height: 2rem;
-  object-fit: contain;
-}
-
-.header-link {
-  color: #c2cbda;
-  font-size: 0.92rem;
-  font-weight: 650;
-}
-
 .hero-shell {
+  position: relative;
+  overflow: hidden;
   min-height: 100vh;
   min-height: 100svh;
   background:
-    radial-gradient(circle at 50% 44%, rgba(106, 126, 181, 0.22), transparent 24rem),
+    radial-gradient(ellipse 68% 52% at 50% 38%, rgba(96, 119, 171, 0.18), transparent 72%),
     linear-gradient(180deg, #0a0e18 0%, #0d1220 100%);
   color: white;
 }
@@ -127,17 +87,20 @@ footer {
 .product-hero {
   display: grid;
   width: min(calc(100% - 2rem), var(--max));
-  min-height: calc(100vh - 4.75rem);
-  min-height: calc(100svh - 4.75rem);
+  min-height: 100vh;
+  min-height: 100svh;
   margin-inline: auto;
-  padding: 1.5rem 0 2.5rem;
+  padding: 2rem 0 2.5rem;
   align-items: center;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 1fr auto;
   text-align: center;
 }
 
 .hero-content {
   display: flex;
+  width: 100%;
+  min-width: 0;
   min-height: 0;
   align-items: center;
   align-self: center;
@@ -145,22 +108,39 @@ footer {
   justify-content: center;
 }
 
-.mist-logo {
-  width: clamp(14rem, 34vw, 25rem);
-  height: auto;
-  margin: -1rem 0 -1.7rem;
-  filter: drop-shadow(0 0 2.25rem rgba(212, 231, 255, 0.28));
-  animation: mist-breathe 7s ease-in-out infinite;
+.mist-stage {
+  position: relative;
+  width: clamp(24rem, 84vw, 62rem);
+  height: clamp(14rem, 39vw, 27rem);
+  margin: -1.5rem 0 clamp(-5.5rem, -7vw, -3.25rem);
+  isolation: isolate;
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(ellipse 54% 54% at 50% 50%, #000 26%, rgba(0, 0, 0, 0.84) 62%, transparent 100%);
+  mask-image: radial-gradient(ellipse 54% 54% at 50% 50%, #000 26%, rgba(0, 0, 0, 0.84) 62%, transparent 100%);
 }
 
-@keyframes mist-breathe {
-  0%,
-  100% {
-    transform: translateY(0) scale(0.985) rotate(-1deg);
-  }
-  50% {
-    transform: translateY(-0.55rem) scale(1.015) rotate(1deg);
-  }
+.mist-texture,
+.mist-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  mix-blend-mode: screen;
+}
+
+.mist-texture {
+  object-fit: cover;
+  opacity: 0.14;
+  transform: scale(1.06, 0.92);
+}
+
+.mist-canvas {
+  opacity: 0.94;
+  will-change: opacity;
+}
+
+.mist-stage.is-static .mist-canvas {
+  opacity: 0;
 }
 
 .product-hero h1 {
@@ -171,6 +151,7 @@ footer {
 }
 
 .hero-tagline {
+  width: min(100%, 34rem);
   max-width: 34rem;
   margin: 0.85rem 0 0;
   color: #c7cfdb;
@@ -395,21 +376,12 @@ h2 {
   font-weight: 700;
 }
 
-.release-status,
 .setup-expectation {
   margin: 0.9rem 0 0;
-  color: var(--muted);
-  font-size: 0.84rem;
-}
-
-.release-status.is-ready {
-  color: var(--success);
-  font-weight: 650;
-}
-
-.setup-expectation {
   padding-top: 0.9rem;
   border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.84rem;
 }
 
 .next-steps,
@@ -523,8 +495,10 @@ footer nav {
     padding-bottom: 1.75rem;
   }
 
-  .mist-logo {
-    width: clamp(13rem, 58vw, 20rem);
+  .mist-stage {
+    width: min(43rem, 96vw);
+    height: clamp(12rem, 43vw, 20rem);
+    margin-bottom: clamp(-3.5rem, -8vw, -2.6rem);
   }
 
   .download-panel {
@@ -538,15 +512,68 @@ footer nav {
   }
 }
 
+@media (max-height: 700px) and (min-width: 600px) {
+  .product-hero {
+    padding: 0.75rem 0 1rem;
+  }
+
+  .mist-stage {
+    width: min(70vw, 52rem);
+    height: clamp(10rem, 38vh, 15rem);
+    margin: -1rem 0 -3.25rem;
+  }
+
+  .product-hero h1 {
+    font-size: clamp(3.5rem, 10vh, 5rem);
+  }
+
+  .hero-tagline {
+    margin-top: 0.4rem;
+    font-size: 1rem;
+  }
+
+  .hero-download {
+    min-height: 2.8rem;
+    margin-top: 0.5rem;
+    padding: 0.65rem 1.2rem;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .product-hero {
+    padding: 0.5rem 0 0.75rem;
+  }
+
+  .mist-stage {
+    width: min(70vw, 28rem);
+    height: clamp(7rem, 36vh, 10rem);
+    margin: -0.5rem 0 -2.25rem;
+  }
+
+  .product-hero h1 {
+    font-size: clamp(2.75rem, 13vh, 3.75rem);
+  }
+
+  .hero-tagline {
+    margin-top: 0.25rem;
+    font-size: 0.9rem;
+  }
+
+  .hero-download {
+    min-height: 2.6rem;
+    padding: 0.5rem 1rem;
+  }
+}
+
 @media (max-width: 460px) {
-  .site-header,
   main,
   footer {
     width: min(calc(100% - 1.25rem), var(--max));
   }
 
-  .header-link {
-    font-size: 0.84rem;
+  .product-hero {
+    width: min(calc(100% - 1.25rem), var(--max));
+    padding-top: 1rem;
   }
 
   .product-hero h1 {
@@ -575,5 +602,15 @@ footer nav {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .mist-canvas {
+    display: none;
+    will-change: auto;
+  }
+
+  .mist-texture {
+    opacity: 0.24;
+    transform: scale(1.04, 0.94);
   }
 }

@@ -63,6 +63,8 @@ staged_desktop=
 staged_launcher=
 staged_release_directory=
 staged_current=
+backup_release_directory=
+release_directory=
 cleanup() {
     if [ -n "$mounted_image" ]; then
         hdiutil detach "$mounted_image" -quiet >/dev/null 2>&1 || true
@@ -82,6 +84,18 @@ cleanup() {
     done
     if [ -n "$staged_current" ]; then
         rm -f "$staged_current"
+    fi
+    if [ -n "$backup_release_directory" ]; then
+        if [ -e "$backup_release_directory" ] || [ -L "$backup_release_directory" ]; then
+            if [ -n "$release_directory" ] &&
+                [ ! -e "$release_directory" ] && [ ! -L "$release_directory" ]; then
+                mv "$backup_release_directory" "$release_directory" >/dev/null 2>&1 || true
+            fi
+            if { [ -e "$release_directory" ] || [ -L "$release_directory" ]; } &&
+                { [ -e "$backup_release_directory" ] || [ -L "$backup_release_directory" ]; }; then
+                rm -rf "$backup_release_directory"
+            fi
+        fi
     fi
     if [ -n "$staged_release_directory" ]; then
         rm -rf "$staged_release_directory"
@@ -272,8 +286,9 @@ case "$platform" in
             printf '%s\n' "Refusing to replace unmanaged path $current_path." >&2
             exit 1
         fi
-        if [ -e "$release_directory" ] && [ ! -d "$release_directory" ]; then
-            printf '%s\n' "Refusing to replace file $release_directory." >&2
+        if [ -L "$release_directory" ] ||
+            { [ -e "$release_directory" ] && [ ! -d "$release_directory" ]; }; then
+            printf '%s\n' "Refusing to replace non-directory $release_directory." >&2
             exit 1
         fi
 
@@ -298,22 +313,27 @@ case "$platform" in
             printf '%s\n' "The downloaded AppImage does not contain an executable AppRun." >&2
             exit 1
         fi
-        expected_apprun_checksum=$(checksum "$staged_apprun")
-
         if [ -d "$release_directory" ]; then
-            if [ ! -x "$release_directory/Mist.AppImage" ] ||
-                [ "$(checksum "$release_directory/Mist.AppImage")" != "$actual_checksum" ] ||
-                [ "$(checksum "$release_directory/Mist.png")" != "$actual_icon_checksum" ] ||
-                [ ! -x "$release_directory/squashfs-root/AppRun" ] ||
-                [ "$(checksum "$release_directory/squashfs-root/AppRun")" != "$expected_apprun_checksum" ]; then
-                printf '%s\n' "Existing Mist release directory failed verification." >&2
+            backup_release_directory="$releases_directory/.old.$$"
+            rm -rf "$backup_release_directory"
+            trap '' 1 2 15
+            mv "$release_directory" "$backup_release_directory"
+            if mv "$staged_release_directory" "$release_directory"; then
+                staged_release_directory=
+                rm -rf "$backup_release_directory"
+                backup_release_directory=
+            else
+                mv "$backup_release_directory" "$release_directory"
+                backup_release_directory=
                 exit 1
             fi
-            rm -rf "$staged_release_directory"
+            trap 'exit 129' 1
+            trap 'exit 130' 2
+            trap 'exit 143' 15
         else
             mv "$staged_release_directory" "$release_directory"
+            staged_release_directory=
         fi
-        staged_release_directory=
 
         staged_launcher="$binary_directory/.mist.new.$$"
         staged_icon="$icon_directory/.${icon_name}.new.$$"

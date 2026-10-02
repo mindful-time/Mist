@@ -11,36 +11,31 @@
     <link rel="icon" type="image/png" href="assets/mist.png">
     <noscript><style>.checking-state { display: none; }</style></noscript>
     <title>Download Mist</title>
-    <link rel="stylesheet" href="styles.css">
-    <script src="site.js" defer></script>
+    <link rel="stylesheet" href="styles.css?v=0.1.0">
+    <script src="mist.js?v=0.1.0" defer></script>
+    <script src="site.js?v=0.1.0" defer></script>
   </head>
   <body data-repository="mindful-time/Mist">
     <a class="skip-link" href="#download">Skip to download</a>
 
     <div class="hero-shell">
-      <header class="site-header">
-        <a class="brand" href="#top" aria-label="Mist home">
-          <span class="brand-icon" aria-hidden="true">
-            <img src="assets/mist.png" alt="" width="1280" height="1280">
-          </span>
-          Mist
-        </a>
-        <a class="header-link" href="https://github.com/mindful-time/Mist">View on GitHub</a>
-      </header>
-
       <section class="product-hero" id="top" aria-labelledby="product-title">
         <div class="hero-content">
-          <img
-            class="mist-logo"
-            src="assets/mist.png"
-            alt=""
-            width="1280"
-            height="1280"
-          >
+          <div class="mist-stage" data-mist-stage aria-hidden="true">
+            <img
+              class="mist-texture"
+              src="assets/mist-field-alpha-v1.webp"
+              alt=""
+              width="1672"
+              height="941"
+              fetchpriority="high"
+            >
+            <canvas class="mist-canvas" data-mist-canvas></canvas>
+          </div>
           <h1 id="product-title">Mist</h1>
           <p class="hero-tagline">Select text. Hear it aloud. Keep it on your device.</p>
         </div>
-        <a class="hero-download" href="#download">Download Mist</a>
+        <a class="hero-download" href="#download" data-hero-download>Choose your download</a>
       </section>
     </div>
 
@@ -49,7 +44,7 @@
         <div class="download-intro">
           <p class="overline">Step 1 of 2</p>
           <h2>Download Mist</h2>
-          <p>Choose the computer you are using. The page will show only compatible packages.</p>
+          <p>Choose your computer, then pick the installer that matches it.</p>
         </div>
         <div class="download-panel" aria-labelledby="download-title">
           <div class="panel-heading">
@@ -76,9 +71,6 @@
             </noscript>
           </div>
 
-          <p class="release-status" data-release-status role="status">
-            Looking for the latest public release.
-          </p>
           <p class="setup-expectation">
             First setup needs internet to download the speech model and voices (about 338 MiB).
             Speech stays local after setup.
@@ -105,7 +97,7 @@
         </div>
         <ul>
           <li>54 natural voices across nine language groups</li>
-          <li>Pause, resume, replay, and adjust reading speed</li>
+          <li>Pause, resume, and adjust reading speed</li>
           <li>Selected text is not sent to a speech service</li>
         </ul>
       </section>
@@ -116,6 +108,7 @@
       <nav aria-label="Footer navigation">
         <a href="https://github.com/mindful-time/Mist/releases">All releases</a>
         <a href="https://github.com/mindful-time/Mist/tree/main/docs">Documentation</a>
+        <a href="https://github.com/mindful-time/Mist">Source code</a>
         <a href="https://github.com/mindful-time/Mist/issues">Get help</a>
       </nav>
     </footer>

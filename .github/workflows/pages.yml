@@ -7,6 +7,7 @@ on:
     paths:
       - "site/**"
       - "assets/mist-v2.png"
+      - "assets/mist-field-alpha-v1.webp"
       - "scripts/build-site.sh"
       - ".github/workflows/pages.yml"
   workflow_dispatch:

@@ -9,8 +9,10 @@ mkdir -p "$output_directory/assets"
 
 cp "$project_root/site/index.html" "$output_directory/index.html"
 cp "$project_root/site/styles.css" "$output_directory/styles.css"
+cp "$project_root/site/mist.js" "$output_directory/mist.js"
 cp "$project_root/site/site.js" "$output_directory/site.js"
 cp "$project_root/assets/mist-v2.png" "$output_directory/assets/mist.png"
+cp "$project_root/assets/mist-field-alpha-v1.webp" "$output_directory/assets/mist-field-alpha-v1.webp"
 : > "$output_directory/.nojekyll"
 
 printf '%s\n' "Built Mist website at $output_directory"

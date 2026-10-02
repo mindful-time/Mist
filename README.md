@@ -70,8 +70,8 @@ See [inference backend research](docs/INFERENCE_BACKEND_RESEARCH.md) for provide
 
 For the simplest path, use the
 [Mist download page](https://mindful-time.github.io/Mist/). It chooses your
-operating system and shows the correct signed installer when a public release is
-available.
+operating system and shows the matching verified download when a public release
+is available. macOS and Windows installers are also platform-signed.
 
 macOS and Linux:
 

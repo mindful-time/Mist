@@ -20,11 +20,14 @@ jobs:
       - name: Validate website output
         shell: bash
         run: |
+          node --check site/mist.js
           node --check site/site.js
           test -s dist/site/index.html
           test -s dist/site/styles.css
+          test -s dist/site/mist.js
           test -s dist/site/site.js
           test -s dist/site/assets/mist.png
+          test -s dist/site/assets/mist-field-alpha-v1.webp
           test -f dist/site/.nojekyll
       - name: Validate GitHub Actions workflows
         shell: bash

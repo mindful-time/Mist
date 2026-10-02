@@ -306,8 +306,16 @@ jobs:
           chmod 755 dist/release/Mist-linux-x86_64.AppImage
           dpkg-deb --info dist/release/Mist-linux-x86_64.deb >/dev/null
           dependencies=$(dpkg-deb --field dist/release/Mist-linux-x86_64.deb Depends)
-          printf '%s\n' "$dependencies" | grep -F libx11-6 >/dev/null
-          printf '%s\n' "$dependencies" | grep -F fonts-noto-core >/dev/null
+          expected_dependencies="$RUNNER_TEMP/expected-deb-dependencies"
+          packaged_dependencies="$RUNNER_TEMP/packaged-deb-dependencies"
+          cargo metadata --format-version 1 --no-deps |
+            jq -r '.packages[] | select(.name == "mist") | .metadata.packager.deb.depends[]' |
+            sort > "$expected_dependencies"
+          printf '%s\n' "$dependencies" |
+            tr ',' '\n' |
+            sed 's/^[[:space:]]*//; s/[[:space:]]*$//' |
+            sort > "$packaged_dependencies"
+          diff -u "$expected_dependencies" "$packaged_dependencies"
           deb_root="$RUNNER_TEMP/mist-deb"
           mkdir -p "$deb_root"
           dpkg-deb --extract dist/release/Mist-linux-x86_64.deb "$deb_root"
