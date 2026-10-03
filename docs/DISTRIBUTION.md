@@ -207,11 +207,17 @@ Run **Actions → Release → Run workflow** on `main`. Choose `linux`, `macos`,
 `windows` to validate one platform and download its individual Actions artifacts.
 macOS requires the Apple signing credentials; Windows requires the Windows
 signing credentials. Linux can be tested while either signing setup is pending.
-Every candidate or tagged release validates its source/version and reruns the
-full build, test, CRAP, Smells, OSV, and Gitleaks gate on the exact release commit
-before platform packaging or access to signing environments. This is independent
-of the earlier PR result. Quality tooling and Linux packaging are shared
-composite actions; PR CI cannot call the signing/publishing jobs.
+Every candidate or tagged release validates its source/version, then verifies
+successful integration CI for the exact release commit before platform packaging
+or access to signing environments. CI owns audio and other tests, CRAP, Smells,
+OSV, and Gitleaks; Release does not repeat them. The verifier requires the latest
+push-to-`main` run of `.github/workflows/ci.yml` and all required jobs in its latest
+attempt to succeed. PR/merge-ref runs, wrong commits, failed/skipped/missing jobs,
+API errors, incomplete pagination, and concurrent reruns fail closed. If main CI
+is still running, wait and retry the candidate. For a partial or failed rerun,
+rerun all CI jobs on that main commit rather than bypassing the release gate.
+Linux packaging is shared between CI and Release; PR CI cannot call the
+signing/publishing jobs.
 
 After both signing setups are configured, choose `all` to build, sign, notarize,
 and validate every platform artifact, then upload
@@ -224,7 +230,8 @@ before choosing a version tag.
 
 1. Synchronize `VERSION`, `Cargo.toml`, `Cargo.lock`, and the macOS bundle
    version, then run `./scripts/release-check.sh`.
-2. Complete a successful manual release-candidate run for the commit on `main`.
+2. Wait for all required integration-CI checks on the exact commit on `main`,
+   then complete a successful manual release-candidate run for that commit.
 3. Create and push the matching `v<version>` tag. The release workflow packages
    each operating system on its native runner and creates or updates a draft
    GitHub Release.

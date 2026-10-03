@@ -55,3 +55,28 @@ Approved on 2026-10-03, reviewed from PR #2's existing commit
   Smells 0.5.0 and the existing
   policies/CRAP baseline; do not invent the proposed staged debt comparison.
 - Update PR #2, leave it unmerged, and leave publication/website deployment alone.
+
+## CI-owned testing and release consumption follow-up
+
+Approved on 2026-10-03 after the user clarified that audio tests belong in CI
+and Release owns building/distribution. Review these additions from
+`ec80e552e8cd08a271a503fb93097169fac4ba31` in the existing PR #2.
+This supersedes the earlier requirement to rerun quality inside Release.
+
+- Keep audio/application tests, CRAP, Smells, OSV, Gitleaks, and native validation
+  in required CI and the existing local hooks. Do not weaken thresholds or
+  regenerate the CRAP baseline to repair the timing-sensitive audio coverage.
+- Release validates its source/version, then requires successful canonical
+  push-to-`main` CI for the exact release SHA. Verify the latest run/attempt and
+  every required job from the versioned main-quality ruleset. Reject missing,
+  failed, skipped, pending, PR/fork, wrong-commit, stale, or incomplete evidence;
+  API/network failures also block. Do not rerun application tests in Release.
+- Test the verifier through its CLI with GitHub responses substituted only at
+  the external HTTP boundary; test the actual workflow dependency graph and
+  repair audio process tests using real child-process state.
+- Preserve pinned release checkouts, source/version checks, package formats,
+  native signing/notarization, protected environments, and draft-only publication.
+  The website links published release assets and stays opt-in after acceptance.
+- Commit and push to PR #2. Leave merging, tags, public publication, signing
+  credential setup, package-registry submissions, and website deployment pending
+  their existing prerequisites; no direct-main push or protection bypass.

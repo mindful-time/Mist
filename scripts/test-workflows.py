@@ -74,20 +74,24 @@ class WorkflowBoundaryTests(unittest.TestCase):
         self.assertIn("Linux package validation", names)
         self.assertNotIn("Linux release packages", names)
 
-    def test_release_artifacts_require_a_fresh_fail_closed_quality_run(self):
+    def test_release_artifacts_require_exact_commit_ci_without_rerunning_tests(self):
         jobs = workflow("release.yml")["jobs"]
-        self.assertIn("quality", jobs)
-        quality = jobs["quality"]
-        self.assertIn("preflight", prerequisites(jobs, "quality"))
-        self.assertNotIn("if", quality)
-        self.assertNotIn("continue-on-error", quality)
-        for config in [quality, workflow("ci.yml")["jobs"]["quality"]]:
-            steps = list(expanded_steps(config))
-            self.assertTrue(any("scripts/check-quality.sh" in step.get("run", "") for step in steps))
-            for step in config["steps"] + steps:
+        self.assertNotIn("quality", jobs)
+        gate = jobs["preflight"]
+        self.assertEqual(gate["permissions"], {"contents": "read", "actions": "read"})
+        self.assertNotIn("if", gate)
+        checks = [step for step in gate["steps"] if "scripts/verify-release-ci.mjs" in step.get("run", "")]
+        self.assertEqual(len(checks), 1)
+        self.assertEqual(checks[0]["env"]["GH_TOKEN"], "${{ github.token }}")
+        for job in jobs.values():
+            for step in list(expanded_steps(job)) + job["steps"]:
                 self.assertNotIn("continue-on-error", step)
+                self.assertNotIn("check-quality.sh", step.get("run", ""))
+                self.assertNotIn("cargo test", step.get("run", ""))
+        quality_steps = list(expanded_steps(workflow("ci.yml")["jobs"]["quality"]))
+        self.assertTrue(any("scripts/check-quality.sh" in step.get("run", "") for step in quality_steps))
         for name in ["macos", "windows", "linux", "assemble", "publish"]:
-            self.assertIn("quality", prerequisites(jobs, name), name)
+            self.assertIn("preflight", prerequisites(jobs, name), name)
             self.assertNotIn("always()", jobs[name].get("if", ""), name)
 
     def test_every_release_checkout_is_pinned_to_the_event_commit(self):

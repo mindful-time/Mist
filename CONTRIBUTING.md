@@ -77,6 +77,11 @@ See [distribution](docs/DISTRIBUTION.md),
 signed release or clean-machine acceptance. Never commit credentials, publish
 an unsigned stable release, or enable the download website before acceptance.
 Release runs only for version-tag pushes or manual candidate runs from `main`.
-It reruns the same fail-closed quality suite on the release commit before any
-platform packaging/signing job. Shared composite actions keep quality and Linux
-packaging consistent without mixing their workflow triggers or permissions.
+Tests and quality/security analysis belong to CI. Before packaging or signing,
+Release verifies the latest push-to-`main` CI run for its exact commit and every
+required check from `.github/rulesets/main-quality.json`. A PR merge-ref result,
+another commit, a failed/skipped check, or unavailable evidence cannot authorize
+a release. Rerun all integration-CI jobs on `main` if evidence is incomplete;
+Release does not rerun the test suite or substitute another successful run.
+Protected signing/publishing environments and draft-only publication remain.
+The Linux packaging composite is shared between CI validation and Release.

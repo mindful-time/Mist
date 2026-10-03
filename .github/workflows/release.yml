@@ -29,11 +29,17 @@ env:
 jobs:
   preflight:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
       - name: Install Rust 1.95
         run: |
           rustup toolchain install 1.95.0 --profile minimal
@@ -61,21 +67,14 @@ jobs:
             exit 1
           fi
 
-  quality:
-    name: Release quality and security gates
-    needs: preflight
-    # Match the committed coverage-backed CRAP baseline, as PR CI does.
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-      - uses: ./.github/actions/quality
+      - name: Verify successful main CI for the exact release commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/verify-release-ci.mjs
 
   macos:
     if: github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos'
-    needs: quality
+    needs: preflight
     strategy:
       fail-fast: false
       matrix:
@@ -206,7 +205,7 @@ jobs:
 
   windows:
     if: github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'windows'
-    needs: quality
+    needs: preflight
     runs-on: windows-2025
     environment: release-signing
     env:
@@ -308,7 +307,7 @@ jobs:
   linux:
     name: Linux release packages
     if: github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'linux'
-    needs: quality
+    needs: preflight
     # ort-sys's locked prebuilt ONNX Runtime uses newer glibc/libstdc++ symbols.
     # Keep the build image aligned with the documented Linux runtime baseline.
     runs-on: ubuntu-24.04
