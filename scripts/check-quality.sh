@@ -5,7 +5,7 @@ cd "$project_root"
 mode=${1:-commit}
 case "$mode" in index|commit) ;; *) exit 2 ;; esac
 
-for tool in cargo uvx osv-scanner gitleaks jq node; do
+for tool in cargo uv uvx osv-scanner gitleaks jq node; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         printf 'Mist quality gate requires %s. See CONTRIBUTING.md.\n' "$tool" >&2
         exit 1
@@ -39,7 +39,7 @@ else
         --format table --log "$report_directory/smells-findings.log" --report "$report_directory/smells-report.json"
 fi
 printf '%s\n' 'Mist quality gate: OSV dependency audit'
-osv-scanner scan source --lockfile Cargo.lock
+osv-scanner scan source --lockfile Cargo.lock --lockfile uv.lock:scripts/test-workflows.py.lock
 printf '%s\n' 'Mist quality gate: redacted secret scan'
 if [ "$mode" = index ]; then
     gitleaks git --pre-commit --staged --redact .

@@ -31,3 +31,27 @@ Implementation scope agreed on 2026-10-03, reviewed from commit
 The linked Smells chat proposes a future staged debt-envelope comparison.
 Published Smells 0.5.0 already reads complete staged blobs but does not implement
 that comparison. This work must not claim to have changed the separate scanner.
+
+## PR/release separation follow-up
+
+Approved on 2026-10-03, reviewed from PR #2's existing commit
+`b4560172a8afc68ab6d0e89caa8a5887a4ebd80e`.
+
+- CI runs on PRs targeting `main` and pushes to `main`. Do not start a duplicate
+  CI run for a PR branch push or run Release on a PR.
+- Move Linux production-package validation into required read-only CI, retaining
+  ABI, dependency, license, and archive checks. Reuse the same build/validation
+  logic in the release path.
+- Keep Release for version-tag pushes and manual candidates from `main`.
+  Validate the release source/version, then rerun the full fail-closed quality
+  suite on that exact commit before any platform builds/signing. Preserve
+  protected signing/publishing environments, package formats, and draft-only
+  publication; do not change signing credentials or create a release.
+- Replace the existing required `Linux release packages` context with
+  `Linux package validation` one-for-one in the template and live ruleset after
+  observing the new CI check. Preserve all other main protections.
+- Add regression tests for workflow triggers, the required read-only package
+  check, the release quality dependency, and pinned release checkouts. Keep
+  Smells 0.5.0 and the existing
+  policies/CRAP baseline; do not invent the proposed staged debt comparison.
+- Update PR #2, leave it unmerged, and leave publication/website deployment alone.

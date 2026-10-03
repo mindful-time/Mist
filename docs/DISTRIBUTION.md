@@ -195,16 +195,23 @@ existing rulesets; editing a file does not update server configuration.
 
 ## Testing a release candidate
 
-PRs targeting `main` build and validate the Linux production packages without
-signing secrets. The signed macOS/Windows jobs, bundle assembly, and draft
-publication are skipped on PRs. This catches release-only linker and packaging
-failures before merging without allowing untrusted PR code to access signing
-credentials. PR artifacts are test candidates, not approved public downloads.
+PRs targeting `main` run the read-only CI workflow, including required quality,
+native builds/tests, and `Linux package validation`. CI builds and validates
+the Linux production packages without signing secrets. The Release workflow
+does not start on PRs; signing, bundle assembly, and publication belong only to
+Release. PR artifacts are test candidates, not approved public downloads.
+Pushes to `main` rerun CI as an integration check; pushes to a PR branch do not
+start a duplicate CI run.
 
 Run **Actions → Release → Run workflow** on `main`. Choose `linux`, `macos`, or
 `windows` to validate one platform and download its individual Actions artifacts.
 macOS requires the Apple signing credentials; Windows requires the Windows
 signing credentials. Linux can be tested while either signing setup is pending.
+Every candidate or tagged release validates its source/version and reruns the
+full build, test, CRAP, Smells, OSV, and Gitleaks gate on the exact release commit
+before platform packaging or access to signing environments. This is independent
+of the earlier PR result. Quality tooling and Linux packaging are shared
+composite actions; PR CI cannot call the signing/publishing jobs.
 
 After both signing setups are configured, choose `all` to build, sign, notarize,
 and validate every platform artifact, then upload

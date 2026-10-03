@@ -72,7 +72,7 @@ test('quality runs every requested gate and fails closed on incomplete scans', t
   }
   const bin = path.join(f.root, 'bin');
   mkdirSync(bin);
-  for (const name of ['cargo', 'uvx', 'osv-scanner', 'gitleaks', 'jq', 'node']) {
+  for (const name of ['cargo', 'uv', 'uvx', 'osv-scanner', 'gitleaks', 'jq', 'node']) {
     writeFileSync(path.join(bin, name), `#!/bin/sh\nprintf '%s\\n' '${name}'" $*" >> "$MIST_GATE_TRACE"\nif [ "\${MIST_FAIL_TOOL:-}" = '${name}' ]; then exit 2; fi\n`, { mode: 0o755 });
   }
   const trace = path.join(f.root, 'trace');

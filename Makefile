@@ -14,7 +14,7 @@ distribution-test:
 	sh scripts/test-distribution.sh
 
 security:
-	osv-scanner scan source --lockfile Cargo.lock
+	osv-scanner scan source --lockfile Cargo.lock --lockfile uv.lock:scripts/test-workflows.py.lock
 	gitleaks git --redact .
 
 smells:

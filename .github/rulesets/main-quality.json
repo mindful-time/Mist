@@ -29,7 +29,7 @@
           { "context": "check (macos-latest)", "integration_id": 15368 },
           { "context": "check (windows-latest)", "integration_id": 15368 },
           { "context": "check (ubuntu-latest)", "integration_id": 15368 },
-          { "context": "Linux release packages", "integration_id": 15368 }
+          { "context": "Linux package validation", "integration_id": 15368 }
         ]
       }
     }

@@ -56,9 +56,18 @@ CI checks are the merge enforcement. The `Quality and security gates` job runs
 the same suite with pinned scanners, full Git history, and retained evidence.
 Coverage runs on Apple Silicon to match the committed CRAP baseline; native
 builds and tests are separate required jobs on macOS, Linux, and Windows.
+The required `Linux package validation` job builds and inspects production
+DEB/AppImage packages in CI without running the Release workflow. CI runs for
+PRs targeting `main` and pushes to `main`, not duplicate pushes to PR branches
+or release tags.
 Fork PRs do not receive signing credentials. Only the owner may apply changes
 to the existing server rulesets; editing `.github/rulesets/` alone does not
 change GitHub enforcement.
+
+Workflow-boundary regression tests parse the actual YAML and branch-rules
+template. They run through `uv` with locked PyYAML 6.0.3 as part of
+`make test`, both hooks, and required CI. OSV checks both Cargo dependencies
+and this test-only Python lockfile.
 
 ## Release work
 
@@ -67,3 +76,7 @@ See [distribution](docs/DISTRIBUTION.md),
 [Apple signing](docs/APPLE_SIGNING.md). A successful PR is not evidence of a
 signed release or clean-machine acceptance. Never commit credentials, publish
 an unsigned stable release, or enable the download website before acceptance.
+Release runs only for version-tag pushes or manual candidate runs from `main`.
+It reruns the same fail-closed quality suite on the release commit before any
+platform packaging/signing job. Shared composite actions keep quality and Linux
+packaging consistent without mixing their workflow triggers or permissions.

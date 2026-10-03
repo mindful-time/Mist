@@ -3,6 +3,7 @@ set -eu
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$project_root"
 node --test scripts/test-git-hooks.mjs scripts/test-package-managers.mjs
+uv run --no-project --locked --script scripts/test-workflows.py
 sh scripts/test-install-release.sh
 for script in scripts/*.sh .githooks/*; do sh -n "$script"; done
 # PowerShell trust-decision tests also run natively in Windows CI.
