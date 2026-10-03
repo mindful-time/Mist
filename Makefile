@@ -1,16 +1,20 @@
-.PHONY: test check quality security smells crap crap-baseline release-check hooks app install install-linux run
+.PHONY: test check quality security smells crap crap-baseline release-check hooks app install install-linux run distribution-test
 
 test:
-	cargo test
+	cargo test --locked --all-targets
+	sh scripts/test-distribution.sh
 
 check:
 	cargo clippy --all-targets -- -D warnings
 
 quality:
-	./scripts/pre-commit.sh
+	sh scripts/check-quality.sh
+
+distribution-test:
+	sh scripts/test-distribution.sh
 
 security:
-	osv-scanner scan source --lockfile Cargo.lock
+	osv-scanner scan source --lockfile Cargo.lock --lockfile uv.lock:scripts/test-workflows.py.lock
 	gitleaks git --redact .
 
 smells:
