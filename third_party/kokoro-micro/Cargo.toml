@@ -23,7 +23,7 @@ include = [
 
 [dependencies]
 # Core ONNX Runtime for model inference
-ort = { version = "2.0.0-rc.11", features = ["ndarray"] }
+ort = { version = "=2.0.0-rc.13", features = ["ndarray"] }
 
 # Essential for text processing and audio
 hound = "3.5.1"  # WAV support built-in

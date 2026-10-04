@@ -5,8 +5,8 @@ use mist::{
     ports::VoiceCatalog,
 };
 
-/// Optional end-to-end model check. It is ignored in normal CI because the
-/// Kokoro model is downloaded data, not a repository fixture.
+/// End-to-end model check. Native Intel CI explicitly downloads and verifies
+/// the model before running this; ordinary unit-test runs do not download it.
 #[test]
 #[ignore = "requires MIST_MODEL_DIR with downloaded Kokoro files"]
 fn local_kokoro_model_produces_audio() {
@@ -20,6 +20,12 @@ fn local_kokoro_model_produces_audio() {
         synthesizer.runtime_backend_label(),
         "CoreMLExecutionProvider (device 0)",
         "Apple Silicon must try the packaged Core ML provider before CPU"
+    );
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    assert_eq!(
+        synthesizer.runtime_backend_label(),
+        "CPU",
+        "Intel macOS uses the pinned, statically linked CPU runtime"
     );
     let catalog = KokoroVoiceCatalog;
     for (voice, sample) in [
@@ -42,6 +48,13 @@ fn local_kokoro_model_produces_audio() {
 
         assert!(!chunks.is_empty());
         assert!(chunks.iter().all(|audio| audio.sample_rate == 24_000));
+        assert!(
+            chunks
+                .iter()
+                .flat_map(|audio| &audio.samples)
+                .all(|sample| sample.is_finite()),
+            "voice {voice} produced non-finite audio"
+        );
         assert!(
             chunks
                 .iter()

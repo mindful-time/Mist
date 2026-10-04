@@ -19,4 +19,7 @@ are retained.
 
 Mist's ignored `tests/kokoro_smoke.rs` check loads the pinned production model,
 asserts the reported Core ML backend on Apple Silicon, and synthesizes English,
-Spanish, Japanese, and Mandarin samples.
+Spanish, Japanese, and Mandarin samples. Intel macOS builds omit the Core ML
+feature and link the native, source-built CPU runtime. The Rust `ort` version
+is pinned to the previously locked 2.0.0-rc.13 so its API requirement stays
+compatible with ONNX Runtime 1.28.0; this does not downgrade other platforms.

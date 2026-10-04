@@ -45,6 +45,27 @@ def expanded_steps(job):
 
 
 class WorkflowBoundaryTests(unittest.TestCase):
+    def test_intel_build_is_required_and_uses_the_same_runtime_as_release(self):
+        ci = workflow("ci.yml")
+        check = ci["jobs"]["check"]
+        self.assertIn("macos-15-intel", check["strategy"]["matrix"]["os"])
+        runtime_action = "./.github/actions/intel-onnxruntime"
+        ci_runtime = [step for step in check["steps"] if step.get("uses") == runtime_action]
+        release_runtime = [
+            step for step in workflow("release.yml")["jobs"]["macos"]["steps"]
+            if step.get("uses") == runtime_action
+        ]
+        self.assertEqual(len(ci_runtime), 1)
+        self.assertEqual(ci_runtime[0]["if"], "matrix.os == 'macos-15-intel'")
+        self.assertEqual(len(release_runtime), 1)
+        self.assertEqual(release_runtime[0]["if"], "matrix.architecture == 'x86_64'")
+        rules = json.loads((ROOT / ".github/rulesets/main-quality.json").read_text())
+        required = next(
+            rule["parameters"]["required_status_checks"]
+            for rule in rules["rules"] if rule["type"] == "required_status_checks"
+        )
+        self.assertIn("check (macos-15-intel)", [check["context"] for check in required])
+
     def test_prs_run_ci_without_starting_a_release(self):
         ci = events(workflow("ci.yml"))
         release = events(workflow("release.yml"))

@@ -128,6 +128,55 @@ Developer ID signing, hardened runtime, timestamping, notarization, and
 stapling. Windows requires Authenticode signing of both the executable and the
 installer.
 
+### Intel macOS runtime
+
+`ort-sys` 2.0.0-rc.13 has no prebuilt Intel Mac archive. Intel builds use
+ONNX Runtime 1.28.0 at source commit
+`da9b5e364c465de65c49d91e696cd6485270757f`, compiled natively with the CPU
+provider and static linkage. Apple Silicon keeps its existing Core ML runtime.
+The shared `.github/actions/intel-onnxruntime` action prepares this runtime in
+both CI and Release. Its exact cache key includes the compiler/SDK identity
+and builder/action content; it does not use approximate restore keys.
+
+For a local Intel source build, install Xcode Command Line Tools and uv, then:
+
+```sh
+git clone --filter=blob:none --no-checkout --depth=1 --branch v1.28.0 https://github.com/microsoft/onnxruntime.git target/intel-onnxruntime/source
+git -C target/intel-onnxruntime/source fetch --depth=1 origin da9b5e364c465de65c49d91e696cd6485270757f
+git -C target/intel-onnxruntime/source checkout --detach da9b5e364c465de65c49d91e696cd6485270757f
+sh scripts/build-intel-onnxruntime.sh target/intel-onnxruntime/source target/intel-onnxruntime/build
+export ORT_LIB_PATH="$PWD/target/intel-onnxruntime/build/Release"
+export ORT_PREFER_DYNAMIC_LINK=0
+export MACOSX_DEPLOYMENT_TARGET=13.3
+export MIST_INTEL_ORT_SOURCE="$PWD/target/intel-onnxruntime/source"
+cargo build --release --locked
+cargo packager --release --formats app
+sh scripts/prepare-intel-app.sh dist/packages/Mist.app
+```
+
+The builder pins Python 3.12.12 and CMake 3.31.6, retains all CPU operators,
+and disables FetchContent's installed-package fallback so dependency sources
+come from the pinned runtime manifest rather than Homebrew packages.
+It records the source revision, dependency-manifest hash, compiler/SDK, cache
+configuration, and static archive hashes. It builds the excluded RE2 target
+and combines the runtime, model-package, and built dependency archives into
+one complete `Release/libonnxruntime.a`. `ORT_LIB_PATH` points to this
+configuration directory, using `ort-sys`'s single-archive contract rather than
+its full-build-tree directory guesses. The archive-input manifest and provenance
+remain alongside it. The exact validated build is cached before application
+tests, so a later failure does not discard a successful runtime build.
+Do not rely on an installed system runtime.
+
+The Intel app targets macOS 13.3. Packaging verifies the binary's architecture,
+minimum OS, and system-only dynamic dependencies, sets matching bundle metadata,
+and includes the runtime MIT license, third-party notices, and provenance.
+Intel CI runs application/audio tests, builds this unsigned app, and generates
+non-silent multilingual audio from the pinned production model. These checks
+are not signing, audible-playback, Gatekeeper, or clean macOS 13.3 acceptance.
+See [the research and outstanding acceptance gates](INTEL_MAC_SUPPORT_RESEARCH.md).
+The [native CI validation record](INTEL_MAC_VALIDATION.md) identifies the tested
+commit and inspected unsigned artifact; it is not public-release approval.
+
 The release workflow requires these `release-signing` environment secrets:
 
 - `APPLE_CERTIFICATE`: base64-encoded Developer ID Application `.p12`
@@ -175,7 +224,8 @@ access-control rule.
 Once the plan supports rulesets (or the repository is made public), apply the
 two rulesets under `.github/rulesets/` in **Settings → Rules → Rulesets**. Their
 combined policy requires PRs, resolved review threads, repository validation,
-the three OS checks, full quality/security gates, and the Linux release-package check;
+the Apple Silicon and Intel macOS, Windows, and Linux checks, full quality/security
+gates, and `Linux package validation`;
 blocks deletion and force pushes; and lets only `mindful-time` merge. The
 maintainer exception is PR-only and does not bypass the separate CI ruleset.
 Zero mandatory approving reviews allows the solo maintainer to merge their
