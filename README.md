@@ -205,7 +205,10 @@ Install repository-owned Git hooks once per clone:
 make hooks
 ```
 
-The hooks run formatting, checks, strict Clippy, tests, coverage-backed CRAP analysis, Smells v0.5.0, OSV, Gitleaks, and release-version checks.
+Both hooks run formatting, checks, strict Clippy, builds, tests, coverage-backed
+CRAP analysis, Smells v0.5.0, OSV, Gitleaks, and release-version checks.
+Pre-commit tests the staged snapshot; pre-push tests the pushed revisions.
+See [contributing](CONTRIBUTING.md) for tool setup and the enforced CI gates.
 
 CRAP scores above 5 warn. New or regressed scores above 10 block. Run the gates directly when needed:
 
@@ -219,7 +222,9 @@ make security
 Mist is prepared for its first public SemVer release, `0.1.0`. `VERSION`,
 `Cargo.toml`, `Cargo.lock`, and bundle metadata must move together.
 
-Only the repository owner may push directly to `main`. Every other change must arrive through a pull request, and pull requests are squash-merged.
+Only `mindful-time` may merge to `main`. Everyone, including the owner, must use
+a pull request with passing required checks. Direct and force pushes are blocked;
+pull requests are squash-merged.
 
 Launch at login remains outside the current scope. Tagged releases build draft,
 signed installers for macOS and Windows plus AppImage and DEB packages for

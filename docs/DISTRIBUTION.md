@@ -174,8 +174,8 @@ access-control rule.
 
 Once the plan supports rulesets (or the repository is made public), apply the
 two rulesets under `.github/rulesets/` in **Settings → Rules → Rulesets**. Their
-combined policy requires PRs, resolved review threads, all four CI checks, and
-the Linux release-package check;
+combined policy requires PRs, resolved review threads, repository validation,
+the three OS checks, full quality/security gates, and the Linux release-package check;
 blocks deletion and force pushes; and lets only `mindful-time` merge. The
 maintainer exception is PR-only and does not bypass the separate CI ruleset.
 Zero mandatory approving reviews allows the solo maintainer to merge their
@@ -195,16 +195,29 @@ existing rulesets; editing a file does not update server configuration.
 
 ## Testing a release candidate
 
-PRs targeting `main` build and validate the Linux production packages without
-signing secrets. The signed macOS/Windows jobs, bundle assembly, and draft
-publication are skipped on PRs. This catches release-only linker and packaging
-failures before merging without allowing untrusted PR code to access signing
-credentials. PR artifacts are test candidates, not approved public downloads.
+PRs targeting `main` run the read-only CI workflow, including required quality,
+native builds/tests, and `Linux package validation`. CI builds and validates
+the Linux production packages without signing secrets. The Release workflow
+does not start on PRs; signing, bundle assembly, and publication belong only to
+Release. PR artifacts are test candidates, not approved public downloads.
+Pushes to `main` rerun CI as an integration check; pushes to a PR branch do not
+start a duplicate CI run.
 
 Run **Actions → Release → Run workflow** on `main`. Choose `linux`, `macos`, or
 `windows` to validate one platform and download its individual Actions artifacts.
 macOS requires the Apple signing credentials; Windows requires the Windows
 signing credentials. Linux can be tested while either signing setup is pending.
+Every candidate or tagged release validates its source/version, then verifies
+successful integration CI for the exact release commit before platform packaging
+or access to signing environments. CI owns audio and other tests, CRAP, Smells,
+OSV, and Gitleaks; Release does not repeat them. The verifier requires the latest
+push-to-`main` run of `.github/workflows/ci.yml` and all required jobs in its latest
+attempt to succeed. PR/merge-ref runs, wrong commits, failed/skipped/missing jobs,
+API errors, incomplete pagination, and concurrent reruns fail closed. If main CI
+is still running, wait and retry the candidate. For a partial or failed rerun,
+rerun all CI jobs on that main commit rather than bypassing the release gate.
+Linux packaging is shared between CI and Release; PR CI cannot call the
+signing/publishing jobs.
 
 After both signing setups are configured, choose `all` to build, sign, notarize,
 and validate every platform artifact, then upload
@@ -217,7 +230,8 @@ before choosing a version tag.
 
 1. Synchronize `VERSION`, `Cargo.toml`, `Cargo.lock`, and the macOS bundle
    version, then run `./scripts/release-check.sh`.
-2. Complete a successful manual release-candidate run for the commit on `main`.
+2. Wait for all required integration-CI checks on the exact commit on `main`,
+   then complete a successful manual release-candidate run for that commit.
 3. Create and push the matching `v<version>` tag. The release workflow packages
    each operating system on its native runner and creates or updates a draft
    GitHub Release.

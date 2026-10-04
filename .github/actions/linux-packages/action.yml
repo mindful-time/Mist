@@ -1,0 +1,91 @@
+name: Build and validate Linux packages
+description: Build DEB/AppImage artifacts and verify their ABI, dependencies, and contents.
+inputs:
+  packager-version:
+    description: Pinned cargo-packager version
+    default: "0.11.8"
+  artifact-name:
+    description: Name of the temporary workflow artifact
+    default: mist-linux-x86_64
+runs:
+  using: composite
+  steps:
+    - name: Install Rust 1.95
+      shell: bash
+      run: |
+        rustup toolchain install 1.95.0 --profile minimal
+        rustup default 1.95.0
+    - name: Install desktop packaging dependencies
+      shell: bash
+      run: >-
+        sudo apt-get update && sudo apt-get install -y
+        libx11-dev libxkbcommon-dev libwayland-dev libgl1-mesa-dev
+        libfuse2t64 patchelf binutils fonts-dejavu-core fonts-noto-core fonts-noto-cjk
+    - name: Install cargo-packager
+      shell: bash
+      env:
+        CARGO_PACKAGER_VERSION: ${{ inputs.packager-version }}
+      run: cargo install cargo-packager --version "$CARGO_PACKAGER_VERSION" --locked
+    - name: Build and validate DEB and AppImage
+      shell: bash
+      run: |
+        cargo build --release --locked
+        # Do not silently raise the published ABI baseline on dependency updates.
+        required_glibc=$(readelf --version-info target/release/mist |
+          grep -Eo 'GLIBC_[0-9.]+' | sort -Vu | tail -1)
+        required_glibcxx=$(readelf --version-info target/release/mist |
+          grep -Eo 'GLIBCXX_[0-9.]+' | sort -Vu | tail -1)
+        echo "Linux runtime requirements: $required_glibc, $required_glibcxx"
+        if ! dpkg --compare-versions "${required_glibc#GLIBC_}" le 2.39 ||
+           ! dpkg --compare-versions "${required_glibcxx#GLIBCXX_}" le 3.4.32; then
+          echo "The binary exceeds the documented Linux runtime baseline." >&2
+          exit 1
+        fi
+        cargo packager --release --formats deb,appimage
+        deb=$(find dist/packages -maxdepth 1 -type f -name '*.deb' -print -quit)
+        appimage=$(find dist/packages -maxdepth 1 -type f -name '*.AppImage' -print -quit)
+        test -n "$deb"
+        test -n "$appimage"
+        mkdir -p dist/release
+        cp "$deb" dist/release/Mist-linux-x86_64.deb
+        cp "$appimage" dist/release/Mist-linux-x86_64.AppImage
+        chmod 755 dist/release/Mist-linux-x86_64.AppImage
+        dpkg-deb --info dist/release/Mist-linux-x86_64.deb >/dev/null
+        dependencies=$(dpkg-deb --field dist/release/Mist-linux-x86_64.deb Depends)
+        expected_dependencies="$RUNNER_TEMP/expected-deb-dependencies"
+        packaged_dependencies="$RUNNER_TEMP/packaged-deb-dependencies"
+        cargo metadata --format-version 1 --no-deps |
+          jq -r '.packages[] | select(.name == "mist") | .metadata.packager.deb.depends[]' |
+          sort > "$expected_dependencies"
+        printf '%s\n' "$dependencies" |
+          tr ',' '\n' |
+          sed 's/^[[:space:]]*//; s/[[:space:]]*$//' |
+          sort > "$packaged_dependencies"
+        diff -u "$expected_dependencies" "$packaged_dependencies"
+        deb_root="$RUNNER_TEMP/mist-deb"
+        mkdir -p "$deb_root"
+        dpkg-deb --extract dist/release/Mist-linux-x86_64.deb "$deb_root"
+        file "$deb_root/usr/bin/mist" | grep -F 'ELF 64-bit LSB pie executable, x86-64' >/dev/null
+        test -f "$deb_root/usr/lib/mist/licenses/kokoro-micro-NOTICE"
+        test -f "$deb_root/usr/lib/mist/licenses/kokoro-micro-THIRD_PARTY_LICENSES"
+        test -f "$deb_root/usr/lib/mist/licenses/NotoSansDevanagariUI-OFL"
+        if ldd "$deb_root/usr/bin/mist" | grep -F 'not found'; then
+          echo "The DEB executable has unresolved runtime libraries." >&2
+          exit 1
+        fi
+        appimage_root="$RUNNER_TEMP/mist-appimage"
+        mkdir -p "$appimage_root"
+        (
+          cd "$appimage_root"
+          "$GITHUB_WORKSPACE/dist/release/Mist-linux-x86_64.AppImage" --appimage-extract >/dev/null
+        )
+        appimage_binary=$(find "$appimage_root/squashfs-root" -type f -name mist -perm -111 -print -quit)
+        test -n "$appimage_binary"
+        file "$appimage_binary" | grep -F 'ELF 64-bit LSB pie executable, x86-64' >/dev/null
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: |
+          dist/release/Mist-linux-x86_64.deb
+          dist/release/Mist-linux-x86_64.AppImage
+        if-no-files-found: error

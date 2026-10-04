@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>mist-tts</id>
+    <version>__VERSION__</version>
+    <title>Mist</title>
+    <authors>Mindful Time</authors>
+    <owners>mindful-time</owners>
+    <projectUrl>https://github.com/mindful-time/Mist</projectUrl>
+    <packageSourceUrl>https://github.com/mindful-time/Mist/tree/v__VERSION__/packaging/chocolatey</packageSourceUrl>
+    <licenseUrl>https://github.com/mindful-time/Mist/blob/v__VERSION__/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <summary>Select text and hear it spoken locally.</summary>
+    <description>Mist reads selected text using on-device Kokoro speech synthesis. Open Mist after installation, choose Download voices, then select text and press Ctrl+Space. Supports 64-bit Windows. Models and voices are downloaded separately and SHA-256 verified. Installs for the Windows account running Chocolatey; use the same account that will run Mist.</description>
+    <releaseNotes>https://github.com/mindful-time/Mist/releases/tag/v__VERSION__</releaseNotes>
+    <tags>mist tts text-to-speech accessibility kokoro</tags>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

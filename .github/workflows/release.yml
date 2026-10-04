@@ -1,9 +1,6 @@
 name: Release
 
 on:
-  pull_request:
-    branches:
-      - main
   push:
     tags:
       - "v*"
@@ -32,10 +29,17 @@ env:
 jobs:
   preflight:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
       - name: Install Rust 1.95
         run: |
           rustup toolchain install 1.95.0 --profile minimal
@@ -63,6 +67,11 @@ jobs:
             exit 1
           fi
 
+      - name: Verify successful main CI for the exact release commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/verify-release-ci.mjs
+
   macos:
     if: github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos'
     needs: preflight
@@ -82,6 +91,8 @@ jobs:
       MACOSX_DEPLOYMENT_TARGET: "13.0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
       - name: Install Rust 1.95
         run: |
           rustup toolchain install 1.95.0 --profile minimal
@@ -202,6 +213,8 @@ jobs:
       WINDOWS_SIGNER_SHA256: ${{ vars.WINDOWS_SIGNER_SHA256 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
       - name: Install Rust 1.95
         shell: pwsh
         run: |
@@ -293,125 +306,66 @@ jobs:
 
   linux:
     name: Linux release packages
-    if: github.event_name == 'push' || github.event_name == 'pull_request' || inputs.platform == 'all' || inputs.platform == 'linux'
+    if: github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'linux'
     needs: preflight
     # ort-sys's locked prebuilt ONNX Runtime uses newer glibc/libstdc++ symbols.
     # Keep the build image aligned with the documented Linux runtime baseline.
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install Rust 1.95
-        run: |
-          rustup toolchain install 1.95.0 --profile minimal
-          rustup default 1.95.0
-      - name: Install desktop packaging dependencies
-        run: >-
-          sudo apt-get update && sudo apt-get install -y
-          libx11-dev libxkbcommon-dev libwayland-dev libgl1-mesa-dev
-          libfuse2t64 patchelf binutils fonts-dejavu-core fonts-noto-core fonts-noto-cjk
-      - name: Install cargo-packager
-        run: cargo install cargo-packager --version "$CARGO_PACKAGER_VERSION" --locked
-      - name: Build Linux packages
-        shell: bash
-        run: |
-          cargo build --release --locked
-          # Do not silently raise the published ABI baseline on dependency updates.
-          required_glibc=$(readelf --version-info target/release/mist |
-            grep -Eo 'GLIBC_[0-9.]+' | sort -Vu | tail -1)
-          required_glibcxx=$(readelf --version-info target/release/mist |
-            grep -Eo 'GLIBCXX_[0-9.]+' | sort -Vu | tail -1)
-          echo "Linux runtime requirements: $required_glibc, $required_glibcxx"
-          if ! dpkg --compare-versions "${required_glibc#GLIBC_}" le 2.39 ||
-             ! dpkg --compare-versions "${required_glibcxx#GLIBCXX_}" le 3.4.32; then
-            echo "The binary exceeds the documented Linux runtime baseline." >&2
-            exit 1
-          fi
-          cargo packager --release --formats deb,appimage
-          deb=$(find dist/packages -maxdepth 1 -type f -name '*.deb' -print -quit)
-          appimage=$(find dist/packages -maxdepth 1 -type f -name '*.AppImage' -print -quit)
-          test -n "$deb"
-          test -n "$appimage"
-          mkdir -p dist/release
-          cp "$deb" dist/release/Mist-linux-x86_64.deb
-          cp "$appimage" dist/release/Mist-linux-x86_64.AppImage
-          chmod 755 dist/release/Mist-linux-x86_64.AppImage
-          dpkg-deb --info dist/release/Mist-linux-x86_64.deb >/dev/null
-          dependencies=$(dpkg-deb --field dist/release/Mist-linux-x86_64.deb Depends)
-          expected_dependencies="$RUNNER_TEMP/expected-deb-dependencies"
-          packaged_dependencies="$RUNNER_TEMP/packaged-deb-dependencies"
-          cargo metadata --format-version 1 --no-deps |
-            jq -r '.packages[] | select(.name == "mist") | .metadata.packager.deb.depends[]' |
-            sort > "$expected_dependencies"
-          printf '%s\n' "$dependencies" |
-            tr ',' '\n' |
-            sed 's/^[[:space:]]*//; s/[[:space:]]*$//' |
-            sort > "$packaged_dependencies"
-          diff -u "$expected_dependencies" "$packaged_dependencies"
-          deb_root="$RUNNER_TEMP/mist-deb"
-          mkdir -p "$deb_root"
-          dpkg-deb --extract dist/release/Mist-linux-x86_64.deb "$deb_root"
-          file "$deb_root/usr/bin/mist" | grep -F 'ELF 64-bit LSB pie executable, x86-64' >/dev/null
-          test -f "$deb_root/usr/lib/mist/licenses/kokoro-micro-NOTICE"
-          test -f "$deb_root/usr/lib/mist/licenses/kokoro-micro-THIRD_PARTY_LICENSES"
-          test -f "$deb_root/usr/lib/mist/licenses/NotoSansDevanagariUI-OFL"
-          if ldd "$deb_root/usr/bin/mist" | grep -F 'not found'; then
-            echo "The DEB executable has unresolved runtime libraries." >&2
-            exit 1
-          fi
-          appimage_root="$RUNNER_TEMP/mist-appimage"
-          mkdir -p "$appimage_root"
-          (
-            cd "$appimage_root"
-            "$GITHUB_WORKSPACE/dist/release/Mist-linux-x86_64.AppImage" --appimage-extract >/dev/null
-          )
-          appimage_binary=$(find "$appimage_root/squashfs-root" -type f -name mist -perm -111 -print -quit)
-          test -n "$appimage_binary"
-          file "$appimage_binary" | grep -F 'ELF 64-bit LSB pie executable, x86-64' >/dev/null
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: mist-linux-x86_64
-          path: |
-            dist/release/Mist-linux-x86_64.deb
-            dist/release/Mist-linux-x86_64.AppImage
-          if-no-files-found: error
+          ref: ${{ github.sha }}
+      - uses: ./.github/actions/linux-packages
+        with:
+          packager-version: ${{ env.CARGO_PACKAGER_VERSION }}
 
   assemble:
     if: github.event_name == 'push' || inputs.platform == 'all'
     needs: [macos, windows, linux]
-    runs-on: ubuntu-22.04
+    runs-on: windows-2025
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: mist-*
           path: release-assets
           merge-multiple: true
-      - name: Add installers and checksums
-        shell: bash
+      - name: Add verified installers and package-manager recipes
+        shell: pwsh
         env:
           APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
           WINDOWS_SIGNER_SHA256: ${{ vars.WINDOWS_SIGNER_SHA256 }}
         run: |
-          if [[ ! "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]; then
-            echo "Repository variable APPLE_TEAM_ID must be a 10-character Team ID." >&2
-            exit 1
-          fi
-          if [[ ! "$WINDOWS_SIGNER_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]; then
-            echo "Repository variable WINDOWS_SIGNER_SHA256 must be a SHA-256 certificate fingerprint." >&2
-            exit 1
-          fi
-          cp scripts/install-release.sh release-assets/mist-installer.sh
-          cp scripts/install-release.ps1 release-assets/mist-installer.ps1
-          sed -i "s/__MIST_APPLE_TEAM_ID__/$APPLE_TEAM_ID/g" release-assets/mist-installer.sh
-          sed -i "s/__MIST_WINDOWS_SIGNER_SHA256__/${WINDOWS_SIGNER_SHA256^^}/g" release-assets/mist-installer.ps1
-          cp assets/mist-orb-512-v1.png release-assets/Mist.png
-          cd release-assets
-          checksums=$(mktemp "$RUNNER_TEMP/mist-checksums.XXXXXX")
-          find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 |
-            sort -z |
-            xargs -0 sha256sum |
-            sed 's#  \./#  #' > "$checksums"
-          mv "$checksums" SHA256SUMS
+          $ErrorActionPreference = 'Stop'
+          if ($env:APPLE_TEAM_ID -cnotmatch '^[A-Z0-9]{10}$') { throw 'APPLE_TEAM_ID must be a 10-character Team ID.' }
+          if ($env:WINDOWS_SIGNER_SHA256 -notmatch '^[a-fA-F0-9]{64}$') { throw 'WINDOWS_SIGNER_SHA256 must be a certificate SHA-256.' }
+          $encoding = [Text.UTF8Encoding]::new($false)
+          $assets = (Resolve-Path release-assets).Path
+          $shell = [IO.File]::ReadAllText((Resolve-Path scripts/install-release.sh))
+          [IO.File]::WriteAllText((Join-Path $assets 'mist-installer.sh'), $shell.Replace("`r`n", "`n").Replace('__MIST_APPLE_TEAM_ID__', $env:APPLE_TEAM_ID), $encoding)
+          $powershell = [IO.File]::ReadAllText((Resolve-Path scripts/install-release.ps1))
+          [IO.File]::WriteAllText((Join-Path $assets 'mist-installer.ps1'), $powershell.Replace('__MIST_WINDOWS_SIGNER_SHA256__', $env:WINDOWS_SIGNER_SHA256.ToUpperInvariant()), $encoding)
+          Copy-Item assets/mist-orb-512-v1.png (Join-Path $assets 'Mist.png')
+          function Write-Checksums {
+            $lines = Get-ChildItem $assets -File | Where-Object Name -ne 'SHA256SUMS' | Sort-Object Name | ForEach-Object {
+              '{0}  {1}' -f (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLowerInvariant(), $_.Name
+            }
+            [IO.File]::WriteAllText((Join-Path $assets 'SHA256SUMS'), ($lines -join "`n") + "`n", $encoding)
+          }
+          Write-Checksums
+          $version = (Get-Content VERSION -Raw).Trim()
+          # Stable recipes only; prerelease installers retain their existing flow.
+          if ($version -match '^\d+\.\d+\.\d+$') {
+            $packages = Join-Path $env:RUNNER_TEMP 'mist-package-managers'
+            node scripts/build-package-managers.mjs $version $assets $packages $env:WINDOWS_SIGNER_SHA256
+            if ($LASTEXITCODE -ne 0) { throw 'Package recipe generation failed.' }
+            choco pack (Join-Path $packages 'chocolatey/mist-tts.nuspec') --outputdirectory $assets
+            if ($LASTEXITCODE -ne 0) { throw 'Chocolatey packaging failed.' }
+            Copy-Item (Join-Path $packages 'Casks/mist.rb') (Join-Path $assets 'mist.rb')
+            Write-Checksums
+          }
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mist-release-bundle-${{ github.sha }}

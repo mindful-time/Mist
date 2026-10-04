@@ -1,0 +1,20 @@
+cask "mist" do
+  arch arm: "aarch64", intel: "x86_64"
+
+  version "__VERSION__"
+  sha256 arm: "__ARM_SHA256__", intel: "__INTEL_SHA256__"
+
+  url "https://github.com/mindful-time/Mist/releases/download/v#{version}/Mist-macos-#{arch}.dmg",
+      verified: "github.com/mindful-time/Mist/"
+  name "Mist"
+  desc "Select text and hear it spoken locally"
+  homepage "https://github.com/mindful-time/Mist"
+
+  depends_on macos: :ventura
+  app "Mist.app"
+
+  caveats <<~EOS
+    Open Mist, choose Download voices, and allow Accessibility in System Settings.
+    Speech runs locally after the model and voices have been downloaded.
+  EOS
+end

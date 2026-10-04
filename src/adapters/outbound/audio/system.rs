@@ -266,10 +266,7 @@ fn set_process_paused(child: &Child, paused: bool) -> Result<()> {
 
 #[cfg(all(test, any(target_os = "macos", target_os = "linux")))]
 mod tests {
-    use std::{
-        sync::{Arc, Mutex, mpsc},
-        thread,
-    };
+    use std::{sync::mpsc, thread};
 
     use super::*;
 
@@ -283,38 +280,115 @@ mod tests {
         let token = crate::playback::PlaybackToken::queue_item(id);
         assert!(control.register(token));
         control.begin_session(token).unwrap();
-        let transitions = Arc::new(Mutex::new(Vec::new()));
+        let mut child = Command::new("/bin/sleep").arg("5").spawn().unwrap();
+        let process_id = child.id() as libc::pid_t;
+        let (sample_sender, sample_receiver) = mpsc::sync_channel(1);
         let control_thread = control.clone();
-        let thread_transitions = transitions.clone();
         let controller = thread::spawn(move || {
-            thread::sleep(Duration::from_millis(80));
-            thread_transitions
-                .lock()
-                .unwrap()
-                .push(control_thread.pause(token));
-            thread::sleep(Duration::from_millis(80));
-            thread_transitions
-                .lock()
-                .unwrap()
-                .push(control_thread.resume(token));
-            thread::sleep(Duration::from_millis(80));
-            thread_transitions
-                .lock()
-                .unwrap()
-                .push(control_thread.cancel(token));
+            sample_receiver
+                .recv_timeout(Duration::from_secs(2))
+                .unwrap();
+            assert!(control_thread.pause(token));
+            let stopped = wait_for_stopped_process(process_id);
+            if !stopped {
+                control_thread.cancel(token);
+                return false;
+            }
+            // Discard samples queued before SIGSTOP. The next sample must be
+            // emitted after the monitor has applied resume to the child.
+            sample_receiver.try_iter().for_each(drop);
+            assert!(control_thread.resume(token));
+            let resumed = sample_receiver.recv_timeout(Duration::from_secs(2)).is_ok();
+            assert!(control_thread.cancel(token));
+            resumed
         });
 
-        let mut child = Command::new("/bin/sleep").arg("5").spawn().unwrap();
         let audio = Audio::new(vec![0.1; 24_000], 24_000);
-        let mut samples = 0;
-        let error =
-            monitor_playback(&mut child, &audio, &mut |_| samples += 1, &control).unwrap_err();
-        controller.join().unwrap();
+        let error = monitor_playback(
+            &mut child,
+            &audio,
+            &mut |_| {
+                let _ = sample_sender.try_send(());
+            },
+            &control,
+        )
+        .unwrap_err();
+        let resumed = controller.join().unwrap();
         control.finish_session(token);
 
         assert!(playback_error_was_stopped(&error));
-        assert_eq!(&*transitions.lock().unwrap(), &[true, true, true]);
-        assert!(samples > 0);
+        assert!(resumed, "system player did not stop and resume sampling");
+        assert!(
+            child.try_wait().unwrap().is_some(),
+            "cancel must reap the child"
+        );
+    }
+
+    fn wait_for_stopped_process(process_id: libc::pid_t) -> bool {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while Instant::now() < deadline {
+            let mut status = 0;
+            // SAFETY: the caller owns this live child and `status` is a valid
+            // writable wait-status pointer. Stop notifications do not reap it.
+            let result =
+                unsafe { libc::waitpid(process_id, &mut status, libc::WNOHANG | libc::WUNTRACED) };
+            if result == process_id && libc::WIFSTOPPED(status) {
+                return true;
+            }
+            if result == -1 {
+                return false;
+            }
+            thread::sleep(Duration::from_millis(1));
+        }
+        false
+    }
+
+    #[test]
+    fn cancellation_before_playback_stops_and_reaps_the_system_player() {
+        let control = PlaybackController::default();
+        let token = crate::playback::PlaybackToken::PREVIEW;
+        control.begin_session(token).unwrap();
+        assert!(control.cancel(token));
+        let mut child = Command::new("/bin/sleep").arg("5").spawn().unwrap();
+        let audio = Audio::new(vec![0.1; 24_000], 24_000);
+
+        let error = monitor_playback(
+            &mut child,
+            &audio,
+            &mut |_| panic!("cancelled speech must not emit playback samples"),
+            &control,
+        )
+        .unwrap_err();
+
+        assert!(playback_error_was_stopped(&error));
+        assert!(
+            child.try_wait().unwrap().is_some(),
+            "cancel must reap the child"
+        );
+    }
+
+    #[test]
+    fn completed_system_playback_returns_its_exit_status_without_emitting_samples() {
+        let control = PlaybackController::default();
+        control
+            .begin_session(crate::playback::PlaybackToken::PREVIEW)
+            .unwrap();
+        let mut child = Command::new("/bin/sh")
+            .args(["-c", "exit 0"])
+            .spawn()
+            .unwrap();
+        assert!(child.wait().unwrap().success());
+        let audio = Audio::new(vec![0.1; 24_000], 24_000);
+
+        let status = monitor_playback(
+            &mut child,
+            &audio,
+            &mut |_| panic!("finished speech must not emit playback samples"),
+            &control,
+        )
+        .unwrap();
+
+        assert!(status.success());
     }
 
     #[test]
