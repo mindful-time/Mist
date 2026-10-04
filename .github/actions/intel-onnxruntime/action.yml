@@ -1,0 +1,33 @@
+name: Intel macOS ONNX Runtime
+description: Build the pinned CPU runtime missing from ort-sys's Intel macOS download matrix.
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+      with:
+        version: '0.11.10'
+    - name: Checkout the exact ONNX Runtime source
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        repository: microsoft/onnxruntime
+        ref: da9b5e364c465de65c49d91e696cd6485270757f # v1.28.0
+        path: target/intel-onnxruntime/source
+        persist-credentials: false
+    - name: Identify the native compiler and SDK
+      id: sdk
+      shell: bash
+      run: |
+        test "$(uname -s):$(uname -m)" = Darwin:x86_64
+        printf 'identity=%s\n' "$( { xcodebuild -version; xcrun --show-sdk-version; xcrun clang --version; } | shasum -a 256 | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+    - name: Cache the exact native static build
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      with:
+        path: target/intel-onnxruntime/build
+        key: intel-ort-1.28.0-${{ steps.sdk.outputs.identity }}-${{ hashFiles('scripts/build-intel-onnxruntime.sh', '.github/actions/intel-onnxruntime/action.yml') }}
+    - name: Build and validate the Intel CPU runtime
+      shell: bash
+      run: |
+        runtime_source="$GITHUB_WORKSPACE/target/intel-onnxruntime/source"
+        runtime_build="$GITHUB_WORKSPACE/target/intel-onnxruntime/build"
+        sh scripts/build-intel-onnxruntime.sh "$runtime_source" "$runtime_build"
+        printf 'ORT_LIB_PATH=%s\nORT_LIB_PROFILE=Release\nORT_PREFER_DYNAMIC_LINK=0\nMACOSX_DEPLOYMENT_TARGET=13.3\nMIST_INTEL_ORT_SOURCE=%s\n' "$runtime_build" "$runtime_source" >> "$GITHUB_ENV"

@@ -80,3 +80,28 @@ This supersedes the earlier requirement to rerun quality inside Release.
 - Commit and push to PR #2. Leave merging, tags, public publication, signing
   credential setup, package-registry submissions, and website deployment pending
   their existing prerequisites; no direct-main push or protection bypass.
+
+## Intel macOS runtime follow-up
+
+Approved on 2026-10-04 after the Intel candidate failed at `ort-sys`. Review
+these changes from merged `main`, `1c505dc67c5e2814e8514034b4374c4c8481db25`.
+See [the runtime research](INTEL_MAC_SUPPORT_RESEARCH.md).
+
+- Keep the locked `ort`/`ort-sys` 2.0.0-rc.13 APIs and existing model/voices.
+  Build ONNX Runtime 1.28.0 from its exact source commit on native Intel macOS;
+  begin with CPU inference and static linkage. Do not downgrade the Windows
+  DirectML implementation or change Apple Silicon's Core ML runtime path.
+- Share the Intel runtime build between CI and Release. Cache only an exact
+  source/build-script/compiler/SDK configuration, preserve build provenance,
+  and include ONNX Runtime's license and third-party notices in the Intel app.
+- Make Intel native builds, application/audio tests, and real multilingual
+  synthesis part of read-only CI. Validate the release-mode app's architecture,
+  deployment target, and self-contained static linkage without signing secrets.
+  Release consumes exact-commit CI evidence; it must not rerun application tests.
+- The Intel candidate targets macOS 13.3. Align its bundle metadata with that
+  target and reject unexpected runtime library dependencies or binary minimums.
+  A runner on macOS 15 is not acceptance evidence for macOS 13.3.
+- Use a new PR branch; leave merging and server-ruleset application to the owner.
+  Do not publish a release, create a tag, change signing credentials, or enable
+  the download website. The separate notarization credential error, Windows
+  signing, and clean-machine acceptance remain outstanding.

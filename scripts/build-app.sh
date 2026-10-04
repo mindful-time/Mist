@@ -14,6 +14,9 @@ cp "$project_root/target/release/mist" "$contents/MacOS/mist"
 cp "$project_root/macos/Info.plist" "$contents/Info.plist"
 "$project_root/scripts/build-macos-icon.sh" "$contents/Resources/Mist.icns" >/dev/null
 /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string Mist.icns" "$contents/Info.plist"
+if [[ "$(uname -m)" == x86_64 ]]; then
+    sh "$project_root/scripts/prepare-intel-app.sh" "$app_bundle"
+fi
 
 /usr/bin/codesign --force --deep --sign "$signing_identity" "$app_bundle"
 echo "$app_bundle"

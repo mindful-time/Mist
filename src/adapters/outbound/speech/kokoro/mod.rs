@@ -98,7 +98,7 @@ fn capabilities_for(
     cuda_device_present: bool,
 ) -> Vec<ProviderCapability> {
     let auto_detail = match operating_system {
-        "macos" => "Chooses Core ML GPU when available, then ONNX CPU",
+        "macos" => "Core ML on Apple Silicon, ONNX CPU on Intel",
         "windows" => "Chooses CUDA, then DirectML, then ONNX CPU",
         "linux" => "Chooses CUDA when validated, then ONNX CPU",
         _ => "Chooses a validated backend · currently ONNX CPU",

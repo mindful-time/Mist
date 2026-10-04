@@ -27,6 +27,7 @@
           { "context": "Repository metadata, workflows, and website", "integration_id": 15368 },
           { "context": "Quality and security gates", "integration_id": 15368 },
           { "context": "check (macos-latest)", "integration_id": 15368 },
+          { "context": "check (macos-15-intel)", "integration_id": 15368 },
           { "context": "check (windows-latest)", "integration_id": 15368 },
           { "context": "check (ubuntu-latest)", "integration_id": 15368 },
           { "context": "Linux package validation", "integration_id": 15368 }

@@ -14,6 +14,7 @@ const required = [
   'Repository metadata, workflows, and website',
   'Quality and security gates',
   'check (macos-latest)',
+  'check (macos-15-intel)',
   'check (windows-latest)',
   'check (ubuntu-latest)',
   'Linux package validation',
@@ -33,7 +34,7 @@ function fixture(t) {
     [`${prefix}/workflows/456/runs?page=1`]: { total_count: 1, workflow_runs: [run] },
     [`${prefix}/runs/123`]: run,
     [`${prefix}/runs/123/attempts/1/jobs?page=1`]: {
-      total_count: 6,
+      total_count: 7,
       jobs: required.map(name => ({ name, head_sha: commit, run_id: 123, run_attempt: 1, status: 'completed', conclusion: 'success' })),
     },
   };
@@ -80,8 +81,8 @@ test('release checks required jobs on every API page', t => {
   const f = fixture(t);
   const key = `${prefix}/runs/123/attempts/1/jobs`;
   const jobs = f.responses[`${key}?page=1`].jobs;
-  f.responses[`${key}?page=1`] = { total_count: 6, jobs: jobs.slice(0, 3) };
-  f.responses[`${key}?page=2`] = { total_count: 6, jobs: jobs.slice(3) };
+  f.responses[`${key}?page=1`] = { total_count: 7, jobs: jobs.slice(0, 3) };
+  f.responses[`${key}?page=2`] = { total_count: 7, jobs: jobs.slice(3) };
   const result = f.verify();
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
@@ -101,7 +102,7 @@ test('release fails closed when GitHub job evidence is unavailable or incomplete
   const page = f.responses[key];
   delete f.responses[key];
   assert.notEqual(f.verify().status, 0);
-  f.responses[key] = { ...page, total_count: 7 };
+  f.responses[key] = { ...page, total_count: 8 };
   assert.notEqual(f.verify().status, 0);
 });
 

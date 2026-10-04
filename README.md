@@ -116,7 +116,11 @@ Choose a voice, select **Download voices**, then select text in another applicat
 
 ### macOS
 
-Mist supports macOS 13+ and requires the Xcode Command Line Tools.
+Mist requires the Xcode Command Line Tools. Apple Silicon uses the existing
+Core ML build; the Intel CPU candidate targets macOS 13.3+ and requires the
+[pinned runtime preparation](docs/DISTRIBUTION.md#intel-macos-runtime) before
+the commands below. Signed, clean-machine acceptance is still required before
+the first public release.
 
 ```sh
 MIST_SIGNING_IDENTITY="Apple Development: Your Name (TEAMID)" make install

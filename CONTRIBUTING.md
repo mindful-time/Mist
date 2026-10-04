@@ -85,3 +85,12 @@ a release. Rerun all integration-CI jobs on `main` if evidence is incomplete;
 Release does not rerun the test suite or substitute another successful run.
 Protected signing/publishing environments and draft-only publication remain.
 The Linux packaging composite is shared between CI validation and Release.
+
+Intel macOS additionally uses the revision-pinned source build described
+in [distribution](docs/DISTRIBUTION.md#intel-macos-runtime). Set its absolute
+`ORT_LIB_PATH` before running local checks; ordinary `ort-sys` downloads do not
+contain an Intel Mac runtime. The `check (macos-15-intel)` job uses the same
+CPU runtime preparation as Release, validates an unsigned release-mode app,
+and runs the downloaded-model multilingual smoke test. It receives no signing
+credentials. The versioned ruleset and Release verifier require this check;
+only the owner may add its new context to the existing server ruleset.

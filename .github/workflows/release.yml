@@ -82,13 +82,15 @@ jobs:
           - runner: macos-15
             architecture: aarch64
             binary_architecture: arm64
+            deployment_target: "13.0"
           - runner: macos-15-intel
             architecture: x86_64
             binary_architecture: x86_64
+            deployment_target: "13.3"
     runs-on: ${{ matrix.runner }}
     environment: release-signing
     env:
-      MACOSX_DEPLOYMENT_TARGET: "13.0"
+      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment_target }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -97,6 +99,8 @@ jobs:
         run: |
           rustup toolchain install 1.95.0 --profile minimal
           rustup default 1.95.0
+      - uses: ./.github/actions/intel-onnxruntime
+        if: matrix.architecture == 'x86_64'
       - name: Require Apple release credentials
         shell: bash
         env:
@@ -125,6 +129,9 @@ jobs:
           test -f dist/packages/Mist.app/Contents/Resources/licenses/kokoro-micro-NOTICE
           test -f dist/packages/Mist.app/Contents/Resources/licenses/kokoro-micro-THIRD_PARTY_LICENSES
           test -f dist/packages/Mist.app/Contents/Resources/licenses/NotoSansDevanagariUI-OFL
+      - name: Validate Intel runtime packaging
+        if: matrix.architecture == 'x86_64'
+        run: sh scripts/prepare-intel-app.sh dist/packages/Mist.app
       - name: Import Developer ID certificate
         id: keychain
         shell: bash
