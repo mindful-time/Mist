@@ -20,14 +20,21 @@ runs:
         test "$(uname -s):$(uname -m)" = Darwin:x86_64
         printf 'identity=%s\n' "$( { xcodebuild -version; xcrun --show-sdk-version; xcrun clang --version; } | shasum -a 256 | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
     - name: Cache the exact native static build
-      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      id: runtime-cache
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
       with:
         path: target/intel-onnxruntime/build
-        key: intel-ort-1.28.0-${{ steps.sdk.outputs.identity }}-${{ hashFiles('scripts/build-intel-onnxruntime.sh', '.github/actions/intel-onnxruntime/action.yml') }}
+        key: intel-ort-1.28.0-${{ steps.sdk.outputs.identity }}-${{ hashFiles('scripts/build-intel-onnxruntime.sh', 'scripts/link-intel-onnxruntime.sh', '.github/actions/intel-onnxruntime/action.yml') }}
     - name: Build and validate the Intel CPU runtime
       shell: bash
       run: |
         runtime_source="$GITHUB_WORKSPACE/target/intel-onnxruntime/source"
         runtime_build="$GITHUB_WORKSPACE/target/intel-onnxruntime/build"
         sh scripts/build-intel-onnxruntime.sh "$runtime_source" "$runtime_build"
-        printf 'ORT_LIB_PATH=%s\nORT_LIB_PROFILE=Release\nORT_PREFER_DYNAMIC_LINK=0\nMACOSX_DEPLOYMENT_TARGET=13.3\nMIST_INTEL_ORT_SOURCE=%s\n' "$runtime_build" "$runtime_source" >> "$GITHUB_ENV"
+        printf 'ORT_LIB_PATH=%s\nORT_PREFER_DYNAMIC_LINK=0\nMACOSX_DEPLOYMENT_TARGET=13.3\nMIST_INTEL_ORT_SOURCE=%s\n' "$runtime_build/Release" "$runtime_source" >> "$GITHUB_ENV"
+    - name: Retain the validated runtime before application tests
+      if: steps.runtime-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      with:
+        path: target/intel-onnxruntime/build
+        key: ${{ steps.runtime-cache.outputs.cache-primary-key }}

@@ -19,7 +19,7 @@ test -z "$(git -C "$runtime_source" status --porcelain --untracked-files=no)"
 test "$(tr -d '[:space:]' < "$runtime_source/VERSION_NUMBER")" = 1.28.0
 
 # Do not restrict operators: Kokoro uses dynamic shapes, LSTM, and STFT.
-# Keep the complete CPU graph and dependency archives needed by ort-sys rc.13.
+# Keep the complete CPU graph and dependency archives before bundling for ort-sys.
 uv run --no-project --python 3.12.12 --with cmake==3.31.6 \
     python "$runtime_source/tools/ci_build/build.py" \
     --build_dir "$runtime_build" --config Release --parallel 3 \
@@ -31,11 +31,13 @@ uv run --no-project --python 3.12.12 --with cmake==3.31.6 \
     onnxruntime_BUILD_UNIT_TESTS=OFF onnxruntime_BUILD_SHARED_LIB=OFF \
     onnxruntime_USE_COREML=OFF
 
-for library in common flatbuffers framework graph lora mlas optimizer providers session util; do
-    archive="$runtime_build/Release/libonnxruntime_$library.a"
-    test -s "$archive"
-    test "$(lipo -archs "$archive")" = x86_64
+# RE2 is excluded from the upstream default static build's ALL target.
+uv run --no-project --python 3.12.12 --with cmake==3.31.6 \
+    cmake --build "$runtime_build/Release" --config Release --target re2 --parallel 3
+for dependency in onnx-build/libonnx.a onnx-build/libonnx_proto.a re2-build/libre2.a; do
+    test -s "$runtime_build/Release/_deps/$dependency"
 done
+sh scripts/link-intel-onnxruntime.sh "$runtime_build/Release"
 
 # Retain enough provenance to identify the exact code, dependencies, and tools.
 {
@@ -44,8 +46,9 @@ done
     xcrun --show-sdk-version
     xcrun clang --version
     shasum -a 256 "$runtime_source/cmake/deps.txt" "$runtime_build/Release/CMakeCache.txt"
-    for archive in "$runtime_build/Release"/libonnxruntime_*.a; do
+    while IFS= read -r archive; do
         shasum -a 256 "$archive"
-    done
-} > "$runtime_build/provenance.txt"
+    done < "$runtime_build/Release/runtime-archives.txt"
+    shasum -a 256 "$runtime_build/Release/libonnxruntime.a"
+} > "$runtime_build/Release/provenance.txt"
 printf 'Intel CPU runtime is ready in %s\n' "$runtime_build"

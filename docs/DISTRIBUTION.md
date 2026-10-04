@@ -145,8 +145,7 @@ git clone --filter=blob:none --no-checkout --depth=1 --branch v1.28.0 https://gi
 git -C target/intel-onnxruntime/source fetch --depth=1 origin da9b5e364c465de65c49d91e696cd6485270757f
 git -C target/intel-onnxruntime/source checkout --detach da9b5e364c465de65c49d91e696cd6485270757f
 sh scripts/build-intel-onnxruntime.sh target/intel-onnxruntime/source target/intel-onnxruntime/build
-export ORT_LIB_PATH="$PWD/target/intel-onnxruntime/build"
-export ORT_LIB_PROFILE=Release
+export ORT_LIB_PATH="$PWD/target/intel-onnxruntime/build/Release"
 export ORT_PREFER_DYNAMIC_LINK=0
 export MACOSX_DEPLOYMENT_TARGET=13.3
 export MIST_INTEL_ORT_SOURCE="$PWD/target/intel-onnxruntime/source"
@@ -159,9 +158,14 @@ The builder pins Python 3.12.12 and CMake 3.31.6, retains all CPU operators,
 and disables FetchContent's installed-package fallback so dependency sources
 come from the pinned runtime manifest rather than Homebrew packages.
 It records the source revision, dependency-manifest hash, compiler/SDK, cache
-configuration, and static archive hashes. `ORT_LIB_PATH` points to the complete
-build tree because `ort-sys` must link its dependency archives as well.
-Do not publish only the main ONNX archive or rely on an installed system runtime.
+configuration, and static archive hashes. It builds the excluded RE2 target
+and combines the runtime, model-package, and built dependency archives into
+one complete `Release/libonnxruntime.a`. `ORT_LIB_PATH` points to this
+configuration directory, using `ort-sys`'s single-archive contract rather than
+its full-build-tree directory guesses. The archive-input manifest and provenance
+remain alongside it. The exact validated build is cached before application
+tests, so a later failure does not discard a successful runtime build.
+Do not rely on an installed system runtime.
 
 The Intel app targets macOS 13.3. Packaging verifies the binary's architecture,
 minimum OS, and system-only dynamic dependencies, sets matching bundle metadata,
