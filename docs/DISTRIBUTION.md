@@ -156,7 +156,9 @@ sh scripts/prepare-intel-app.sh dist/packages/Mist.app
 ```
 
 The builder pins Python 3.12.12 and CMake 3.31.6, retains all CPU operators,
-and records the source revision, dependency-manifest hash, compiler/SDK, cache
+and disables FetchContent's installed-package fallback so dependency sources
+come from the pinned runtime manifest rather than Homebrew packages.
+It records the source revision, dependency-manifest hash, compiler/SDK, cache
 configuration, and static archive hashes. `ORT_LIB_PATH` points to the complete
 build tree because `ort-sys` must link its dependency archives as well.
 Do not publish only the main ONNX archive or rely on an installed system runtime.

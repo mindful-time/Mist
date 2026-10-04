@@ -27,6 +27,7 @@ uv run --no-project --python 3.12.12 --with cmake==3.31.6 \
     --compile_no_warning_as_error \
     --cmake_extra_defines \
     CMAKE_OSX_ARCHITECTURES=x86_64 CMAKE_OSX_DEPLOYMENT_TARGET=13.3 \
+    FETCHCONTENT_TRY_FIND_PACKAGE_MODE=NEVER \
     onnxruntime_BUILD_UNIT_TESTS=OFF onnxruntime_BUILD_SHARED_LIB=OFF \
     onnxruntime_USE_COREML=OFF
 
