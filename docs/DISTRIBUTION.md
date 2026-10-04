@@ -174,6 +174,8 @@ Intel CI runs application/audio tests, builds this unsigned app, and generates
 non-silent multilingual audio from the pinned production model. These checks
 are not signing, audible-playback, Gatekeeper, or clean macOS 13.3 acceptance.
 See [the research and outstanding acceptance gates](INTEL_MAC_SUPPORT_RESEARCH.md).
+The [native CI validation record](INTEL_MAC_VALIDATION.md) identifies the tested
+commit and inspected unsigned artifact; it is not public-release approval.
 
 The release workflow requires these `release-signing` environment secrets:
 
@@ -222,7 +224,8 @@ access-control rule.
 Once the plan supports rulesets (or the repository is made public), apply the
 two rulesets under `.github/rulesets/` in **Settings → Rules → Rulesets**. Their
 combined policy requires PRs, resolved review threads, repository validation,
-the three OS checks, full quality/security gates, and the Linux release-package check;
+the Apple Silicon and Intel macOS, Windows, and Linux checks, full quality/security
+gates, and `Linux package validation`;
 blocks deletion and force pushes; and lets only `mindful-time` merge. The
 maintainer exception is PR-only and does not bypass the separate CI ruleset.
 Zero mandatory approving reviews allows the solo maintainer to merge their
