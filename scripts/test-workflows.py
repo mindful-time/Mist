@@ -45,6 +45,22 @@ def expanded_steps(job):
 
 
 class WorkflowBoundaryTests(unittest.TestCase):
+    def test_linux_preview_is_separate_and_keeps_ci_and_publication_protection(self):
+        jobs = workflow("release.yml")["jobs"]
+        preview = jobs["publish_linux_preview"]
+        self.assertEqual(preview["environment"], "release-publishing")
+        self.assertEqual(preview["needs"], ["preflight", "linux"])
+        self.assertIn("needs.preflight.outputs.channel == 'linux-preview'", preview["if"])
+        for name in ["macos", "windows", "assemble"]:
+            self.assertIn("needs.preflight.outputs.channel != 'linux-preview'", jobs[name]["if"])
+        downloads = [step for step in preview["steps"] if step.get("uses", "").startswith("actions/download-artifact@")]
+        self.assertEqual(downloads[0]["with"]["name"], "mist-linux-x86_64")
+        create = next(step["run"] for step in preview["steps"] if step.get("name") == "Create Linux preview draft")
+        for flag in ["--draft", "--prerelease", "--verify-tag", "--latest=false"]:
+            self.assertIn(flag, create)
+        self.assertNotIn("--clobber", create)
+        self.assertIn("preflight", prerequisites(jobs, "publish_linux_preview"))
+
     def test_intel_build_is_required_and_uses_the_same_runtime_as_release(self):
         ci = workflow("ci.yml")
         check = ci["jobs"]["check"]

@@ -3,6 +3,14 @@ const packageArea = document.querySelector("[data-package-area]");
 const platformButtons = [...document.querySelectorAll("[data-platform]")];
 const instructions = document.querySelector("[data-instructions]");
 const heroDownload = document.querySelector("[data-hero-download]");
+const platformPicker = document.querySelector("[data-platform-picker]");
+const nextSteps = document.querySelector("[data-next-steps]");
+const setupExpectation = document.querySelector("[data-setup-expectation]");
+const previewNotice = document.querySelector("[data-preview-notice]");
+const downloadHeading = document.querySelector("[data-download-heading]");
+const downloadCopy = document.querySelector("[data-download-copy]");
+const downloadStep = document.querySelector("[data-download-step]");
+const panelHeading = document.querySelector("[data-panel-heading]");
 
 const releasesUrl = `https://github.com/${repository}/releases`;
 
@@ -159,6 +167,23 @@ function renderPackages() {
   }
   renderInstructions();
   updateHeroDownload();
+  const ready = releaseState.kind === "ready";
+  const selectedAvailable = ready && selectedPlatform && platforms[selectedPlatform].packages.some((packageInfo) =>
+    releaseState.assets.has(packageInfo.asset));
+  platformPicker.hidden = !ready;
+  nextSteps.hidden = !selectedAvailable;
+  setupExpectation.hidden = !selectedAvailable;
+  downloadStep.hidden = !selectedAvailable;
+  previewNotice.hidden = !ready || !releaseState.prerelease;
+  panelHeading.textContent = ready ? "Choose your platform" : "Release status";
+  downloadHeading.textContent = ready
+    ? (releaseState.prerelease ? "Try the Linux preview" : "Download Mist")
+    : (releaseState.kind === "none" ? "Downloads coming soon" : "Download availability");
+  downloadCopy.textContent = ready
+    ? (releaseState.prerelease
+      ? "Linux is available first. Mac and Windows installers are coming soon."
+      : "Choose your computer, then pick the installer that matches it.")
+    : "Only published installers appear here. You can follow progress on GitHub.";
   packageArea.replaceChildren();
 
   if (releaseState.kind === "checking") {
@@ -201,6 +226,17 @@ function renderPackages() {
     return;
   }
 
+  if (!platforms[selectedPlatform].packages.some((packageInfo) => releaseState.assets.has(packageInfo.asset))) {
+    packageArea.append(unavailableNotice(
+      `${platforms[selectedPlatform].label} download coming soon.`,
+      releaseState.prerelease
+        ? "Choose Linux above to try the available preview. Mac and Windows installers are still being prepared."
+        : "This release has no installer for this platform. Choose another platform above or check back later.",
+      "View available releases",
+    ));
+    return;
+  }
+
   const list = document.createElement("div");
   list.className = "package-list";
   for (const packageInfo of platforms[selectedPlatform].packages) {
@@ -213,14 +249,30 @@ function renderPackages() {
 function updateHeroDownload() {
   heroDownload.href = "#download";
   heroDownload.removeAttribute("download");
+  if (releaseState.kind === "none") {
+    heroDownload.textContent = "Downloads coming soon";
+    return;
+  }
+  if (releaseState.kind === "checking") {
+    heroDownload.textContent = "Checking downloads…";
+    return;
+  }
+  if (releaseState.kind === "error") {
+    heroDownload.textContent = "View download status";
+    return;
+  }
   heroDownload.textContent = selectedPlatform
-    ? `Choose ${platforms[selectedPlatform].label} download`
+    ? `Download for ${platforms[selectedPlatform].label}`
     : "Choose your download";
 
   if (releaseState.kind !== "ready" || !selectedPlatform) return;
   const availablePackages = platforms[selectedPlatform].packages.filter((packageInfo) =>
     releaseState.assets.has(packageInfo.asset)
   );
+  if (availablePackages.length === 0) {
+    heroDownload.textContent = `${platforms[selectedPlatform].label} download coming soon`;
+    return;
+  }
   if (platforms[selectedPlatform].packages.length !== 1 || availablePackages.length !== 1) return;
 
   const packageInfo = availablePackages[0];
@@ -235,25 +287,54 @@ for (const button of platformButtons) {
   });
 }
 
+function publishedAssets(release) {
+  const assets = new Map();
+  if (!release || release.draft || !release.published_at || !Array.isArray(release.assets)) return assets;
+  const supportedNames = new Set(Object.values(platforms).flatMap((platform) =>
+    platform.packages.map((packageInfo) => packageInfo.asset)));
+  for (const asset of release.assets) {
+    if (!asset || !supportedNames.has(asset.name) || asset.state !== "uploaded" ||
+        !Number.isSafeInteger(asset.size) || asset.size <= 0) continue;
+    const expectedUrl = `https://github.com/${repository}/releases/download/${encodeURIComponent(release.tag_name)}/${encodeURIComponent(asset.name)}`;
+    if (asset.browser_download_url === expectedUrl) assets.set(asset.name, asset);
+  }
+  return assets;
+}
+
 async function loadLatestRelease() {
   renderPackages();
   try {
     const response = await fetch(`https://api.github.com/repos/${repository}/releases/latest`, {
       headers: { Accept: "application/vnd.github+json" },
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (response.status === 404) {
-      releaseState = { kind: "none", assets: new Map() };
-      renderPackages();
-      return;
+      // GitHub's "latest" endpoint excludes previews. Only use this explicitly
+      // named Linux preview channel when there is no stable desktop release.
+      const previewsResponse = await fetch(`https://api.github.com/repos/${repository}/releases?per_page=100`, {
+        headers: { Accept: "application/vnd.github+json" },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!previewsResponse.ok) throw new Error(`GitHub returned ${previewsResponse.status}`);
+      const releases = await previewsResponse.json();
+      if (!Array.isArray(releases)) throw new Error("Invalid release listing");
+      const preview = releases.filter((release) => release?.prerelease &&
+        /^v\d+\.\d+\.\d+-linux-preview\.[1-9]\d*$/.test(release.tag_name))
+        .sort((left, right) => Date.parse(right.published_at) - Date.parse(left.published_at))
+        .find((release) => platforms.linux.packages.some((packageInfo) =>
+          publishedAssets(release).has(packageInfo.asset)));
+      releaseState = preview
+        ? { kind: "ready", assets: publishedAssets(preview), prerelease: true }
+        : { kind: "none", assets: new Map() };
+    } else {
+      if (!response.ok) throw new Error(`GitHub returned ${response.status}`);
+      const release = await response.json();
+      const assets = publishedAssets(release);
+      releaseState = assets.size > 0
+        ? { kind: "ready", assets, prerelease: false }
+        : { kind: "none", assets };
     }
-    if (!response.ok) throw new Error(`GitHub returned ${response.status}`);
-
-    const release = await response.json();
-    releaseState = {
-      kind: "ready",
-      assets: new Map(release.assets.map((asset) => [asset.name, asset])),
-    };
   } catch {
     releaseState = { kind: "error", assets: new Map() };
   }

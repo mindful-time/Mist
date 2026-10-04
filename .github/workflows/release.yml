@@ -29,6 +29,8 @@ env:
 jobs:
   preflight:
     runs-on: ubuntu-22.04
+    outputs:
+      channel: ${{ steps.release.outputs.channel }}
     permissions:
       contents: read
       actions: read
@@ -45,19 +47,15 @@ jobs:
           rustup toolchain install 1.95.0 --profile minimal
           rustup default 1.95.0
       - name: Verify release version
+        id: release
         shell: bash
         run: |
           ./scripts/release-check.sh
           version=$(tr -d '[:space:]' < VERSION)
+          channel=candidate
           git fetch --no-tags origin main
           if [ "$GITHUB_EVENT_NAME" = push ]; then
-            case "$GITHUB_REF_NAME" in
-              "v$version") ;;
-              *)
-                echo "Tag $GITHUB_REF_NAME does not match VERSION $version." >&2
-                exit 1
-                ;;
-            esac
+            channel=$(node scripts/release-channel.mjs "$version" "$GITHUB_REF_NAME")
             if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
               echo "Release tag must point to a commit on main." >&2
               exit 1
@@ -66,6 +64,7 @@ jobs:
             echo "Manual release tests must run from main." >&2
             exit 1
           fi
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
 
       - name: Verify successful main CI for the exact release commit
         env:
@@ -73,7 +72,7 @@ jobs:
         run: node scripts/verify-release-ci.mjs
 
   macos:
-    if: github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos'
+    if: needs.preflight.outputs.channel != 'linux-preview' && (github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos')
     needs: preflight
     strategy:
       fail-fast: false
@@ -211,7 +210,7 @@ jobs:
           if-no-files-found: error
 
   windows:
-    if: github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'windows'
+    if: needs.preflight.outputs.channel != 'linux-preview' && (github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'windows')
     needs: preflight
     runs-on: windows-2025
     environment: release-signing
@@ -327,8 +326,8 @@ jobs:
           packager-version: ${{ env.CARGO_PACKAGER_VERSION }}
 
   assemble:
-    if: github.event_name == 'push' || inputs.platform == 'all'
-    needs: [macos, windows, linux]
+    if: needs.preflight.outputs.channel != 'linux-preview' && (github.event_name == 'push' || inputs.platform == 'all')
+    needs: [preflight, macos, windows, linux]
     runs-on: windows-2025
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -422,3 +421,53 @@ jobs:
               "${release_flags[@]}"
           fi
           gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
+
+  publish_linux_preview:
+    if: needs.preflight.outputs.channel == 'linux-preview'
+    needs: [preflight, linux]
+    runs-on: ubuntu-24.04
+    environment: release-publishing
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: mist-linux-x86_64
+          path: release-assets
+      - name: Add Linux installer and checksums
+        shell: bash
+        run: |
+          test -s release-assets/Mist-linux-x86_64.deb
+          test -s release-assets/Mist-linux-x86_64.AppImage
+          cp assets/mist-orb-512-v1.png release-assets/Mist.png
+          # No Mac asset is included, and the unconfigured Mac trust check stays closed.
+          cp scripts/install-release.sh release-assets/mist-installer.sh
+          (
+            cd release-assets
+            sha256sum Mist-linux-x86_64.deb Mist-linux-x86_64.AppImage Mist.png mist-installer.sh > SHA256SUMS
+            sha256sum --check SHA256SUMS
+          )
+      - name: Attest Linux preview artifacts
+        if: github.event.repository.visibility == 'public'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: release-assets/SHA256SUMS
+      - name: Create Linux preview draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "A release already exists for $GITHUB_REF_NAME; use a new preview number." >&2
+            exit 1
+          fi
+          gh release create "$GITHUB_REF_NAME" release-assets/* \
+            --draft --prerelease --verify-tag --latest=false \
+            --title "Mist $GITHUB_REF_NAME — Linux preview" \
+            --notes "Linux-only early-access preview built from $GITHUB_SHA after exact-commit CI passed. Requires x86_64 with AVX2, glibc 2.39+ and GLIBCXX 3.4.32 (Ubuntu 24.04+ / Mint 22+). Mac and Windows are not included. Download the DEB or AppImage; check SHA256SUMS before installing. For the curl installer, use MIST_RELEASE=$GITHUB_REF_NAME rather than latest. Clean-machine installation and speech acceptance are still required before promoting this to a stable desktop release."

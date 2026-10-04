@@ -11,9 +11,9 @@
     <link rel="icon" type="image/png" href="assets/mist.png">
     <noscript><style>.checking-state { display: none; }</style></noscript>
     <title>Download Mist</title>
-    <link rel="stylesheet" href="styles.css?v=0.1.0">
+    <link rel="stylesheet" href="styles.css?v=0.1.0-downloads-1">
     <script src="mist.js?v=0.1.0" defer></script>
-    <script src="site.js?v=0.1.0" defer></script>
+    <script src="site.js?v=0.1.0-downloads-1" defer></script>
   </head>
   <body data-repository="mindful-time/Mist">
     <a class="skip-link" href="#download">Skip to download</a>
@@ -40,27 +40,31 @@
           </div>
           <p class="hero-tagline">Select text. Hear it aloud. Keep it on your device.</p>
         </div>
-        <a class="hero-download" href="#download" data-hero-download>Choose your download</a>
+        <a class="hero-download" href="#download" data-hero-download>View downloads</a>
       </section>
     </div>
 
     <main>
       <section class="download-section" id="download" tabindex="-1">
         <div class="download-intro">
-          <p class="overline">Step 1 of 2</p>
-          <h2>Download Mist</h2>
-          <p>Choose your computer, then pick the installer that matches it.</p>
+          <p class="overline" data-download-step>Step 1 of 2</p>
+          <h2 data-download-heading>Download Mist</h2>
+          <p data-download-copy>Choose your computer, then pick the installer that matches it.</p>
         </div>
         <div class="download-panel" aria-labelledby="download-title">
           <div class="panel-heading">
-            <h3 id="download-title">Choose your platform</h3>
+            <h3 id="download-title" data-panel-heading>Choose your platform</h3>
           </div>
 
-          <div class="platform-picker" role="group" aria-label="Choose your operating system">
+          <div class="platform-picker" data-platform-picker role="group" aria-label="Choose your operating system">
             <button type="button" data-platform="mac" aria-pressed="false">Mac</button>
             <button type="button" data-platform="windows" aria-pressed="false">Windows</button>
             <button type="button" data-platform="linux" aria-pressed="false">Linux</button>
           </div>
+
+          <p class="preview-notice" data-preview-notice hidden>
+            Early-access preview. Some features still need real-world testing.
+          </p>
 
           <div class="package-area" data-package-area aria-live="polite" aria-busy="true">
             <div class="checking-state">
@@ -76,14 +80,14 @@
             </noscript>
           </div>
 
-          <p class="setup-expectation">
+          <p class="setup-expectation" data-setup-expectation>
             First setup needs internet to download the speech model and voices (about 338 MiB).
             Speech stays local after setup.
           </p>
         </div>
       </section>
 
-      <section class="next-steps" id="install" aria-labelledby="install-title">
+      <section class="next-steps" data-next-steps id="install" aria-labelledby="install-title">
         <div class="section-title">
           <p class="step-label">Step 2 of 2</p>
           <h2 id="install-title">After it downloads</h2>

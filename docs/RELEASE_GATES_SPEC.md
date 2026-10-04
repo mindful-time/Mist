@@ -105,3 +105,30 @@ See [the runtime research](INTEL_MAC_SUPPORT_RESEARCH.md).
   Do not publish a release, create a tag, change signing credentials, or enable
   the download website. The separate notarization credential error, Windows
   signing, and clean-machine acceptance remain outstanding.
+
+## Linux-first preview and honest website availability
+
+Requested on 2026-10-05: fix the unavailable-download UI and provide the software
+that is available while the other platform release work continues. Review this
+work against `f8b796ec5cd4fb6d5ea53dd68770bb792872213c`.
+
+- Offer Linux first as an explicitly labeled early-access preview, not a
+  complete stable desktop release. Mac and Windows remain coming soon.
+- Use protected `v<base-version>-linux-preview.<positive number>` tags on main,
+  exact-commit successful integration CI, the existing native Linux packaging
+  action, attestations, and protected draft-only publication. Linux preview
+  preparation must not require Apple or Windows signing configuration.
+- Keep the complete desktop release, its five-platform-asset contract, both
+  signing paths, main/CI rules, and protected publication unchanged. Do not
+  publish an unsigned Mac/Windows installer or claim clean-machine acceptance.
+- The website prefers a stable release; only if none exists may it offer a
+  published Linux preview. Never expose drafts, unfinished uploads, or external
+  download URLs. An unavailable platform must not have a download CTA or
+  installation steps. No release means coming soon, not a download promise.
+- Test the tag classifier through its CLI, workflow dependencies through the
+  actual YAML, and user-facing download states through the actual site script
+  and markup with browser/HTTP boundaries supplied by fixtures.
+- Submit this work via a new PR and preserve owner-only merging. Do not tag the
+  preview before the new workflow is merged and its main CI passes. Protected
+  environment approval and draft review remain maintainer actions. Do not
+  change credentials or server protection rules.
