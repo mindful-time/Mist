@@ -15,7 +15,7 @@ class Element {
     this.dataset = Object.fromEntries(Object.entries(attributes).filter(([key]) => key.startsWith('data-'))
       .map(([key, value]) => [key.slice(5).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase()), value]));
     this.children = [];
-    this.hidden = false;
+    this.hidden = 'hidden' in attributes;
     this.listeners = {};
     this.href = attributes.href ?? '';
     this.classList = { add() {} };
@@ -29,6 +29,18 @@ class Element {
   removeAttribute(name) { delete this.attributes[name]; }
   addEventListener(name, listener) { this.listeners[name] = listener; }
 }
+
+test('without JavaScript, the page offers release status rather than unverified installation steps', () => {
+  for (const attribute of [
+    'data-platform-picker', 'data-next-steps', 'data-setup-expectation', 'data-download-step',
+  ]) {
+    const tag = html.match(new RegExp(`<[^>]*\\b${attribute}\\b[^>]*>`))?.[0];
+    assert.ok(tag, `${attribute} exists`);
+    assert.match(tag, /\shidden(?:\s|>)/, `${attribute} starts hidden`);
+  }
+  assert.match(html, /<noscript><style>\.checking-state\s*\{\s*display:\s*none\s*!important;/);
+  assert.match(html, /<strong>Check releases on GitHub\.<\/strong>/);
+});
 
 function browser(responses, platform = 'Linux x86_64') {
   const nodes = [...html.matchAll(/<(\w+)\b([^>]*\bdata-[^>]*)>/g)].map(([, tag, source]) => {

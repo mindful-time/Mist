@@ -9,7 +9,7 @@
       content="Download Mist, a local text-to-speech desktop app for macOS, Windows, and Linux."
     >
     <link rel="icon" type="image/png" href="assets/mist.png">
-    <noscript><style>.checking-state { display: none; }</style></noscript>
+    <noscript><style>.checking-state { display: none !important; }</style></noscript>
     <title>Download Mist</title>
     <link rel="stylesheet" href="styles.css?v=0.1.0-downloads-1">
     <script src="mist.js?v=0.1.0" defer></script>
@@ -47,7 +47,7 @@
     <main>
       <section class="download-section" id="download" tabindex="-1">
         <div class="download-intro">
-          <p class="overline" data-download-step>Step 1 of 2</p>
+          <p class="overline" data-download-step hidden>Step 1 of 2</p>
           <h2 data-download-heading>Download Mist</h2>
           <p data-download-copy>Choose your computer, then pick the installer that matches it.</p>
         </div>
@@ -56,7 +56,7 @@
             <h3 id="download-title" data-panel-heading>Choose your platform</h3>
           </div>
 
-          <div class="platform-picker" data-platform-picker role="group" aria-label="Choose your operating system">
+          <div class="platform-picker" data-platform-picker hidden role="group" aria-label="Choose your operating system">
             <button type="button" data-platform="mac" aria-pressed="false">Mac</button>
             <button type="button" data-platform="windows" aria-pressed="false">Windows</button>
             <button type="button" data-platform="linux" aria-pressed="false">Linux</button>
@@ -73,21 +73,21 @@
             </div>
             <noscript>
               <div class="release-notice">
-                <strong>Choose a download on GitHub.</strong>
-                <span>This page needs JavaScript to match an installer to your computer.</span>
+                <strong>Check releases on GitHub.</strong>
+                <span>This page needs JavaScript to check which installers are available.</span>
                 <a href="https://github.com/mindful-time/Mist/releases">View all releases</a>
               </div>
             </noscript>
           </div>
 
-          <p class="setup-expectation" data-setup-expectation>
+          <p class="setup-expectation" data-setup-expectation hidden>
             First setup needs internet to download the speech model and voices (about 338 MiB).
             Speech stays local after setup.
           </p>
         </div>
       </section>
 
-      <section class="next-steps" data-next-steps id="install" aria-labelledby="install-title">
+      <section class="next-steps" data-next-steps hidden id="install" aria-labelledby="install-title">
         <div class="section-title">
           <p class="step-label">Step 2 of 2</p>
           <h2 id="install-title">After it downloads</h2>
