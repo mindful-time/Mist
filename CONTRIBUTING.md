@@ -45,8 +45,9 @@ Review signals are not proven bugs. The published 0.5.0 scanner checks the
 complete staged snapshot; it does not implement the proposed debt-envelope
 comparison from the separate Smells project.
 
-CRAP uses actual LLVM test coverage. Scores above 5 warn; new or regressed
-scores above 10 block against `quality/crap-baseline.json`. Do not update that
+CRAP uses actual LLVM test coverage. Scores of 5 or higher warn; new or regressed
+scores of 10 or higher block against `quality/crap-baseline.json`. Crossing from
+below 10 to 10 or higher also blocks, even within the analyzer's epsilon. Do not update that
 baseline, weaken policy, or suppress findings merely to make checks pass.
 Rust CRAP/Smells do not measure JavaScript, shell, or PowerShell; those have
 explicit CLI, syntax, and installer trust-decision tests instead.
@@ -76,7 +77,10 @@ See [distribution](docs/DISTRIBUTION.md),
 [Apple signing](docs/APPLE_SIGNING.md). A successful PR is not evidence of a
 signed release or clean-machine acceptance. Never commit credentials or publish
 an unsigned stable release. A pre-release website may show unavailable downloads
-or a clearly labeled Linux preview, following the distribution guide.
+or clearly labeled platform previews, following the distribution guide.
+Linux, Apple Silicon Mac, Intel Mac, and Windows have independent release
+workflows using shared native build/signing logic. One release failure does not
+block another platform's draft preview; all still require successful main CI.
 Release runs only for version-tag pushes or manual candidate runs from `main`.
 Tests and quality/security analysis belong to CI. Before packaging or signing,
 Release verifies the latest push-to-`main` CI run for its exact commit and every

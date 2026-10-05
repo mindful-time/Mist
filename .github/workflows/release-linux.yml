@@ -1,0 +1,26 @@
+name: Release Linux
+
+on:
+  push:
+    tags: ["v*-linux-preview.*"]
+  workflow_dispatch:
+
+concurrency:
+  group: release-linux-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    uses: ./.github/workflows/release-platform.yml
+    with:
+      platform: linux
+    secrets: inherit
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write

@@ -5,6 +5,7 @@
 """Regression tests for GitHub's PR-versus-release workflow contract."""
 
 import json
+from itertools import product
 import unittest
 from pathlib import Path
 
@@ -36,7 +37,10 @@ def prerequisites(jobs, name):
 
 
 def expanded_steps(job):
-    for step in job["steps"]:
+    if job.get("uses", "").startswith("./.github/workflows/"):
+        for child in workflow(Path(job["uses"]).name)["jobs"].values():
+            yield from expanded_steps(child)
+    for step in job.get("steps", []):
         if step.get("uses", "").startswith("./.github/actions/"):
             action = yaml.safe_load((ROOT / step["uses"] / "action.yml").read_text())
             yield from expanded_steps(action["runs"])
@@ -45,21 +49,87 @@ def expanded_steps(job):
 
 
 class WorkflowBoundaryTests(unittest.TestCase):
-    def test_linux_preview_is_separate_and_keeps_ci_and_publication_protection(self):
-        jobs = workflow("release.yml")["jobs"]
-        preview = jobs["publish_linux_preview"]
+    def test_each_platform_has_an_independent_release_entry_point(self):
+        for platform in ["linux", "macos-aarch64", "macos-x86_64", "windows-x86_64"]:
+            config = workflow(f"release-{platform}.yml")
+            trigger = events(config)
+            self.assertNotIn("pull_request", trigger)
+            self.assertEqual(trigger["push"]["tags"], [f"v*-{platform}-preview.*"])
+            self.assertIn("workflow_dispatch", trigger)
+            self.assertEqual(list(config["jobs"]), ["release"])
+            call = config["jobs"]["release"]
+            self.assertNotIn("needs", call)
+            self.assertEqual(call["uses"], "./.github/workflows/release-platform.yml")
+            self.assertEqual(call["with"]["platform"], platform)
+            self.assertEqual(call["secrets"], "inherit")
+
+    def test_independent_publication_requires_its_own_successful_build(self):
+        jobs = workflow("release-platform.yml")["jobs"]
+        publish = jobs["publish_preview"]
+        self.assertEqual(publish["environment"], "release-publishing")
+        self.assertIn("needs.preflight.result == 'success'", publish["if"])
+        self.assertIn("!cancelled()", publish["if"])
+        for platform in ["linux", "macos", "windows"]:
+            self.assertIn(f"needs.{platform}.result == 'success'", publish["if"])
+            self.assertEqual(jobs[platform]["needs"], "preflight")
+            self.assertNotIn("strategy", jobs[platform])
+        self.assertNotIn("assemble", jobs)
+
+    def test_preview_publication_expression_fails_closed_for_failed_or_skipped_selected_jobs(self):
+        expression = workflow("release-platform.yml")["jobs"]["publish_preview"]["if"]
+        for platform, selected in [("linux", "linux"), ("macos-aarch64", "macos"),
+                                   ("macos-x86_64", "macos"), ("windows-x86_64", "windows")]:
+            for preflight, build, cancelled, publishing, event in product(
+                ["success", "failure", "skipped", "cancelled"],
+                ["success", "failure", "skipped", "cancelled"],
+                [False, True], [False, True], ["push", "workflow_dispatch"]
+            ):
+                values = {
+                    "cancelled()": repr(cancelled), "inputs.publish-preview": repr(publishing),
+                    "github.event_name": repr(event), "inputs.platform": repr(platform),
+                    "needs.preflight.result": repr(preflight),
+                    **{f"needs.{name}.result": repr(build if name == selected else "skipped")
+                       for name in ["macos", "windows", "linux"]},
+                }
+                actual = expression.removeprefix("${{").removesuffix("}}").strip()
+                for key, value in values.items():
+                    actual = actual.replace(key, value)
+                actual = actual.replace("&&", "and").replace("||", "or").replace("!", "not ")
+                actual = " ".join(actual.split())
+                result = eval(actual, {"__builtins__": {}, "startsWith": str.startswith})
+                expected = not cancelled and publishing and event == "push" and preflight == "success" and build == "success"
+                self.assertEqual(result, expected, (platform, preflight, build, cancelled, publishing, event))
+
+    def test_complete_release_reuses_platform_builds_without_duplicate_preview_publication(self):
+        config = workflow("release.yml")
+        jobs = config["jobs"]
+        for name, platform in [("macos_apple_silicon", "macos-aarch64"), ("macos_intel", "macos-x86_64"),
+                               ("linux", "linux"), ("windows", "windows-x86_64")]:
+            self.assertEqual(jobs[name]["uses"], "./.github/workflows/release-platform.yml")
+            self.assertEqual(jobs[name]["with"], {"platform": platform, "publish-preview": False})
+            self.assertEqual(jobs[name]["needs"], "preflight")
+            self.assertIn(name, jobs["assemble"]["needs"])
+        self.assertNotIn("publish_linux_preview", jobs)
+        tags = events(config)["push"]["tags"]
+        for platform in ["linux", "macos-aarch64", "macos-x86_64", "windows-x86_64"]:
+            self.assertIn(f"!v*-{platform}-preview.*", tags)
+
+    def test_preview_keeps_ci_and_publication_protection(self):
+        jobs = workflow("release-platform.yml")["jobs"]
+        preview = jobs["publish_preview"]
         self.assertEqual(preview["environment"], "release-publishing")
-        self.assertEqual(preview["needs"], ["preflight", "linux"])
-        self.assertIn("needs.preflight.outputs.channel == 'linux-preview'", preview["if"])
-        for name in ["macos", "windows", "assemble"]:
-            self.assertIn("needs.preflight.outputs.channel != 'linux-preview'", jobs[name]["if"])
+        self.assertIn("inputs.publish-preview", preview["if"])
+        self.assertIn("github.event_name == 'push'", preview["if"])
         downloads = [step for step in preview["steps"] if step.get("uses", "").startswith("actions/download-artifact@")]
-        self.assertEqual(downloads[0]["with"]["name"], "mist-linux-x86_64")
-        create = next(step["run"] for step in preview["steps"] if step.get("name") == "Create Linux preview draft")
+        self.assertEqual(downloads[0]["with"]["name"], "mist-${{ inputs.platform == 'linux' && 'linux-x86_64' || inputs.platform }}")
+        create = next(step["run"] for step in preview["steps"] if step.get("name") == "Create platform preview draft")
         for flag in ["--draft", "--prerelease", "--verify-tag", "--latest=false"]:
             self.assertIn(flag, create)
         self.assertNotIn("--clobber", create)
-        self.assertIn("preflight", prerequisites(jobs, "publish_linux_preview"))
+        self.assertIn("preflight", prerequisites(jobs, "publish_preview"))
+        self.assertNotIn("environment", jobs["linux"])
+        for name in ["macos", "windows"]:
+            self.assertEqual(jobs[name]["environment"], "release-signing")
 
     def test_intel_build_is_required_and_uses_the_same_runtime_as_release(self):
         ci = workflow("ci.yml")
@@ -68,13 +138,13 @@ class WorkflowBoundaryTests(unittest.TestCase):
         runtime_action = "./.github/actions/intel-onnxruntime"
         ci_runtime = [step for step in check["steps"] if step.get("uses") == runtime_action]
         release_runtime = [
-            step for step in workflow("release.yml")["jobs"]["macos"]["steps"]
+            step for step in workflow("release-platform.yml")["jobs"]["macos"]["steps"]
             if step.get("uses") == runtime_action
         ]
         self.assertEqual(len(ci_runtime), 1)
         self.assertEqual(ci_runtime[0]["if"], "matrix.os == 'macos-15-intel'")
         self.assertEqual(len(release_runtime), 1)
-        self.assertEqual(release_runtime[0]["if"], "matrix.architecture == 'x86_64'")
+        self.assertEqual(release_runtime[0]["if"], "inputs.platform == 'macos-x86_64'")
         rules = json.loads((ROOT / ".github/rulesets/main-quality.json").read_text())
         required = next(
             rule["parameters"]["required_status_checks"]
@@ -86,7 +156,7 @@ class WorkflowBoundaryTests(unittest.TestCase):
         ci = events(workflow("ci.yml"))
         release = events(workflow("release.yml"))
         self.assertNotIn("pull_request", release)
-        self.assertEqual(release["push"]["tags"], ["v*"])
+        self.assertEqual(release["push"]["tags"][0], "v*")
         self.assertIn("workflow_dispatch", release)
         self.assertEqual(ci["pull_request"]["branches"], ["main"])
         self.assertEqual(ci["push"], {"branches": ["main"]})
@@ -112,30 +182,32 @@ class WorkflowBoundaryTests(unittest.TestCase):
         self.assertNotIn("Linux release packages", names)
 
     def test_release_artifacts_require_exact_commit_ci_without_rerunning_tests(self):
-        jobs = workflow("release.yml")["jobs"]
-        self.assertNotIn("quality", jobs)
-        gate = jobs["preflight"]
-        self.assertEqual(gate["permissions"], {"contents": "read", "actions": "read"})
-        self.assertNotIn("if", gate)
-        checks = [step for step in gate["steps"] if "scripts/verify-release-ci.mjs" in step.get("run", "")]
-        self.assertEqual(len(checks), 1)
-        self.assertEqual(checks[0]["env"]["GH_TOKEN"], "${{ github.token }}")
-        for job in jobs.values():
-            for step in list(expanded_steps(job)) + job["steps"]:
-                self.assertNotIn("continue-on-error", step)
-                self.assertNotIn("check-quality.sh", step.get("run", ""))
-                self.assertNotIn("cargo test", step.get("run", ""))
+        for file in ["release.yml", "release-platform.yml"]:
+            jobs = workflow(file)["jobs"]
+            self.assertNotIn("quality", jobs)
+            gate = jobs["preflight"]
+            self.assertEqual(gate["permissions"], {"contents": "read", "actions": "read"})
+            self.assertNotIn("if", gate)
+            checks = [step for step in gate["steps"] if "scripts/verify-release-ci.mjs" in step.get("run", "")]
+            self.assertEqual(len(checks), 1)
+            self.assertEqual(checks[0]["env"]["GH_TOKEN"], "${{ github.token }}")
+            for name, job in jobs.items():
+                for step in expanded_steps(job):
+                    self.assertNotIn("continue-on-error", step)
+                    self.assertNotIn("check-quality.sh", step.get("run", ""))
+                    self.assertNotIn("cargo test", step.get("run", ""))
+                if name != "preflight":
+                    self.assertIn("preflight", prerequisites(jobs, name), name)
+                    self.assertNotIn("always()", job.get("if", ""), name)
         quality_steps = list(expanded_steps(workflow("ci.yml")["jobs"]["quality"]))
         self.assertTrue(any("scripts/check-quality.sh" in step.get("run", "") for step in quality_steps))
-        for name in ["macos", "windows", "linux", "assemble", "publish"]:
-            self.assertIn("preflight", prerequisites(jobs, name), name)
-            self.assertNotIn("always()", jobs[name].get("if", ""), name)
 
     def test_every_release_checkout_is_pinned_to_the_event_commit(self):
-        for name, job in workflow("release.yml")["jobs"].items():
-            for step in job["steps"]:
-                if step.get("uses", "").startswith("actions/checkout@"):
-                    self.assertEqual(step.get("with", {}).get("ref"), "${{ github.sha }}", name)
+        for file in ["release.yml", "release-platform.yml"]:
+            for name, job in workflow(file)["jobs"].items():
+                for step in job.get("steps", []):
+                    if step.get("uses", "").startswith("actions/checkout@"):
+                        self.assertEqual(step.get("with", {}).get("ref"), "${{ github.sha }}", name)
 
 
 if __name__ == "__main__":

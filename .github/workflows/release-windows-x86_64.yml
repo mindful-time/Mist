@@ -1,0 +1,26 @@
+name: Release Windows
+
+on:
+  push:
+    tags: ["v*-windows-x86_64-preview.*"]
+  workflow_dispatch:
+
+concurrency:
+  group: release-windows-x86_64-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    uses: ./.github/workflows/release-platform.yml
+    with:
+      platform: windows-x86_64
+    secrets: inherit
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write

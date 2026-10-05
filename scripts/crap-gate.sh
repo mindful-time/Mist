@@ -84,34 +84,6 @@ cargo crap \
     --sort file \
     --output "$delta_report"
 
-blocking_count=$(jq '[.entries[] | select((.status == "new" or .status == "regressed") and .crap > 10)] | length' "$delta_report")
-
-if [ "$blocking_count" -ne 0 ]; then
-    printf '%s\n' \
-        '{' \
-        '  "gate": "crap",' \
-        '  "result": "blocked",' \
-        '  "warning_threshold": 5,' \
-        '  "blocking_threshold": 10,' \
-        '  "policy": "new or regressed functions above 10 block; existing debt is ratcheted",' \
-        '  "why": "CRAP combines decision complexity with missing test coverage.",' \
-        '  "remediation": "Reduce decision complexity and add focused tests for uncovered branches.",' \
-        "  \"evidence_report\": $(jq -Rn --arg report "$delta_report" '$report')" \
-        '}' >&2
-    jq -r '.entries[] | select((.status == "new" or .status == "regressed") and .crap > 10) | "BLOCK \(.file):\(.line) \(.function) CRAP=\(.crap) status=\(.status)"' "$delta_report" >&2
-fi
-
-# Emit one agent-readable annotation for every function above the warning
-# threshold, even when no function crosses the blocking threshold.
-cargo crap \
-    --lcov "$coverage_report" \
-    --exclude 'third_party/**' \
-    --threshold "$warning_threshold" \
-    --format github >&2
-
-if [ "$blocking_count" -ne 0 ]; then
-    exit 1
-fi
-
-printf 'CRAP gate passed: warn above %s, block above %s, report=%s\n' \
-    "$warning_threshold" "$blocking_threshold" "$crap_report"
+# JSON reports retain all functions. Enforce the inclusive user-facing
+# boundaries ourselves; cargo-crap's --threshold comparison is strictly >.
+node scripts/check-crap-report.mjs "$crap_report" "$delta_report"

@@ -171,8 +171,8 @@ text-to-speech model.
   denied.
 - Repository hooks run formatting, check, strict Clippy, tests, coverage-backed
   CRAP analysis, the pinned Smells v0.5.0 policy, OSV dependency scanning, and
-  staged-secret scanning before commits. CRAP scores above 5 emit warnings;
-  new or regressed scores above 10 block against the reviewed committed
+  staged-secret scanning before commits. CRAP scores of 5 or higher emit warnings;
+  new, regressed, or newly boundary-crossing scores of 10 or higher block against the reviewed committed
   baseline. The pre-push hook adds a full-repository Smells scan and
   full-history secret scan, then keeps package and native bundle SemVer
   metadata synchronized. Handwritten platform FFI remains in scanned Rust

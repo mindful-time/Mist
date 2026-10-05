@@ -214,7 +214,9 @@ CRAP analysis, Smells v0.5.0, OSV, Gitleaks, and release-version checks.
 Pre-commit tests the staged snapshot; pre-push tests the pushed revisions.
 See [contributing](CONTRIBUTING.md) for tool setup and the enforced CI gates.
 
-CRAP scores above 5 warn. New or regressed scores above 10 block. Run the gates directly when needed:
+CRAP scores of 5 or higher warn. New, regressed, or newly boundary-crossing
+scores of 10 or higher block; unchanged/improving baseline debt remains visible.
+Run the gates directly when needed:
 
 ```sh
 make quality

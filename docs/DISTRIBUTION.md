@@ -91,7 +91,7 @@ from public `main` when the repository variable `DOWNLOAD_SITE_ENABLED` is
 complete release passes acceptance testing and is published, enable the
 variable and run **Actions → Pages → Run workflow**. The site can also be enabled
 before that milestone: it must honestly show downloads coming soon or a labeled
-Linux preview, never imply unavailable installers exist. This gate prevents future
+platform preview, never imply unavailable installers exist. This gate prevents future
 deployments; it does not unpublish a site that is already deployed.
 
 The nontechnical download page lives in `site/` and is deployed by the Pages
@@ -106,33 +106,51 @@ platform, but never guesses a Mac processor or Linux package: those choices stay
 visible. It enables a link only when the latest public GitHub Release contains
 the exact asset name from the release contract. Before the first public release,
 it shows an explicit unavailable state instead of a broken download. When no
-stable desktop release exists, it can offer the newest published Linux preview
-from the recent release listing. Drafts, incomplete uploads, unsupported asset
-names, and links outside this repository's release assets are not downloads.
-Mac and Windows remain visibly unavailable; installation instructions appear
-only for a platform with an actual installer. A stable release takes precedence.
+stable desktop release exists, it combines the newest valid published preview
+from each platform channel across the paginated release listing. Drafts, invalid dates,
+incomplete uploads, wrong-channel asset names, and links outside this repository's
+release assets are not downloads. Installation instructions appear only for a
+platform with an actual installer. A stable release takes precedence.
 
 To publish the site, set **Settings → Pages → Build and deployment → Source** to
 **GitHub Actions**. A push to `main` that changes the site then deploys
 `https://mindful-time.github.io/Mist/`. The repository or the Pages site and its
 release asset host must be public for anonymous users.
 
-### Linux-first preview
+### Independent platform previews
 
-Linux can be distributed for early testing while Mac and Windows signing work
-continues. This does not weaken or replace the complete desktop release contract.
+Each platform can be distributed for early testing as soon as its own build and
+signing succeed. These independent pipelines share `release-platform.yml`; they
+do not wait for another platform's release/signing jobs. They still require all
+required main CI checks on the exact source commit. This does not weaken or
+replace the complete desktop release contract.
+
+| Actions workflow | Example protected tag | Installer assets |
+| --- | --- | --- |
+| Release Linux | `v0.1.0-linux-preview.1` | DEB and AppImage |
+| Release macOS Apple Silicon | `v0.1.0-macos-aarch64-preview.1` | Apple Silicon DMG |
+| Release macOS Intel | `v0.1.0-macos-x86_64-preview.1` | Intel DMG |
+| Release Windows | `v0.1.0-windows-x86_64-preview.1` | Signed x64 setup EXE |
+
+Run the matching workflow manually from `main` to build an Actions candidate
+without creating a release. `Release complete desktop` remains an optional
+all-platform bundle with Homebrew/Chocolatey recipes, not a prerequisite for
+these previews. Homebrew and Chocolatey registry publication remain separate
+maintainer steps after the complete release passes acceptance.
 
 1. Merge the preview workflow/website changes through a PR and wait for all
    required CI checks on that exact `main` commit. Do not tag the old workflow.
-2. The release maintainer creates a tag such as `v0.1.0-linux-preview.1` on that
+2. The release maintainer creates the chosen platform's tag from the table on that
    validated commit. Its stable base version must match `VERSION`; preview numbers
    are positive integers. Use a new number for each build, not replacement assets.
-3. Release builds/validates Linux using the existing native package action.
-   Mac/Windows signing, complete-release assembly, Homebrew, and Chocolatey
-   are not run. No signing secrets or Apple configuration are required.
+3. Only that platform builds, validates, and (for Mac/Windows) signs. Mac requires
+   successful notarization and stapling; Windows requires Authenticode and the
+   configured publisher. Linux uses the existing native package action without
+   Apple or Windows configuration. Complete assembly and package recipes do not run.
 4. Approve the existing protected `release-publishing` environment. The job
    attests the checksums and creates a **draft prerelease**, not a stable release.
-   It contains DEB, AppImage, `Mist.png`, `mist-installer.sh`, and `SHA256SUMS`.
+   It contains only the chosen platform assets plus `Mist.png`, `SHA256SUMS`,
+   and its bootstrap (`mist-installer.ps1` on Windows, `mist-installer.sh` otherwise).
 5. Review those assets and the preview limitations, then publish **as a prerelease**
    for volunteer testing. The website discovers it after refresh. It must retain
    its early-access label; clean-machine acceptance is not claimed by CI.
@@ -157,8 +175,20 @@ prereleases from that endpoint):
 )
 ```
 
-This command is usable **only after that preview is published**. macOS has no
-asset in this preview; its bootstrap cannot install an unsigned Mac application.
+This Linux example is usable **only after that preview is published**. On Mac,
+replace the tag in both places with the published Apple Silicon or Intel preview
+tag matching your computer. There is no Mac asset in a Linux preview.
+
+For a published Windows preview, PowerShell uses its explicit tag too:
+
+```powershell
+$env:MIST_RELEASE = 'v0.1.0-windows-x86_64-preview.1'
+& ([scriptblock]::Create((irm -ErrorAction Stop "https://github.com/mindful-time/Mist/releases/download/$env:MIST_RELEASE/mist-installer.ps1")))
+```
+
+Do not run these examples before their draft has been reviewed and published.
+The bootstraps cannot install unsigned Mac or Windows packages. Previews are
+excluded from `/releases/latest`; the website links their exact asset URLs.
 
 ## Packaging
 
@@ -303,8 +333,9 @@ Release. PR artifacts are test candidates, not approved public downloads.
 Pushes to `main` rerun CI as an integration check; pushes to a PR branch do not
 start a duplicate CI run.
 
-Run **Actions → Release → Run workflow** on `main`. Choose `linux`, `macos`, or
-`windows` to validate one platform and download its individual Actions artifacts.
+Run **Actions → Release Linux / Release macOS Apple Silicon / Release macOS
+Intel / Release Windows → Run workflow** on `main` to validate one platform
+and download its individual Actions artifacts.
 macOS requires the Apple signing credentials; Windows requires the Windows
 signing credentials. Linux can be tested while either signing setup is pending.
 Every candidate or tagged release validates its source/version, then verifies
@@ -319,11 +350,13 @@ rerun all CI jobs on that main commit rather than bypassing the release gate.
 Linux packaging is shared between CI and Release; PR CI cannot call the
 signing/publishing jobs.
 
-After both signing setups are configured, choose `all` to build, sign, notarize,
+After both signing setups are configured, run **Release complete desktop** with
+`all` to build, sign, notarize,
 and validate every platform artifact, then upload
 `mist-release-bundle-<commit>` as a normal Actions artifact. Manual runs do not
 create a tag or GitHub Release and cannot publish anything. Tagged releases
-always require all five packages. Use candidate runs to fix packaging failures
+of the complete desktop channel require all five packages; platform preview
+tags require only their selected platform. Use candidate runs to fix packaging failures
 before choosing a version tag.
 
 ## Publishing a release
