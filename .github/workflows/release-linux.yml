@@ -2,7 +2,7 @@ name: Release Linux
 
 on:
   push:
-    tags: ["v*-linux-preview.*"]
+    tags: ["v*-rc.*-linux", "v*-linux-preview.*"]
   workflow_dispatch:
 
 concurrency:

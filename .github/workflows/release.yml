@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - "v*"
+      - "!v*-rc.*-linux"
+      - "!v*-rc.*-macos-aarch64"
+      - "!v*-rc.*-macos-x86_64"
+      - "!v*-rc.*-windows-x86_64"
       - "!v*-linux-preview.*"
       - "!v*-macos-aarch64-preview.*"
       - "!v*-macos-x86_64-preview.*"
@@ -180,8 +184,8 @@ jobs:
           }
           Write-Checksums
           $version = (Get-Content VERSION -Raw).Trim()
-          # Stable recipes only; prerelease installers retain their existing flow.
-          if ($version -match '^\d+\.\d+\.\d+$') {
+          # Stable and RC recipes point to the same immutable complete release.
+          if ($version -match '^\d+\.\d+\.\d+(-rc\.[1-9]\d*)?$') {
             $packages = Join-Path $env:RUNNER_TEMP 'mist-package-managers'
             node scripts/build-package-managers.mjs $version $assets $packages $env:WINDOWS_SIGNER_SHA256
             if ($LASTEXITCODE -ne 0) { throw 'Package recipe generation failed.' }

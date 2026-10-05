@@ -19,6 +19,12 @@ cargo_version=$(awk '
 bundle_version=$(awk '
     /<key>CFBundleShortVersionString<\/key>/ { getline; value = $0; sub(/.*<string>/, "", value); sub(/<\/string>.*/, "", value); print value; exit }
 ' macos/Info.plist)
+bundle_release=$(awk '
+    /<key>MistReleaseVersion<\/key>/ { getline; value = $0; sub(/.*<string>/, "", value); sub(/<\/string>.*/, "", value); print value; exit }
+' macos/Info.plist)
+bundle_build=$(awk '
+    /<key>CFBundleVersion<\/key>/ { getline; value = $0; sub(/.*<string>/, "", value); sub(/<\/string>.*/, "", value); print value; exit }
+' macos/Info.plist)
 
 if ! printf '%s\n' "$release_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$'; then
     printf '%s\n' "VERSION must contain a semantic version; found '$release_version'." >&2
@@ -30,10 +36,19 @@ if [ "$cargo_version" != "$release_version" ]; then
     exit 1
 fi
 
-if [ "$bundle_version" != "$release_version" ]; then
-    printf '%s\n' "macOS bundle version '$bundle_version' does not match VERSION '$release_version'." >&2
+numeric_version=${release_version%%[-+]*}
+if [ "$bundle_version" != "$numeric_version" ] || [ "$bundle_release" != "$release_version" ]; then
+    printf '%s\n' "macOS bundle must use numeric version '$numeric_version' and MistReleaseVersion '$release_version'." >&2
     exit 1
 fi
+case "$release_version" in
+    *-rc.*)
+        if [ "$bundle_build" != "${release_version##*-rc.}" ]; then
+            echo 'macOS bundle build number must match the RC number.' >&2
+            exit 1
+        fi
+        ;;
+esac
 
 cargo metadata --locked --no-deps --format-version 1 >/dev/null
 printf '%s\n' "Mist release version $release_version is synchronized."

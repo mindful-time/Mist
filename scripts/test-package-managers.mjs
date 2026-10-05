@@ -43,6 +43,18 @@ test('release recipes pin version, architecture checksums, and Windows publisher
   }
 });
 
+test('Homebrew and Chocolatey recipes preserve the same RC version and download tag', t => {
+  const f = fixture(t);
+  const result = f.run('0.1.0-rc.1');
+  assert.equal(result.status, 0, result.stderr);
+  const cask = readFileSync(path.join(f.output, 'Casks/mist.rb'), 'utf8');
+  assert.match(cask, /version "0\.1\.0-rc\.1"/);
+  const nuspec = readFileSync(path.join(f.output, 'chocolatey/mist-tts.nuspec'), 'utf8');
+  assert.ok(nuspec.includes('<version>0.1.0-rc.1</version>'));
+  const installer = readFileSync(path.join(f.output, 'chocolatey/tools/chocolateyinstall.ps1'), 'utf8');
+  assert.ok(installer.includes('releases/download/v0.1.0-rc.1/Mist-windows-x86_64-setup.exe'));
+});
+
 test('corrupted or missing release artifacts cannot produce usable recipes', t => {
   const f = fixture(t);
   writeFileSync(path.join(f.root, assets[0]), 'corrupted');

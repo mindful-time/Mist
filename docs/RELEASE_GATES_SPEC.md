@@ -168,3 +168,28 @@ preview discovery above, not the CI, signing, or owner-merge requirements.
   website script/markup with only external boundaries substituted. Commit/push
   a new PR for the owner to merge. Do not merge, tag, publish, change credentials
   or protection rules, or claim clean-machine/native release acceptance.
+
+## Shared release-candidate version
+
+Clarified on 2026-10-05: all native installers, Homebrew, and Chocolatey use
+`0.1.0-rc.1`, not `0.0.1` or a stable release. Review from
+`f7c041cd3a691a57c3760db9293c0229f9214a98`.
+
+- Synchronize VERSION, Cargo.toml/Cargo.lock, and the full Mac release identity.
+  Keep Apple's numeric CFBundleShortVersionString at the base version and the
+  build number equal to the RC number; do not insert SemVer prerelease text into
+  those keys. Normalize DEB candidates to `x.y.z~rc.N` before checksums, preserving
+  their payload and source artifact, so they upgrade to stable in Debian order.
+- Preserve independent platform pipelines, existing signing/CI/environment
+  protections, and draft-only creation. Use `v<RC-version>-<platform>` tags;
+  the common `v<RC-version>` tag remains the optional complete bundle. Never
+  run both publication paths for one platform tag or overwrite published assets.
+- Discover published common and platform RCs on the website, show their real
+  version, preserve stable precedence and channel/URL/upload checks, and keep
+  unavailable platforms disabled. Legacy platform previews remain discoverable.
+- Generate complete-bundle Homebrew and Chocolatey recipes for the same RC
+  version with version-pinned URLs/checksums/publisher. Recipe generation is not
+  tap/feed publication. Missing signing credentials and native acceptance remain
+  blockers; no unsigned Mac/Windows release or false package-manager commands.
+- Submit version/pipeline/site changes through a PR. Leave its merge to the
+  owner and do not create candidate tags against the old main workflow.

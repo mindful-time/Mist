@@ -4,8 +4,8 @@ import path from 'node:path';
 
 const [version, assetDirectory, outputDirectory, signer] = process.argv.slice(2);
 try {
-  if (process.argv.length !== 6 || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) {
-    throw new Error('Usage: node scripts/build-package-managers.mjs <stable-version> <release-assets> <output> <Windows-certificate-SHA256>');
+  if (process.argv.length !== 6 || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-rc\.[1-9]\d*)?$/.test(version)) {
+    throw new Error('Usage: node scripts/build-package-managers.mjs <stable-or-RC-version> <release-assets> <output> <Windows-certificate-SHA256>');
   }
   if (!/^[a-fA-F0-9]{64}$/.test(signer)) throw new Error('A pinned Windows certificate SHA-256 is required.');
   const assets = path.resolve(assetDirectory);

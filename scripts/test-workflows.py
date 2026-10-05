@@ -54,7 +54,7 @@ class WorkflowBoundaryTests(unittest.TestCase):
             config = workflow(f"release-{platform}.yml")
             trigger = events(config)
             self.assertNotIn("pull_request", trigger)
-            self.assertEqual(trigger["push"]["tags"], [f"v*-{platform}-preview.*"])
+            self.assertEqual(trigger["push"]["tags"], [f"v*-rc.*-{platform}", f"v*-{platform}-preview.*"])
             self.assertIn("workflow_dispatch", trigger)
             self.assertEqual(list(config["jobs"]), ["release"])
             call = config["jobs"]["release"]
@@ -113,6 +113,7 @@ class WorkflowBoundaryTests(unittest.TestCase):
         tags = events(config)["push"]["tags"]
         for platform in ["linux", "macos-aarch64", "macos-x86_64", "windows-x86_64"]:
             self.assertIn(f"!v*-{platform}-preview.*", tags)
+            self.assertIn(f"!v*-rc.*-{platform}", tags)
 
     def test_preview_keeps_ci_and_publication_protection(self):
         jobs = workflow("release-platform.yml")["jobs"]

@@ -2,7 +2,7 @@
 set -eu
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$project_root"
-node --test scripts/test-git-hooks.mjs scripts/test-crap-policy.mjs scripts/test-package-managers.mjs scripts/test-preview-release.mjs scripts/test-release-ci.mjs scripts/test-release-channel.mjs scripts/test-site.mjs
+node --test scripts/test-git-hooks.mjs scripts/test-crap-policy.mjs scripts/test-deb-version.mjs scripts/test-package-managers.mjs scripts/test-preview-release.mjs scripts/test-release-ci.mjs scripts/test-release-channel.mjs scripts/test-release-metadata.mjs scripts/test-site.mjs
 uv run --no-project --locked --script scripts/test-workflows.py
 sh scripts/test-install-release.sh
 sh scripts/test-intel-runtime.sh

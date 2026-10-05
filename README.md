@@ -225,8 +225,9 @@ make smells
 make security
 ```
 
-Mist is prepared for its first public SemVer release, `0.1.0`. `VERSION`,
-`Cargo.toml`, `Cargo.lock`, and bundle metadata must move together.
+Mist is preparing release candidate `0.1.0-rc.1`, not a stable release. `VERSION`,
+`Cargo.toml`, `Cargo.lock`, and the full `MistReleaseVersion` bundle field must
+move together. Apple's numeric bundle version remains `0.1.0`.
 
 Only `mindful-time` may merge to `main`. Everyone, including the owner, must use
 a pull request with passing required checks. Direct and force pushes are blocked;

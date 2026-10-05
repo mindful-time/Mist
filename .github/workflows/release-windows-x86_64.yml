@@ -2,7 +2,7 @@ name: Release Windows
 
 on:
   push:
-    tags: ["v*-windows-x86_64-preview.*"]
+    tags: ["v*-rc.*-windows-x86_64", "v*-windows-x86_64-preview.*"]
   workflow_dispatch:
 
 concurrency:

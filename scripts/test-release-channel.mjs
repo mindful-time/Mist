@@ -5,6 +5,24 @@ import { test } from 'node:test';
 
 const command = fileURLToPath(new URL('./release-channel.mjs', import.meta.url));
 
+for (const platform of ['linux', 'macos-aarch64', 'macos-x86_64', 'windows-x86_64']) {
+  test(`${platform} uses the shared release-candidate version`, () => {
+    const result = spawnSync(process.execPath,
+      [command, '0.1.0-rc.1', `v0.1.0-rc.1-${platform}`], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), `${platform}-preview`);
+    for (const tag of [`v0.1.0-rc.2-${platform}`, `v0.1.0-${platform}`, `v0.1.0-rc.1-${platform}-extra`]) {
+      assert.notEqual(spawnSync(process.execPath, [command, '0.1.0-rc.1', tag]).status, 0);
+    }
+  });
+}
+
+test('the shared release-candidate tag selects the complete desktop bundle', () => {
+  const result = spawnSync(process.execPath, [command, '0.1.0-rc.1', 'v0.1.0-rc.1'], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.trim(), 'desktop');
+});
+
 test('Linux preview tags are distinct from the complete desktop release', () => {
   const result = spawnSync(process.execPath, [command, '0.1.0', 'v0.1.0-linux-preview.1'], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
