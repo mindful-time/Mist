@@ -7,10 +7,6 @@ on:
         description: linux, macos-aarch64, macos-x86_64, or windows-x86_64
         required: true
         type: string
-      publish-preview:
-        description: Publish an independent draft preview on a matching protected tag
-        default: true
-        type: boolean
 
 permissions:
   contents: read
@@ -42,7 +38,6 @@ jobs:
         id: release
         env:
           RELEASE_PLATFORM: ${{ inputs.platform }}
-          PUBLISH_PREVIEW: ${{ inputs.publish-preview }}
         shell: bash
         run: |
           ./scripts/release-check.sh
@@ -55,14 +50,9 @@ jobs:
           git fetch --no-tags origin main
           if [ "$GITHUB_EVENT_NAME" = push ]; then
             channel=$(node scripts/release-channel.mjs "$version" "$GITHUB_REF_NAME")
-            if [ "$PUBLISH_PREVIEW" = true ]; then
-              test "$channel" = "$RELEASE_PLATFORM-preview" || {
-                echo "Tag does not match this platform's preview channel." >&2; exit 1;
-              }
-            elif [ "$channel" != desktop ]; then
-              echo "Complete releases require the synchronized desktop tag." >&2
-              exit 1
-            fi
+            test "$channel" = "$RELEASE_PLATFORM-preview" || {
+              echo "Tag does not match this platform's preview channel." >&2; exit 1;
+            }
             if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
               echo "Release tag must point to a commit on main." >&2
               exit 1
@@ -324,7 +314,7 @@ jobs:
     # Unselected builders are skipped. Override the implicit success() guard,
     # but require the selected builder and preflight to succeed, never cancel.
     if: >-
-      ${{ !cancelled() && inputs.publish-preview && github.event_name == 'push' &&
+      ${{ !cancelled() && github.event_name == 'push' &&
       needs.preflight.result == 'success' &&
       ((inputs.platform == 'linux' && needs.linux.result == 'success') ||
       (startsWith(inputs.platform, 'macos-') && needs.macos.result == 'success') ||

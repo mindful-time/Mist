@@ -76,7 +76,7 @@ release notarization”; use it as `APPLE_PASSWORD`, never your primary password
 
 ## 5. Enter the values directly in GitHub
 
-Matching Mist's [workflow](../.github/workflows/release.yml), add these under
+Matching Mist's [platform workflow](../.github/workflows/release-platform.yml), add these under
 **Settings → Environments → release-signing → Environment secrets**; retain
 the reviewer protection in [DISTRIBUTION.md](DISTRIBUTION.md).
 
