@@ -631,3 +631,6 @@ footer nav {
     transform: scale(1.04, 0.94);
   }
 }
+[hidden] {
+  display: none !important;
+}

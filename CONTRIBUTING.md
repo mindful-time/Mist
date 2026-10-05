@@ -74,8 +74,9 @@ and this test-only Python lockfile.
 See [distribution](docs/DISTRIBUTION.md),
 [package managers](docs/PACKAGE_MANAGER_DISTRIBUTION.md), and
 [Apple signing](docs/APPLE_SIGNING.md). A successful PR is not evidence of a
-signed release or clean-machine acceptance. Never commit credentials, publish
-an unsigned stable release, or enable the download website before acceptance.
+signed release or clean-machine acceptance. Never commit credentials or publish
+an unsigned stable release. A pre-release website may show unavailable downloads
+or a clearly labeled Linux preview, following the distribution guide.
 Release runs only for version-tag pushes or manual candidate runs from `main`.
 Tests and quality/security analysis belong to CI. Before packaging or signing,
 Release verifies the latest push-to-`main` CI run for its exact commit and every

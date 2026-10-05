@@ -68,7 +68,7 @@ requires a separately built compatible inference runtime and native testing.
 
 ## Release asset contract
 
-Every release must contain the five platform artifacts listed above, plus:
+Every complete desktop release must contain the five platform artifacts listed above, plus:
 
 - `Mist.png`
 - `mist-installer.sh`
@@ -89,7 +89,9 @@ Publishing the website is deliberately opt-in. The Pages workflow deploys only
 from public `main` when the repository variable `DOWNLOAD_SITE_ENABLED` is
 `true`. Keep it unset or `false` while preparing the first release. After the
 complete release passes acceptance testing and is published, enable the
-variable and run **Actions → Pages → Run workflow**. This gate prevents future
+variable and run **Actions → Pages → Run workflow**. The site can also be enabled
+before that milestone: it must honestly show downloads coming soon or a labeled
+Linux preview, never imply unavailable installers exist. This gate prevents future
 deployments; it does not unpublish a site that is already deployed.
 
 The nontechnical download page lives in `site/` and is deployed by the Pages
@@ -103,12 +105,60 @@ The generated site is written to `dist/site`. It detects the visitor's desktop
 platform, but never guesses a Mac processor or Linux package: those choices stay
 visible. It enables a link only when the latest public GitHub Release contains
 the exact asset name from the release contract. Before the first public release,
-it shows an explicit unavailable state instead of a broken download.
+it shows an explicit unavailable state instead of a broken download. When no
+stable desktop release exists, it can offer the newest published Linux preview
+from the recent release listing. Drafts, incomplete uploads, unsupported asset
+names, and links outside this repository's release assets are not downloads.
+Mac and Windows remain visibly unavailable; installation instructions appear
+only for a platform with an actual installer. A stable release takes precedence.
 
 To publish the site, set **Settings → Pages → Build and deployment → Source** to
 **GitHub Actions**. A push to `main` that changes the site then deploys
 `https://mindful-time.github.io/Mist/`. The repository or the Pages site and its
 release asset host must be public for anonymous users.
+
+### Linux-first preview
+
+Linux can be distributed for early testing while Mac and Windows signing work
+continues. This does not weaken or replace the complete desktop release contract.
+
+1. Merge the preview workflow/website changes through a PR and wait for all
+   required CI checks on that exact `main` commit. Do not tag the old workflow.
+2. The release maintainer creates a tag such as `v0.1.0-linux-preview.1` on that
+   validated commit. Its stable base version must match `VERSION`; preview numbers
+   are positive integers. Use a new number for each build, not replacement assets.
+3. Release builds/validates Linux using the existing native package action.
+   Mac/Windows signing, complete-release assembly, Homebrew, and Chocolatey
+   are not run. No signing secrets or Apple configuration are required.
+4. Approve the existing protected `release-publishing` environment. The job
+   attests the checksums and creates a **draft prerelease**, not a stable release.
+   It contains DEB, AppImage, `Mist.png`, `mist-installer.sh`, and `SHA256SUMS`.
+5. Review those assets and the preview limitations, then publish **as a prerelease**
+   for volunteer testing. The website discovers it after refresh. It must retain
+   its early-access label; clean-machine acceptance is not claimed by CI.
+
+Linux previews require x86_64/AVX2, glibc 2.39+ and GLIBCXX 3.4.32 (Ubuntu 24.04+
+or Mint 22+), just like the normal Linux packages. AppImage does not make the
+application compatible with every Linux distribution. Full acceptance still precedes the stable
+desktop release. All main, tag, CI, environment, and signing rules remain intact.
+
+For a preview, use its **explicit tag**, not `/releases/latest` (GitHub excludes
+prereleases from that endpoint):
+
+```sh
+(
+  set -eu
+  installer=$(mktemp "${TMPDIR:-/tmp}/mist-preview-bootstrap.XXXXXX")
+  trap 'rm -f "$installer"' 0
+  curl --proto '=https' --tlsv1.2 -LsSf \
+    https://github.com/mindful-time/Mist/releases/download/v0.1.0-linux-preview.1/mist-installer.sh \
+    --output "$installer"
+  MIST_RELEASE=v0.1.0-linux-preview.1 sh "$installer"
+)
+```
+
+This command is usable **only after that preview is published**. macOS has no
+asset in this preview; its bootstrap cannot install an unsigned Mac application.
 
 ## Packaging
 
@@ -204,7 +254,7 @@ to modify assets after a draft has been published.
 ### Main protection and GitHub plan requirements
 
 Mist remains public to enforce protections on the personal GitHub Free plan;
-the website is kept offline separately until the release is ready. If made
+the website's download state is managed separately from release availability. If made
 private during preparation, anonymous downloads cannot work, and Free cannot
 enforce branch/tag rulesets, environment secrets, or environment protection
 rules. Existing public-repository environment rules are ignored while private;
