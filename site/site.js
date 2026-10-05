@@ -180,6 +180,11 @@ function renderPackages() {
   setupExpectation.hidden = !selectedAvailable;
   downloadStep.hidden = !selectedAvailable;
   previewNotice.hidden = !ready || !releaseState.prerelease;
+  const versions = new Set(selectedPlatform ? platforms[selectedPlatform].packages.map((packageInfo) =>
+    releaseState.assets.get(packageInfo.asset)?.releaseVersion).filter(Boolean) : []);
+  previewNotice.textContent = versions.size
+    ? `Early-access ${[...versions].join(', ')}. Some features still need real-world testing.`
+    : 'Early-access preview. Some features still need real-world testing.';
   panelHeading.textContent = ready ? "Choose your platform" : "Release status";
   downloadHeading.textContent = ready
     ? (releaseState.prerelease ? "Try the Mist preview" : "Download Mist")
@@ -309,6 +314,14 @@ function publishedAssets(release, channel = null) {
   return assets;
 }
 
+function previewIdentity(tag) {
+  if (typeof tag !== 'string') return null;
+  const candidate = tag?.match(/^v(\d+\.\d+\.\d+-rc\.[1-9]\d*)(?:-(linux|macos-aarch64|macos-x86_64|windows-x86_64))?$/);
+  if (candidate) return { version: candidate[1], channel: candidate[2] };
+  const legacy = tag?.match(/^v(\d+\.\d+\.\d+)-(linux|macos-aarch64|macos-x86_64|windows-x86_64)-preview\.([1-9]\d*)$/);
+  return legacy ? { version: `${legacy[1]}-preview.${legacy[3]}`, channel: legacy[2] } : null;
+}
+
 async function loadLatestRelease() {
   renderPackages();
   try {
@@ -334,16 +347,20 @@ async function loadLatestRelease() {
       }
       const previews = releases.filter((release) => release?.prerelease && !release.draft &&
         Number.isFinite(Date.parse(release.published_at)) &&
-        /^v\d+\.\d+\.\d+-(linux|macos-aarch64|macos-x86_64|windows-x86_64)-preview\.[1-9]\d*$/.test(release.tag_name))
+        previewIdentity(release.tag_name))
         .sort((left, right) => Date.parse(right.published_at) - Date.parse(left.published_at));
       const assets = new Map();
       const selectedChannels = new Set();
       for (const preview of previews) {
-        const channel = preview.tag_name.match(/-(linux|macos-aarch64|macos-x86_64|windows-x86_64)-preview\./)[1];
-        const available = publishedAssets(preview, channel);
-        if (selectedChannels.has(channel) || available.size === 0) continue;
-        selectedChannels.add(channel);
-        for (const [name, asset] of available) assets.set(name, asset);
+        const identity = previewIdentity(preview.tag_name);
+        const channels = identity.channel ? [identity.channel]
+          : [...new Set(Object.values(platforms).flatMap(platform => platform.packages.map(info => info.previewChannel)))];
+        for (const channel of channels) {
+          const available = publishedAssets(preview, channel);
+          if (selectedChannels.has(channel) || available.size === 0) continue;
+          selectedChannels.add(channel);
+          for (const [name, asset] of available) assets.set(name, { ...asset, releaseVersion: identity.version });
+        }
       }
       releaseState = assets.size > 0
         ? { kind: "ready", assets, prerelease: true }

@@ -2,7 +2,7 @@ name: Release macOS Apple Silicon
 
 on:
   push:
-    tags: ["v*-macos-aarch64-preview.*"]
+    tags: ["v*-rc.*-macos-aarch64", "v*-macos-aarch64-preview.*"]
   workflow_dispatch:
 
 concurrency:

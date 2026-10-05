@@ -47,7 +47,7 @@ runs:
         test -n "$deb"
         test -n "$appimage"
         mkdir -p dist/release
-        cp "$deb" dist/release/Mist-linux-x86_64.deb
+        sh scripts/prepare-deb.sh "$deb" dist/release/Mist-linux-x86_64.deb "$(tr -d '[:space:]' < VERSION)"
         cp "$appimage" dist/release/Mist-linux-x86_64.AppImage
         chmod 755 dist/release/Mist-linux-x86_64.AppImage
         dpkg-deb --info dist/release/Mist-linux-x86_64.deb >/dev/null

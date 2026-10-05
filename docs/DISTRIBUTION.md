@@ -119,6 +119,16 @@ release asset host must be public for anonymous users.
 
 ### Independent platform previews
 
+The shared application and package version is **`0.1.0-rc.1`**. Each candidate
+is a prerelease, not a stable release. Platform suffixes identify independent
+GitHub release channels without changing the version compiled into the app.
+The full version is synchronized in `VERSION`, Cargo metadata/lockfile, and
+`MistReleaseVersion` in the Mac plist. `CFBundleShortVersionString` stays numeric
+(`0.1.0`) as required by Apple; `CFBundleVersion` is the numeric build number.
+It must match the RC number (`1` for this candidate). The Linux DEB encodes
+the version as `0.1.0~rc.1`, so Debian's version ordering upgrades correctly to
+stable `0.1.0`; the compiled app still identifies as `0.1.0-rc.1`.
+
 Each platform can be distributed for early testing as soon as its own build and
 signing succeed. These independent pipelines share `release-platform.yml`; they
 do not wait for another platform's release/signing jobs. They still require all
@@ -127,22 +137,24 @@ replace the complete desktop release contract.
 
 | Actions workflow | Example protected tag | Installer assets |
 | --- | --- | --- |
-| Release Linux | `v0.1.0-linux-preview.1` | DEB and AppImage |
-| Release macOS Apple Silicon | `v0.1.0-macos-aarch64-preview.1` | Apple Silicon DMG |
-| Release macOS Intel | `v0.1.0-macos-x86_64-preview.1` | Intel DMG |
-| Release Windows | `v0.1.0-windows-x86_64-preview.1` | Signed x64 setup EXE |
+| Release Linux | `v0.1.0-rc.1-linux` | DEB and AppImage |
+| Release macOS Apple Silicon | `v0.1.0-rc.1-macos-aarch64` | Apple Silicon DMG |
+| Release macOS Intel | `v0.1.0-rc.1-macos-x86_64` | Intel DMG |
+| Release Windows | `v0.1.0-rc.1-windows-x86_64` | Signed x64 setup EXE |
 
 Run the matching workflow manually from `main` to build an Actions candidate
 without creating a release. `Release complete desktop` remains an optional
 all-platform bundle with Homebrew/Chocolatey recipes, not a prerequisite for
-these previews. Homebrew and Chocolatey registry publication remain separate
+these previews. Its common candidate tag is `v0.1.0-rc.1`; it must not also run
+for a platform-suffixed tag. Homebrew and Chocolatey use the same RC package
+version. Registry publication remains separate
 maintainer steps after the complete release passes acceptance.
 
 1. Merge the preview workflow/website changes through a PR and wait for all
    required CI checks on that exact `main` commit. Do not tag the old workflow.
 2. The release maintainer creates the chosen platform's tag from the table on that
-   validated commit. Its stable base version must match `VERSION`; preview numbers
-   are positive integers. Use a new number for each build, not replacement assets.
+   validated commit. Its full candidate version must match `VERSION`; RC numbers
+   are positive integers. Use a new candidate for changed builds, not replacement assets.
 3. Only that platform builds, validates, and (for Mac/Windows) signs. Mac requires
    successful notarization and stapling; Windows requires Authenticode and the
    configured publisher. Linux uses the existing native package action without
@@ -169,9 +181,9 @@ prereleases from that endpoint):
   installer=$(mktemp "${TMPDIR:-/tmp}/mist-preview-bootstrap.XXXXXX")
   trap 'rm -f "$installer"' 0
   curl --proto '=https' --tlsv1.2 -LsSf \
-    https://github.com/mindful-time/Mist/releases/download/v0.1.0-linux-preview.1/mist-installer.sh \
+    https://github.com/mindful-time/Mist/releases/download/v0.1.0-rc.1-linux/mist-installer.sh \
     --output "$installer"
-  MIST_RELEASE=v0.1.0-linux-preview.1 sh "$installer"
+  MIST_RELEASE=v0.1.0-rc.1-linux sh "$installer"
 )
 ```
 
@@ -182,7 +194,7 @@ tag matching your computer. There is no Mac asset in a Linux preview.
 For a published Windows preview, PowerShell uses its explicit tag too:
 
 ```powershell
-$env:MIST_RELEASE = 'v0.1.0-windows-x86_64-preview.1'
+$env:MIST_RELEASE = 'v0.1.0-rc.1-windows-x86_64'
 & ([scriptblock]::Create((irm -ErrorAction Stop "https://github.com/mindful-time/Mist/releases/download/$env:MIST_RELEASE/mist-installer.ps1")))
 ```
 

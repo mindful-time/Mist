@@ -92,21 +92,26 @@ silent NSIS installation. No quarantine/Gatekeeper bypass is added.
 
 The complete signed Release candidate assembles `mist.rb` and
 `mist-tts.<version>.nupkg` alongside the existing installers and includes both
-in `SHA256SUMS`. Only stable `x.y.z` versions generate package-manager recipes;
-prerelease installers keep their existing flow. Package generation and trust
+in `SHA256SUMS`. Both stable `x.y.z` and `x.y.z-rc.N` versions generate recipes;
+the current shared candidate is `0.1.0-rc.1`. RC recipes reference the complete
+candidate tag `v0.1.0-rc.1`, not a stable or missing platform release. Generation and trust
 decisions have fixture tests; Windows CI also runs `choco pack`. None of those
 fixtures proves a native installer works or a real signature is trusted.
 
 For a signed candidate downloaded from Actions:
 
 ```sh
-node scripts/build-package-managers.mjs 0.1.0 /absolute/candidate/assets \
+node scripts/build-package-managers.mjs 0.1.0-rc.1 /absolute/candidate/assets \
   /absolute/new/package-output WINDOWS_CERTIFICATE_SHA256
 ```
 
 The last argument is the non-secret 64-hex certificate fingerprint, not a
 private key. Use a fresh output directory; the generator will not overwrite
 existing files. Templates live in `packaging/` and use the existing EXE, not MSI.
+Chocolatey CLI 2+ supports the dotted RC version; users must explicitly opt in
+to a published candidate with `--pre --version=0.1.0-rc.1`. Do not advertise
+that command until the package is available in the chosen feed. Homebrew and
+Chocolatey repository publication are not implied by generated recipe files.
 
 ## Remaining publication steps
 

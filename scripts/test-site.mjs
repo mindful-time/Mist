@@ -179,6 +179,49 @@ function platformPreview(platform, names, date = '2026-10-05T01:00:00Z', number 
   };
 }
 
+test('all native platforms display the shared RC version and published installer links', async () => {
+  const releases = [
+    ['linux', ['Mist-linux-x86_64.deb', 'Mist-linux-x86_64.AppImage']],
+    ['macos-aarch64', ['Mist-macos-aarch64.dmg']],
+    ['macos-x86_64', ['Mist-macos-x86_64.dmg']],
+    ['windows-x86_64', ['Mist-windows-x86_64-setup.exe']],
+  ].map(([platform, names]) => {
+    const tag = `v0.1.0-rc.1-${platform}`;
+    return { ...preview, tag_name: tag, assets: names.map(name => ({
+      name, state: 'uploaded', size: 1024,
+      browser_download_url: `https://github.com/mindful-time/Mist/releases/download/${tag}/${name}`,
+    })) };
+  });
+  const page = browser([{ status: 404 }, { status: 200, body: releases }]);
+  await page.done;
+  assert.match(page.node('data-preview-notice').textContent, /0\.1\.0-rc\.1/);
+  assert.equal(page.node('data-preview-notice').hidden, false);
+  assert.match(page.node('data-package-area').textContent, /Download package.*Download AppImage/);
+  page.choose('mac');
+  assert.match(page.node('data-package-area').textContent, /Apple silicon Mac.*Download DMG.*Intel Mac.*Download DMG/);
+  page.choose('windows');
+  assert.equal(page.node('data-hero-download').href, releases[3].assets[0].browser_download_url);
+});
+
+test('a complete shared RC is discoverable and does not replace a newer platform candidate', async () => {
+  const tag = 'v0.1.0-rc.1';
+  const complete = { ...preview, tag_name: tag, assets: [
+    'Mist-linux-x86_64.deb', 'Mist-windows-x86_64-setup.exe', 'Mist-macos-aarch64.dmg',
+  ].map(name => ({ name, state: 'uploaded', size: 1024,
+    browser_download_url: `https://github.com/mindful-time/Mist/releases/download/${tag}/${name}` })) };
+  const newerTag = 'v0.1.0-rc.2-windows-x86_64';
+  const newer = { ...preview, tag_name: newerTag, published_at: '2026-10-05T02:00:00Z',
+    assets: [{ name: 'Mist-windows-x86_64-setup.exe', state: 'uploaded', size: 1024,
+      browser_download_url: `https://github.com/mindful-time/Mist/releases/download/${newerTag}/Mist-windows-x86_64-setup.exe` }] };
+  const page = browser([{ status: 404 }, { status: 200, body: [complete, newer] }], 'Win32');
+  await page.done;
+  assert.equal(page.node('data-hero-download').href, newer.assets[0].browser_download_url);
+  assert.match(page.node('data-preview-notice').textContent, /0\.1\.0-rc\.2/);
+  page.choose('linux');
+  assert.match(page.node('data-preview-notice').textContent, /0\.1\.0-rc\.1/);
+  assert.match(page.node('data-package-area').textContent, /Download package/);
+});
+
 test('independently published Mac and Linux previews appear without waiting for Intel or Windows', async () => {
   const apple = platformPreview('macos-aarch64', ['Mist-macos-aarch64.dmg']);
   const page = browser([{ status: 404 }, { status: 200, body: [apple, preview] }], 'MacIntel');

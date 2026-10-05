@@ -2,7 +2,7 @@ name: Release macOS Intel
 
 on:
   push:
-    tags: ["v*-macos-x86_64-preview.*"]
+    tags: ["v*-rc.*-macos-x86_64", "v*-macos-x86_64-preview.*"]
   workflow_dispatch:
 
 concurrency:
