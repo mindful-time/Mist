@@ -6,6 +6,9 @@
 
 import json
 from itertools import product
+import os
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -129,7 +132,7 @@ class WorkflowBoundaryTests(unittest.TestCase):
         for name in ["macos", "windows"]:
             self.assertEqual(jobs[name]["environment"], "release-signing")
 
-    def test_intel_build_is_required_and_uses_the_same_runtime_as_release(self):
+    def test_intel_build_remains_required_in_ci_and_release_promotes_it_without_rebuilding(self):
         ci = workflow("ci.yml")
         check = ci["jobs"]["check"]
         self.assertIn("macos-15-intel", check["strategy"]["matrix"]["os"])
@@ -141,14 +144,53 @@ class WorkflowBoundaryTests(unittest.TestCase):
         ]
         self.assertEqual(len(ci_runtime), 1)
         self.assertEqual(ci_runtime[0]["if"], "matrix.os == 'macos-15-intel'")
-        self.assertEqual(len(release_runtime), 1)
-        self.assertEqual(release_runtime[0]["if"], "inputs.platform == 'macos-x86_64'")
+        self.assertEqual(release_runtime, [])
+        promote = [step for step in workflow("release-platform.yml")["jobs"]["macos"]["steps"]
+                   if step.get("uses") == "./.github/actions/ci-candidate"]
+        self.assertEqual(len(promote), 1)
         rules = json.loads((ROOT / ".github/rulesets/main-quality.json").read_text())
         required = next(
             rule["parameters"]["required_status_checks"]
             for rule in rules["rules"] if rule["type"] == "required_status_checks"
         )
         self.assertIn("check (macos-15-intel)", [check["context"] for check in required])
+
+    def test_ci_retains_commit_and_attempt_scoped_native_candidates_without_secrets(self):
+        ci = workflow("ci.yml")
+        check = ci["jobs"]["check"]
+        self.assertEqual(check["name"], "check (${{ matrix.os }})")
+        uploads = [step for step in check["steps"] if step.get("uses", "").startswith("actions/upload-artifact@")]
+        self.assertEqual(len(uploads), 2)
+        self.assertEqual(uploads[0]["with"]["path"], "dist/packages/Mist.app.tar")
+        self.assertEqual(uploads[0]["if"], "runner.os == 'macOS'")
+        self.assertEqual(uploads[1]["with"]["path"], "target/release/mist.exe")
+        self.assertEqual(uploads[1]["if"], "runner.os == 'Windows'")
+        for step in uploads:
+            self.assertIn("${{ github.sha }}-attempt-${{ github.run_attempt }}", step["with"]["name"])
+            self.assertEqual(step["with"]["if-no-files-found"], "error")
+        self.assertEqual(ci["jobs"]["packages"]["steps"][1]["with"]["artifact-name"],
+                         "mist-ci-linux-${{ github.sha }}-attempt-${{ github.run_attempt }}")
+
+    def test_every_native_release_verifies_the_ci_archive_before_using_it(self):
+        jobs = workflow("release-platform.yml")["jobs"]
+        for name in ["macos", "windows", "linux"]:
+            step = next(step for step in jobs[name]["steps"]
+                        if step.get("uses") == "./.github/actions/ci-candidate")
+            self.assertEqual(step["with"]["digest"], "${{ needs.preflight.outputs.artifact-digest }}")
+        action = yaml.safe_load((ROOT / ".github/actions/ci-candidate/action.yml").read_text())
+        verify = action["runs"]["steps"][-1]
+        for digest, expected in [
+            ("sha256:03bbb0874ab942ba8e81bb2d49032b3737d834e5ee0e323f04718f233721e882", 0),
+            ("sha256:" + "0" * 64, 1),
+        ]:
+            with tempfile.TemporaryDirectory(prefix="mist-ci-archive-") as directory:
+                candidate = Path(directory) / "ci-candidate"
+                candidate.mkdir()
+                (candidate / "ci-candidate.zip").write_bytes(b"ci-candidate-fixture")
+                result = subprocess.run(["bash", "-c", verify["run"]], cwd=directory,
+                                        env={"PATH": os.environ["PATH"], "CI_ARTIFACT_DIGEST": digest},
+                                        capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, expected, result.stderr)
 
     def test_prs_run_ci_without_starting_a_release(self):
         ci = events(workflow("ci.yml"))
@@ -192,11 +234,16 @@ class WorkflowBoundaryTests(unittest.TestCase):
             checks = [step for step in gate["steps"] if "scripts/verify-release-ci.mjs" in step.get("run", "")]
             self.assertEqual(len(checks), 1)
             self.assertEqual(checks[0]["env"]["GH_TOKEN"], "${{ github.token }}")
+            self.assertEqual(checks[0]["env"]["RELEASE_PLATFORM"], "${{ inputs.platform }}")
+            self.assertEqual(checks[0]["env"]["CI_CANDIDATE_ARCHIVE"], "ci-candidate.zip")
             for name, job in jobs.items():
                 for step in expanded_steps(job):
                     self.assertNotIn("continue-on-error", step)
                     self.assertNotIn("check-quality.sh", step.get("run", ""))
                     self.assertNotIn("cargo test", step.get("run", ""))
+                    self.assertNotIn("cargo build", step.get("run", ""))
+                    self.assertNotIn("./.github/actions/intel-onnxruntime", step.get("uses", ""))
+                    self.assertNotIn("./.github/actions/linux-packages", step.get("uses", ""))
                 if name != "preflight":
                     self.assertIn("preflight", prerequisites(jobs, name), name)
                     self.assertNotIn("always()", job.get("if", ""), name)

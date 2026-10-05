@@ -217,3 +217,37 @@ package assembly, not any CI, signing, owner-merge, or publication protection.
   code, credentials, server rules, tags, published assets, tap, or feed changes
   are part of this cleanup. Future stable channels and independent package-manager
   recipes are separate work, not a hidden common release trigger.
+
+## Platform-scoped CI gates and build-once promotion
+
+Requested on 2026-10-06. Review only this fix against merged main
+`45615abf35872161eb2e9b5b0091e96e585f5230`. This supersedes the seven-job
+release gate and recompilation in Release, not main's seven-check merge rules.
+
+- Each release requires successful shared metadata/website and quality/security
+  checks, plus its native check on the latest canonical push-to-main run/attempt
+  for the exact tag commit. Linux additionally requires package validation.
+  Unrelated platform jobs may be pending, failed, cancelled, skipped, or missing
+  without blocking that release. Required evidence still fails closed on those
+  states, duplicate jobs, wrong identity, incomplete pagination, or API errors.
+- CI retains optimized candidates under platform/SHA/attempt-qualified names:
+  validated DEB/AppImage for Linux, permission-preserving unsigned app archives
+  for both Macs, and an unsigned optimized Windows EXE. PR candidates are test
+  artifacts only; release consumes merged-commit main CI, never a merge-ref build.
+- Select exactly one unexpired nonempty candidate from the verified run and
+  attempt. Require its matching source/repository and SHA-256 archive digest;
+  download by immutable artifact ID and fail on corrupted bytes. Recheck latest
+  run/attempt after download, then recheck the raw archive on native handoff.
+  Missing or expired candidates require fresh CI, never fallback or recompilation.
+- Release does not compile the app or Intel runtime or rerun application/audio
+  tests. It promotes Linux packages unchanged; Mac signs/notarizes/staples and
+  creates a DMG; Windows signs the retained EXE before NSIS assembly and signs
+  the installer. Keep version/platform tag validation, pinned event checkouts,
+  native architecture checks, protected approvals, attestations, selected asset
+  contract validation, draft prereleases, and refusal to overwrite releases.
+- Keep all seven PR/main checks, hooks, CRAP thresholds/baseline, Smells, OSV,
+  Gitleaks, native audio checks, and signing identities unchanged. Do not change
+  credentials, server rules, app version, tags, public assets, taps, or feeds.
+- Test the real gate CLI with only GitHub HTTP/storage boundaries substituted,
+  and the actual CI/release YAML and native archive-handoff command. Commit/push
+  a feature branch and open a PR; merging and tagging remain maintainer actions.

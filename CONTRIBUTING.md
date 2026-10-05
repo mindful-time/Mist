@@ -79,23 +79,30 @@ signed release or clean-machine acceptance. Never commit credentials or publish
 an unsigned stable release. A pre-release website may show unavailable downloads
 or clearly labeled platform previews, following the distribution guide.
 Linux, Apple Silicon Mac, Intel Mac, and Windows have independent release
-workflows using shared native build/signing logic. One release failure does not
-block another platform's draft preview; all still require successful main CI.
+workflows using shared native signing/promotion logic. One platform's failed or
+unfinished CI does not block another platform's draft preview. Each release
+requires the shared metadata/website and quality/security checks, plus its own
+native CI checks on the exact merged commit (Linux also needs package validation).
 Release runs only for version-tag pushes or manual candidate runs from `main`.
 Tests and quality/security analysis belong to CI. Before packaging or signing,
-Release verifies the latest push-to-`main` CI run for its exact commit and every
-required check from `.github/rulesets/main-quality.json`. A PR merge-ref result,
-another commit, a failed/skipped check, or unavailable evidence cannot authorize
-a release. Rerun all integration-CI jobs on `main` if evidence is incomplete;
-Release does not rerun the test suite or substitute another successful run.
+Release verifies the latest push-to-`main` CI run/attempt for its exact commit and
+the selected platform's required checks. Main still requires all seven checks
+for merging; its ruleset is unchanged. A PR merge-ref result, another commit,
+a failed/skipped/missing selected or shared check, or unavailable evidence cannot
+authorize a release. CI retains optimized candidates named by platform, SHA, and
+attempt. Release downloads the selected immutable artifact by ID, verifies its
+SHA-256 before extraction, and promotes it without recompiling the application.
+Expired or missing artifacts require a new CI run, not a rebuild in Release.
+Mac signing/notarization and DMG creation, and Windows signing/NSIS assembly,
+remain in Release. Linux reuses the validated DEB/AppImage byte-for-byte.
 Protected signing/publishing environments and draft-only publication remain.
-The Linux packaging composite is shared between CI validation and Release.
+The Linux packaging composite runs in CI; Release promotes its retained packages.
 
 Intel macOS additionally uses the revision-pinned source build described
 in [distribution](docs/DISTRIBUTION.md#intel-macos-runtime). Set its absolute
 `ORT_LIB_PATH` before running local checks; ordinary `ort-sys` downloads do not
 contain an Intel Mac runtime. The `check (macos-15-intel)` job uses the same
-CPU runtime preparation as Release, validates an unsigned release-mode app,
-and runs the downloaded-model multilingual smoke test. It receives no signing
-credentials. The versioned ruleset and Release verifier require this check;
+CPU runtime preparation used to build the release candidate, validates an unsigned
+release-mode app, and runs the downloaded-model multilingual smoke test. It receives no signing
+credentials. The versioned main ruleset and Intel release verifier require this check;
 only the owner may add its new context to the existing server ruleset.

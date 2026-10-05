@@ -116,9 +116,21 @@ stable `0.1.0`; the compiled app still identifies as `0.1.0-rc.1`.
 
 Each platform can be distributed for early testing as soon as its own build and
 signing succeed. These independent pipelines share `release-platform.yml`; they
-do not wait for another platform's release/signing jobs. They still require all
-required main CI checks on the exact source commit. CI, signing, and publication
-protections are unchanged; there is no combined release workflow.
+do not wait for another platform's CI or release/signing jobs. Every release
+requires `Repository metadata, workflows, and website` and `Quality and security
+gates`, plus only its selected platform's checks on the exact source commit:
+
+| Platform | Additional required CI checks |
+| --- | --- |
+| Linux | `check (ubuntu-latest)` and `Linux package validation` |
+| Apple Silicon | `check (macos-latest)` |
+| Intel Mac | `check (macos-15-intel)` |
+| Windows | `check (windows-latest)` |
+
+Main's seven-check merge protection, signing, and publication protections are
+unchanged; there is no combined release workflow. CI builds optimized candidates
+once for each commit/attempt. Release promotes those exact binaries/packages;
+it does not recompile the app or the Intel inference runtime.
 
 | Actions workflow | Example protected tag | Installer assets |
 | --- | --- | --- |
@@ -132,15 +144,15 @@ without creating a release. Publishing starts only when the matching protected
 platform tag is pushed. A common tag such as `v0.1.0-rc.1` starts no release.
 Changing `VERSION` alone also starts no release: preflight validates the tag
 against synchronized Cargo and macOS version metadata and successful exact-commit
-main CI. Homebrew and Chocolatey recipe/feed publication remains separate work;
+shared/platform main CI. Homebrew and Chocolatey recipe/feed publication remains separate work;
 no combined bundle or package-manager publication is run by these pipelines.
 
 1. Merge the preview workflow/website changes through a PR and wait for all
-   required CI checks on that exact `main` commit. Do not tag the old workflow.
+   shared and selected-platform CI checks on that exact `main` commit. Do not tag the old workflow.
 2. The release maintainer creates the chosen platform's tag from the table on that
    validated commit. Its full candidate version must match `VERSION`; RC numbers
    are positive integers. Use a new candidate for changed builds, not replacement assets.
-3. Only that platform builds, validates, and (for Mac/Windows) signs. Mac requires
+3. Only that platform's CI candidate is verified, promoted, and (for Mac/Windows) signed. Mac requires
    successful notarization and stapling; Windows requires Authenticode and the
    configured publisher. Linux uses the existing native package action without
    Apple or Windows configuration. Complete assembly and package recipes do not run.
@@ -211,8 +223,9 @@ installer.
 ONNX Runtime 1.28.0 at source commit
 `da9b5e364c465de65c49d91e696cd6485270757f`, compiled natively with the CPU
 provider and static linkage. Apple Silicon keeps its existing Core ML runtime.
-The shared `.github/actions/intel-onnxruntime` action prepares this runtime in
-both CI and Release. Its exact cache key includes the compiler/SDK identity
+The `.github/actions/intel-onnxruntime` action prepares this runtime only in CI.
+Release reuses the CI-built app, including runtime notices and provenance,
+without rebuilding ONNX Runtime. Its exact cache key includes the compiler/SDK identity
 and builder/action content; it does not use approximate restore keys.
 
 For a local Intel source build, install Xcode Command Line Tools and uv, then:
@@ -336,16 +349,27 @@ and download its individual Actions artifacts.
 macOS requires the Apple signing credentials; Windows requires the Windows
 signing credentials. Linux can be tested while either signing setup is pending.
 Every candidate or tagged release validates its source/version, then verifies
-successful integration CI for the exact release commit before platform packaging
+successful shared/platform CI for the exact release commit before native signing
 or access to signing environments. CI owns audio and other tests, CRAP, Smells,
 OSV, and Gitleaks; Release does not repeat them. The verifier requires the latest
-push-to-`main` run of `.github/workflows/ci.yml` and all required jobs in its latest
-attempt to succeed. PR/merge-ref runs, wrong commits, failed/skipped/missing jobs,
-API errors, incomplete pagination, and concurrent reruns fail closed. If main CI
-is still running, wait and retry the candidate. For a partial or failed rerun,
-rerun all CI jobs on that main commit rather than bypassing the release gate.
-Linux packaging is shared between CI and Release; PR CI cannot call the
-signing/publishing jobs.
+push-to-`main` run of `.github/workflows/ci.yml` and the shared and selected-platform
+jobs in its latest attempt to succeed. Unrelated pending/failed/cancelled jobs
+do not block promotion. PR/merge-ref runs, wrong commits, failed/skipped/missing
+required jobs, API errors, incomplete pagination, and concurrent reruns fail closed.
+Each optimized CI candidate is named `mist-ci-<platform>-<SHA>-attempt-<N>`.
+Release requires exactly one nonempty, unexpired artifact from that run/attempt
+and repository, downloads it by immutable ID, and checks GitHub's SHA-256 digest
+before extracting. The raw archive is checked again after transfer to the native
+job. Missing, expired, or incomplete latest-attempt evidence requires a CI rerun;
+Release never falls back to an older build or recompiles the app. Retention is
+up to 90 days, subject to repository limits.
+
+Linux retains the validated DEB/AppImage unchanged. Mac retains a tarred unsigned
+app to preserve permissions, then signs/notarizes it and creates the DMG. Windows
+retains the optimized unsigned EXE, signs it, assembles NSIS around that signed
+binary, and signs the installer. Packaging/signing tools may be installed, but
+application compilation remains exclusively in CI. PR CI cannot call the
+signing/publishing jobs, and its temporary merge-ref artifacts are never promoted.
 
 Manual runs create only that platform's Actions artifacts, not a tag or GitHub
 Release. There is no `all` option or cross-platform assembly dependency. Use a
@@ -355,7 +379,7 @@ candidate run when troubleshooting packaging before choosing a platform tag.
 
 1. Synchronize `VERSION`, `Cargo.toml`, `Cargo.lock`, and the macOS bundle
    version, then run `./scripts/release-check.sh`.
-2. Wait for all required integration-CI checks on the exact commit on `main`,
+2. Wait for shared and selected-platform CI checks and its retained candidate on the exact commit on `main`,
    and verify the chosen platform's signing prerequisites.
 3. Create and push the matching `v<RC-version>-<platform>` tag from the table
    above. Only that platform packages on its native runner and creates a new

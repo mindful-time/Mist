@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       channel: ${{ steps.release.outputs.channel }}
+      ci-run-id: ${{ steps.ci.outputs.ci-run-id }}
+      artifact-digest: ${{ steps.ci.outputs.artifact-digest }}
     permissions:
       contents: read
       actions: read
@@ -63,10 +65,18 @@ jobs:
           fi
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
 
-      - name: Verify successful main CI for the exact release commit
+      - name: Verify platform CI and download its exact-commit candidate
+        id: ci
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_PLATFORM: ${{ inputs.platform }}
+          CI_CANDIDATE_ARCHIVE: ci-candidate.zip
         run: node scripts/verify-release-ci.mjs
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: verified-ci-candidate
+          path: ci-candidate.zip
+          if-no-files-found: error
 
   macos:
     if: startsWith(inputs.platform, 'macos-')
@@ -79,12 +89,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
-      - name: Install Rust 1.95
-        run: |
-          rustup toolchain install 1.95.0 --profile minimal
-          rustup default 1.95.0
-      - uses: ./.github/actions/intel-onnxruntime
-        if: inputs.platform == 'macos-x86_64'
+      - uses: ./.github/actions/ci-candidate
+        with:
+          digest: ${{ needs.preflight.outputs.artifact-digest }}
       - name: Require Apple release credentials
         shell: bash
         env:
@@ -101,13 +108,13 @@ jobs:
               exit 1
             fi
           done
-      - name: Install cargo-packager
-        run: cargo install cargo-packager --version "$CARGO_PACKAGER_VERSION" --locked
-      - name: Build app bundle
+      - name: Extract and validate the CI-built app bundle
         run: |
-          cargo build --release --locked
-          cargo packager --release --formats app
+          mkdir -p candidate dist/packages
+          ditto -x -k ci-candidate/ci-candidate.zip candidate
+          tar -xf candidate/Mist.app.tar -C dist/packages
           /usr/libexec/PlistBuddy -c "Print :NSServices" dist/packages/Mist.app/Contents/Info.plist >/dev/null
+          test "$(/usr/libexec/PlistBuddy -c 'Print :MistReleaseVersion' dist/packages/Mist.app/Contents/Info.plist)" = "$(tr -d '[:space:]' < VERSION)"
           binary=dist/packages/Mist.app/Contents/MacOS/mist
           test "$(lipo -archs "$binary")" = "${{ inputs.platform == 'macos-aarch64' && 'arm64' || 'x86_64' }}"
           test -f dist/packages/Mist.app/Contents/Resources/licenses/kokoro-micro-NOTICE
@@ -115,7 +122,15 @@ jobs:
           test -f dist/packages/Mist.app/Contents/Resources/licenses/NotoSansDevanagariUI-OFL
       - name: Validate Intel runtime packaging
         if: inputs.platform == 'macos-x86_64'
-        run: sh scripts/prepare-intel-app.sh dist/packages/Mist.app
+        run: |
+          app=dist/packages/Mist.app
+          binary="$app/Contents/MacOS/mist"
+          test "$(vtool -show-build "$binary" | awk '$1 == "minos" { print $2 }')" = 13.3
+          test "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$app/Contents/Info.plist")" = 13.3
+          test -z "$(otool -L "$binary" | awk 'NR > 1 && $1 !~ /^\/System\/Library\// && $1 !~ /^\/usr\/lib\// { print $1 }')"
+          for file in ONNX-Runtime-LICENSE ONNX-Runtime-ThirdPartyNotices.txt ONNX-Runtime-provenance.txt; do
+            test -s "$app/Contents/Resources/licenses/$file"
+          done
       - name: Import Developer ID certificate
         id: keychain
         shell: bash
@@ -206,6 +221,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
+      - uses: ./.github/actions/ci-candidate
+        with:
+          digest: ${{ needs.preflight.outputs.artifact-digest }}
       - name: Install Rust 1.95
         shell: pwsh
         run: |
@@ -227,11 +245,12 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           choco install nsis --no-progress -y
           cargo install cargo-packager --version $env:CARGO_PACKAGER_VERSION --locked
-      - name: Build executable
+      - name: Extract and validate the CI-built executable
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          cargo build --release --locked
+          New-Item -ItemType Directory -Force target\release | Out-Null
+          Expand-Archive -LiteralPath ci-candidate\ci-candidate.zip -DestinationPath target\release
           $binary = [IO.File]::ReadAllBytes("target\release\mist.exe")
           $peOffset = [BitConverter]::ToInt32($binary, 0x3c)
           $machine = [BitConverter]::ToUInt16($binary, $peOffset + 4)
@@ -306,9 +325,23 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
-      - uses: ./.github/actions/linux-packages
+      - uses: ./.github/actions/ci-candidate
         with:
-          packager-version: ${{ env.CARGO_PACKAGER_VERSION }}
+          digest: ${{ needs.preflight.outputs.artifact-digest }}
+      - name: Extract the CI-validated DEB and AppImage without rebuilding
+        run: |
+          mkdir -p dist/release
+          unzip -q ci-candidate/ci-candidate.zip -d dist/release
+          test -s dist/release/Mist-linux-x86_64.deb
+          test -s dist/release/Mist-linux-x86_64.AppImage
+          chmod 755 dist/release/Mist-linux-x86_64.AppImage
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mist-linux-x86_64
+          path: |
+            dist/release/Mist-linux-x86_64.deb
+            dist/release/Mist-linux-x86_64.AppImage
+          if-no-files-found: error
 
   publish_preview:
     # Unselected builders are skipped. Override the implicit success() guard,
@@ -362,4 +395,4 @@ jobs:
           gh release create "$GITHUB_REF_NAME" release-assets/* \
             --draft --prerelease --verify-tag --latest=false \
             --title "Mist $GITHUB_REF_NAME — $RELEASE_PLATFORM preview" \
-            --notes "Early-access $RELEASE_PLATFORM preview built from $GITHUB_SHA after exact-commit main CI passed. Only this platform is included. Verify SHA256SUMS before installing. The curl/PowerShell installer requires explicit MIST_RELEASE=$GITHUB_REF_NAME, not latest. See the distribution guide for system requirements. Clean-machine installation and speech acceptance remain required before a stable desktop release."
+            --notes "Early-access $RELEASE_PLATFORM preview promoted from CI run ${{ needs.preflight.outputs.ci-run-id }} for $GITHUB_SHA after shared quality/security and this platform's CI checks passed. No application recompilation in Release. Only this platform is included. Verify SHA256SUMS before installing. The curl/PowerShell installer requires explicit MIST_RELEASE=$GITHUB_REF_NAME, not latest. See the distribution guide for system requirements. Clean-machine installation and speech acceptance remain required before a stable desktop release."
