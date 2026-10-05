@@ -193,3 +193,27 @@ Clarified on 2026-10-05: all native installers, Homebrew, and Chocolatey use
   blockers; no unsigned Mac/Windows release or false package-manager commands.
 - Submit version/pipeline/site changes through a PR. Leave its merge to the
   owner and do not create candidate tags against the old main workflow.
+
+## Platform-only release cleanup
+
+Requested on 2026-10-05: remove the optional combined release path because each
+platform is released independently. Review only this cleanup against merged
+main `861cea1be412ee46271c49d194a131ab36bdd520`. This supersedes the earlier
+requirements to preserve the optional complete desktop workflow and common-tag
+package assembly, not any CI, signing, owner-merge, or publication protection.
+
+- Remove `.github/workflows/release.yml` and the shared builder's unused
+  combined-publication switch. Keep the four platform workflows and the
+  same-commit reusable builder; do not duplicate their native build logic.
+- Only matching protected platform tags may prepare a public draft RC. A common
+  RC/stable tag is not a release channel. Version metadata is validation, not
+  an automatic publication trigger. Manual platform runs remain artifact-only
+  diagnostics; PRs cannot call signing or publication.
+- Preserve exact-commit seven-job main CI, version synchronization, native
+  signing/notarization, protected review, attestations, selected-platform asset
+  validation, draft-only creation, and refusal to overwrite existing releases.
+- Update the existing CLI tag and actual-YAML regression boundaries and active
+  documentation. Keep historical website discovery compatibility. No application
+  code, credentials, server rules, tags, published assets, tap, or feed changes
+  are part of this cleanup. Future stable channels and independent package-manager
+  recipes are separate work, not a hidden common release trigger.

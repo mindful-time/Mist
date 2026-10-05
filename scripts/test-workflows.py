@@ -79,13 +79,13 @@ class WorkflowBoundaryTests(unittest.TestCase):
         expression = workflow("release-platform.yml")["jobs"]["publish_preview"]["if"]
         for platform, selected in [("linux", "linux"), ("macos-aarch64", "macos"),
                                    ("macos-x86_64", "macos"), ("windows-x86_64", "windows")]:
-            for preflight, build, cancelled, publishing, event in product(
+            for preflight, build, cancelled, event in product(
                 ["success", "failure", "skipped", "cancelled"],
                 ["success", "failure", "skipped", "cancelled"],
-                [False, True], [False, True], ["push", "workflow_dispatch"]
+                [False, True], ["push", "workflow_dispatch"]
             ):
                 values = {
-                    "cancelled()": repr(cancelled), "inputs.publish-preview": repr(publishing),
+                    "cancelled()": repr(cancelled),
                     "github.event_name": repr(event), "inputs.platform": repr(platform),
                     "needs.preflight.result": repr(preflight),
                     **{f"needs.{name}.result": repr(build if name == selected else "skipped")
@@ -97,29 +97,26 @@ class WorkflowBoundaryTests(unittest.TestCase):
                 actual = actual.replace("&&", "and").replace("||", "or").replace("!", "not ")
                 actual = " ".join(actual.split())
                 result = eval(actual, {"__builtins__": {}, "startsWith": str.startswith})
-                expected = not cancelled and publishing and event == "push" and preflight == "success" and build == "success"
-                self.assertEqual(result, expected, (platform, preflight, build, cancelled, publishing, event))
+                expected = not cancelled and event == "push" and preflight == "success" and build == "success"
+                self.assertEqual(result, expected, (platform, preflight, build, cancelled, event))
 
-    def test_complete_release_reuses_platform_builds_without_duplicate_preview_publication(self):
-        config = workflow("release.yml")
-        jobs = config["jobs"]
-        for name, platform in [("macos_apple_silicon", "macos-aarch64"), ("macos_intel", "macos-x86_64"),
-                               ("linux", "linux"), ("windows", "windows-x86_64")]:
-            self.assertEqual(jobs[name]["uses"], "./.github/workflows/release-platform.yml")
-            self.assertEqual(jobs[name]["with"], {"platform": platform, "publish-preview": False})
-            self.assertEqual(jobs[name]["needs"], "preflight")
-            self.assertIn(name, jobs["assemble"]["needs"])
-        self.assertNotIn("publish_linux_preview", jobs)
-        tags = events(config)["push"]["tags"]
-        for platform in ["linux", "macos-aarch64", "macos-x86_64", "windows-x86_64"]:
-            self.assertIn(f"!v*-{platform}-preview.*", tags)
-            self.assertIn(f"!v*-rc.*-{platform}", tags)
+    def test_only_the_four_platforms_can_start_release_work(self):
+        entry_points = {
+            file.name for file in (ROOT / ".github/workflows").glob("release*.yml")
+            if "push" in events(workflow(file.name))
+        }
+        self.assertEqual(entry_points, {
+            "release-linux.yml", "release-macos-aarch64.yml",
+            "release-macos-x86_64.yml", "release-windows-x86_64.yml",
+        })
+        shared = events(workflow("release-platform.yml"))
+        self.assertEqual(set(shared), {"workflow_call"})
+        self.assertEqual(set(shared["workflow_call"]["inputs"]), {"platform"})
 
     def test_preview_keeps_ci_and_publication_protection(self):
         jobs = workflow("release-platform.yml")["jobs"]
         preview = jobs["publish_preview"]
         self.assertEqual(preview["environment"], "release-publishing")
-        self.assertIn("inputs.publish-preview", preview["if"])
         self.assertIn("github.event_name == 'push'", preview["if"])
         downloads = [step for step in preview["steps"] if step.get("uses", "").startswith("actions/download-artifact@")]
         self.assertEqual(downloads[0]["with"]["name"], "mist-${{ inputs.platform == 'linux' && 'linux-x86_64' || inputs.platform }}")
@@ -155,10 +152,13 @@ class WorkflowBoundaryTests(unittest.TestCase):
 
     def test_prs_run_ci_without_starting_a_release(self):
         ci = events(workflow("ci.yml"))
-        release = events(workflow("release.yml"))
-        self.assertNotIn("pull_request", release)
-        self.assertEqual(release["push"]["tags"][0], "v*")
-        self.assertIn("workflow_dispatch", release)
+        for file in (ROOT / ".github/workflows").glob("release*.yml"):
+            release = events(workflow(file.name))
+            self.assertNotIn("pull_request", release)
+            self.assertNotIn("pull_request_target", release)
+            if "push" in release:
+                self.assertNotIn("branches", release["push"])
+                self.assertIn("workflow_dispatch", release)
         self.assertEqual(ci["pull_request"]["branches"], ["main"])
         self.assertEqual(ci["push"], {"branches": ["main"]})
 
@@ -183,7 +183,7 @@ class WorkflowBoundaryTests(unittest.TestCase):
         self.assertNotIn("Linux release packages", names)
 
     def test_release_artifacts_require_exact_commit_ci_without_rerunning_tests(self):
-        for file in ["release.yml", "release-platform.yml"]:
+        for file in ["release-platform.yml"]:
             jobs = workflow(file)["jobs"]
             self.assertNotIn("quality", jobs)
             gate = jobs["preflight"]
@@ -204,7 +204,7 @@ class WorkflowBoundaryTests(unittest.TestCase):
         self.assertTrue(any("scripts/check-quality.sh" in step.get("run", "") for step in quality_steps))
 
     def test_every_release_checkout_is_pinned_to_the_event_commit(self):
-        for file in ["release.yml", "release-platform.yml"]:
+        for file in ["release-platform.yml"]:
             for name, job in workflow(file)["jobs"].items():
                 for step in job.get("steps", []):
                     if step.get("uses", "").startswith("actions/checkout@"):

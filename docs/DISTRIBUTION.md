@@ -1,30 +1,16 @@
 # Distribution
 
-Mist publishes immutable, checksum-verified desktop artifacts through GitHub
-Releases. Release assets use stable names so the installation commands never
-need a version embedded in them.
+Mist publishes immutable, checksum-verified desktop artifacts through independent
+platform GitHub Releases. Asset names stay consistent; the release tag selects
+the version and platform.
 
 ## User installation
 
-macOS and Linux:
-
-```sh
-(
-  set -eu
-  installer=$(mktemp "${TMPDIR:-/tmp}/mist-bootstrap.XXXXXX")
-  trap 'rm -f "$installer"' 0
-  curl --proto '=https' --tlsv1.2 -LsSf \
-    https://github.com/mindful-time/Mist/releases/latest/download/mist-installer.sh \
-    --output "$installer"
-  sh "$installer"
-)
-```
-
-Windows PowerShell:
-
-```powershell
-& ([scriptblock]::Create((irm -ErrorAction Stop https://github.com/mindful-time/Mist/releases/latest/download/mist-installer.ps1)))
-```
+Choose an available installer on the [download website](https://mindful-time.github.io/Mist/).
+The current version is an early-access release candidate, not a stable release.
+For verified command-line installation, use the explicit platform tag shown in
+[Independent platform previews](#independent-platform-previews); do not use
+`/releases/latest` for an RC.
 
 The scripts download `SHA256SUMS` first and reject an artifact whose SHA-256
 digest does not match. Users who prefer not to pipe a network response into a
@@ -68,14 +54,13 @@ requires a separately built compatible inference runtime and native testing.
 
 ## Release asset contract
 
-Every complete desktop release must contain the five platform artifacts listed above, plus:
+Each release contains only its selected platform's installers, plus:
 
 - `Mist.png`
-- `mist-installer.sh`
-- `mist-installer.ps1`
+- `mist-installer.sh` for macOS/Linux, or `mist-installer.ps1` for Windows
 - `SHA256SUMS`, covering every downloadable artifact except itself
 
-Changing one of these names is a breaking change for the stable installation
+Changing one of these names is a breaking change for the verified installation
 commands. Add a new asset for another architecture instead of replacing an
 existing architecture with a differently built binary.
 
@@ -88,7 +73,7 @@ anonymous commands above.
 Publishing the website is deliberately opt-in. The Pages workflow deploys only
 from public `main` when the repository variable `DOWNLOAD_SITE_ENABLED` is
 `true`. Keep it unset or `false` while preparing the first release. After the
-complete release passes acceptance testing and is published, enable the
+selected platform release passes acceptance testing and is published, enable the
 variable and run **Actions → Pages → Run workflow**. The site can also be enabled
 before that milestone: it must honestly show downloads coming soon or a labeled
 platform preview, never imply unavailable installers exist. This gate prevents future
@@ -132,8 +117,8 @@ stable `0.1.0`; the compiled app still identifies as `0.1.0-rc.1`.
 Each platform can be distributed for early testing as soon as its own build and
 signing succeed. These independent pipelines share `release-platform.yml`; they
 do not wait for another platform's release/signing jobs. They still require all
-required main CI checks on the exact source commit. This does not weaken or
-replace the complete desktop release contract.
+required main CI checks on the exact source commit. CI, signing, and publication
+protections are unchanged; there is no combined release workflow.
 
 | Actions workflow | Example protected tag | Installer assets |
 | --- | --- | --- |
@@ -143,12 +128,12 @@ replace the complete desktop release contract.
 | Release Windows | `v0.1.0-rc.1-windows-x86_64` | Signed x64 setup EXE |
 
 Run the matching workflow manually from `main` to build an Actions candidate
-without creating a release. `Release complete desktop` remains an optional
-all-platform bundle with Homebrew/Chocolatey recipes, not a prerequisite for
-these previews. Its common candidate tag is `v0.1.0-rc.1`; it must not also run
-for a platform-suffixed tag. Homebrew and Chocolatey use the same RC package
-version. Registry publication remains separate
-maintainer steps after the complete release passes acceptance.
+without creating a release. Publishing starts only when the matching protected
+platform tag is pushed. A common tag such as `v0.1.0-rc.1` starts no release.
+Changing `VERSION` alone also starts no release: preflight validates the tag
+against synchronized Cargo and macOS version metadata and successful exact-commit
+main CI. Homebrew and Chocolatey recipe/feed publication remains separate work;
+no combined bundle or package-manager publication is run by these pipelines.
 
 1. Merge the preview workflow/website changes through a PR and wait for all
    required CI checks on that exact `main` commit. Do not tag the old workflow.
@@ -170,7 +155,7 @@ maintainer steps after the complete release passes acceptance.
 Linux previews require x86_64/AVX2, glibc 2.39+ and GLIBCXX 3.4.32 (Ubuntu 24.04+
 or Mint 22+), just like the normal Linux packages. AppImage does not make the
 application compatible with every Linux distribution. Full acceptance still precedes the stable
-desktop release. All main, tag, CI, environment, and signing rules remain intact.
+release. All main, tag, CI, environment, and signing rules remain intact.
 
 For a preview, use its **explicit tag**, not `/releases/latest` (GitHub excludes
 prereleases from that endpoint):
@@ -340,7 +325,7 @@ existing rulesets; editing a file does not update server configuration.
 PRs targeting `main` run the read-only CI workflow, including required quality,
 native builds/tests, and `Linux package validation`. CI builds and validates
 the Linux production packages without signing secrets. The Release workflow
-does not start on PRs; signing, bundle assembly, and publication belong only to
+does not start on PRs; signing, platform packaging, and publication belong only to
 Release. PR artifacts are test candidates, not approved public downloads.
 Pushes to `main` rerun CI as an integration check; pushes to a PR branch do not
 start a duplicate CI run.
@@ -362,33 +347,32 @@ rerun all CI jobs on that main commit rather than bypassing the release gate.
 Linux packaging is shared between CI and Release; PR CI cannot call the
 signing/publishing jobs.
 
-After both signing setups are configured, run **Release complete desktop** with
-`all` to build, sign, notarize,
-and validate every platform artifact, then upload
-`mist-release-bundle-<commit>` as a normal Actions artifact. Manual runs do not
-create a tag or GitHub Release and cannot publish anything. Tagged releases
-of the complete desktop channel require all five packages; platform preview
-tags require only their selected platform. Use candidate runs to fix packaging failures
-before choosing a version tag.
+Manual runs create only that platform's Actions artifacts, not a tag or GitHub
+Release. There is no `all` option or cross-platform assembly dependency. Use a
+candidate run when troubleshooting packaging before choosing a platform tag.
 
 ## Publishing a release
 
 1. Synchronize `VERSION`, `Cargo.toml`, `Cargo.lock`, and the macOS bundle
    version, then run `./scripts/release-check.sh`.
 2. Wait for all required integration-CI checks on the exact commit on `main`,
-   then complete a successful manual release-candidate run for that commit.
-3. Create and push the matching `v<version>` tag. The release workflow packages
-   each operating system on its native runner and creates or updates a draft
-   GitHub Release.
-4. Confirm every file in the release asset contract is present and matches
+   and verify the chosen platform's signing prerequisites.
+3. Create and push the matching `v<RC-version>-<platform>` tag from the table
+   above. Only that platform packages on its native runner and creates a new
+   draft prerelease after protected approval. Existing releases are never overwritten.
+4. Confirm every file in the selected-platform asset contract is present and matches
    `SHA256SUMS`.
-5. Exercise the draft on clean machines before publishing:
+5. Verify metadata, provenance, and required native signing before offering an
+   explicitly labeled RC for volunteer testing. Complete clean-machine acceptance
+   before a stable release, covering the relevant platform:
    - Apple Silicon and Intel macOS: Gatekeeper, first install, update rollback,
      Accessibility permission, selection, hotkey, model download, and speech.
    - Windows x64: Authenticode, install, update, uninstall, UI Automation,
      hotkey, model download, speech, and available GPU/CPU fallbacks.
    - Linux x64: AppImage and DEB install, desktop entry, X11 and Wayland
      selection, portals, hotkey, model download, speech, and CPU fallback.
-6. Publish the draft only after the acceptance checks pass. Keep a failed draft
-   private and fix it with a new version instead of replacing an already
-   published release artifact.
+6. Publish a verified RC as a prerelease with `latest=false`; do not claim
+   unperformed clean-machine acceptance. Keep a failed draft private and use a
+   new candidate version instead of replacing a published artifact. A future
+   stable channel requires its own reviewed publication policy; it is not an
+   implicit all-platform trigger.

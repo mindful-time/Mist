@@ -51,7 +51,7 @@ desired, the pinned cargo-packager 0.11.8 supports it through the `wix` format.
 Add and test that output, its signing and release-asset handling explicitly;
 renaming an EXE is not conversion.
 ([Mist packaging configuration](../Cargo.toml),
-[current release workflow](../.github/workflows/release.yml),
+[current platform release workflow](../.github/workflows/release-platform.yml),
 [cargo-packager formats](https://docs.rs/cargo-packager/0.11.8/cargo_packager/enum.PackageFormat.html))
 
 The reviewed Chocolatey moderation requirements do not state a blanket
@@ -70,13 +70,14 @@ no `release-signing` environment secret names. The latest successful Release
 workflow was a PR run, not publication. These are point-in-time checks, not a
 claim about credentials the maintainer may possess elsewhere.
 
-The existing workflow requires signing credentials and assembles all platform
-artifacts for tagged releases. Its macOS installation script checks codesign,
+The workflow inspected on 2026-10-03 required signing credentials and assembled
+all platforms. That combined workflow has since been removed: current native
+releases are independent. The macOS installation script checks codesign,
 Gatekeeper and the expected Apple team before installing; its Windows script
 checks Authenticode and the expected certificate before either installation or
 download-only completion. The macOS download-only mode checks the checksum,
 but does not perform those installation-time signature checks.
-([Release workflow](../.github/workflows/release.yml),
+([Platform release workflow](../.github/workflows/release-platform.yml),
 [macOS/Linux installer](../scripts/install-release.sh),
 [Windows installer](../scripts/install-release.ps1),
 [existing release policy](DISTRIBUTION.md))
@@ -90,13 +91,13 @@ Homebrew selects the ARM/Intel DMG and pins each checksum. Chocolatey pins
 the EXE checksum and verifies Authenticode plus the exact publisher before
 silent NSIS installation. No quarantine/Gatekeeper bypass is added.
 
-The complete signed Release candidate assembles `mist.rb` and
-`mist-tts.<version>.nupkg` alongside the existing installers and includes both
-in `SHA256SUMS`. Both stable `x.y.z` and `x.y.z-rc.N` versions generate recipes;
-the current shared candidate is `0.1.0-rc.1`. RC recipes reference the complete
-candidate tag `v0.1.0-rc.1`, not a stable or missing platform release. Generation and trust
-decisions have fixture tests; Windows CI also runs `choco pack`. None of those
-fixtures proves a native installer works or a real signature is trusted.
+Recipe generation remains a tested standalone preparation tool, not part of the
+native release pipelines. Its current templates require a common asset-host tag
+and all Mac/Windows installers. Before use with independent platform releases,
+adapt and test the generator's version-pinned URLs for those published channels;
+do not advertise the currently generated common-tag recipes as installable.
+Both stable `x.y.z` and `x.y.z-rc.N` versions have fixture tests; Windows CI also
+runs `choco pack`. Fixtures do not prove native installation or real signatures.
 
 For a signed candidate downloaded from Actions:
 
@@ -115,8 +116,8 @@ Chocolatey repository publication are not implied by generated recipe files.
 
 ## Remaining publication steps
 
-1. Complete Apple signing/notarization and Windows signing setup. Create a
-   draft candidate through the protected Release workflow.
+1. Complete the relevant native signing setup and create that platform's draft
+   through its protected tag workflow; other platforms do not need to be ready.
 2. Test install, upgrade, uninstall, first launch, permissions, hotkey, and
    speech on clean macOS ARM/Intel, Windows x64, and supported Linux desktops.
    Specifically test Chocolatey's per-user install using the same Windows
@@ -124,7 +125,8 @@ Chocolatey repository publication are not implied by generated recipe files.
    pass. Chocolatey's default uninstaller discovers registry changes, so also
    confirm it tracks only Mist.
    ([automatic uninstaller](https://docs.chocolatey.org/en-us/choco/features/auto-uninstaller/))
-3. After acceptance, publish the immutable signed assets. Create the proposed
+3. Adapt and validate the package generator against the independent published
+   signed installers, then choose the tap/feed setup. After acceptance, create the proposed
    `mindful-time/homebrew-tap`, copy the generated cask to `Casks/mist.rb`, and
    validate it with Homebrew before advertising
    `brew install --cask mindful-time/tap/mist`.
@@ -157,5 +159,5 @@ MSI packaging is not part of this change.
 
 An unsigned public tester preview would require an explicitly approved,
 separate preview flow; it must not silently weaken the stable-release checks.
-A macOS-first public release would likewise require changing the current
-all-platform publication contract. Neither policy change was made here.
+The current independent native RC flow is documented in
+[DISTRIBUTION.md](DISTRIBUTION.md); it does not publish a tap or community package.

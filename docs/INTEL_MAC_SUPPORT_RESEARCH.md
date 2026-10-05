@@ -164,7 +164,7 @@ runtime files. ([`v1.28.0` license](https://github.com/microsoft/onnxruntime/blo
 1. **Native build and regression coverage.** Add ordinary Intel CI alongside
    ARM and run the project's required checks using the chosen runtime path.
    [Current CI](../.github/workflows/ci.yml) uses `macos-latest`, while the
-   [release matrix](../.github/workflows/release.yml) includes
+   [platform release workflow](../.github/workflows/release-platform.yml) includes
    `macos-15-intel`. Verify the Rust graph, native archive architecture,
    requested C API, and runtime version. Record source/dependency checksums,
    compiler/SDK versions, cache inputs, and build duration. Cross-compilation
