@@ -11,6 +11,14 @@ test('Linux preview tags are distinct from the complete desktop release', () => 
   assert.equal(result.stdout.trim(), 'linux-preview');
 });
 
+for (const platform of ['macos-aarch64', 'macos-x86_64', 'windows-x86_64']) {
+  test(`${platform} has its own synchronized preview tag`, () => {
+    const result = spawnSync(process.execPath, [command, '0.1.0', `v0.1.0-${platform}-preview.1`], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), `${platform}-preview`);
+  });
+}
+
 test('the synchronized version still selects the complete desktop release', () => {
   const result = spawnSync(process.execPath, [command, '0.1.0', 'v0.1.0'], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);

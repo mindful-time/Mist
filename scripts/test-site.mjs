@@ -104,7 +104,7 @@ test('the Linux preview does not pretend a Mac download exists', async () => {
   const page = browser([{ status: 404 }, { status: 200, body: [preview] }], 'MacIntel');
   await page.done;
   assert.equal(page.node('data-hero-download').textContent, 'Mac download coming soon');
-  assert.match(page.node('data-package-area').textContent, /Choose Linux above/);
+  assert.match(page.node('data-package-area').textContent, /Choose an available platform above/);
   page.choose('linux');
   assert.equal(page.node('data-hero-download').textContent, 'Download for Linux');
 });
@@ -166,6 +166,73 @@ test('a stable installer takes precedence over previews and downloads directly o
 
 test('an incomplete release listing fails closed', async () => {
   const page = browser([{ status: 404 }, { status: 200, body: { message: 'Invalid listing' } }]);
+  await page.done;
+  assert.equal(page.node('data-hero-download').textContent, 'View download status');
+});
+
+function platformPreview(platform, names, date = '2026-10-05T01:00:00Z', number = 1) {
+  const tag = `v0.1.0-${platform}-preview.${number}`;
+  return {
+    ...preview, tag_name: tag, published_at: date,
+    assets: names.map(name => ({ name, state: 'uploaded', size: 1024,
+      browser_download_url: `https://github.com/mindful-time/Mist/releases/download/${tag}/${name}` })),
+  };
+}
+
+test('independently published Mac and Linux previews appear without waiting for Intel or Windows', async () => {
+  const apple = platformPreview('macos-aarch64', ['Mist-macos-aarch64.dmg']);
+  const page = browser([{ status: 404 }, { status: 200, body: [apple, preview] }], 'MacIntel');
+  await page.done;
+  assert.equal(page.node('data-hero-download').textContent, 'Download for Mac');
+  assert.match(page.node('data-package-area').textContent, /Download DMG/);
+  assert.match(page.node('data-package-area').textContent, /Intel Mac.*Not available yet/);
+  assert.equal(page.node('data-download-heading').textContent, 'Try the Mist preview');
+  assert.ok(!page.node('data-download-copy').textContent.includes('Linux is available first'));
+  page.choose('linux');
+  assert.match(page.node('data-package-area').textContent, /Download AppImage/);
+  page.choose('windows');
+  assert.equal(page.node('data-hero-download').textContent, 'Windows download coming soon');
+});
+
+test('Windows can publish first and its preview downloads directly', async () => {
+  const windows = platformPreview('windows-x86_64', ['Mist-windows-x86_64-setup.exe']);
+  const page = browser([{ status: 404 }, { status: 200, body: [windows] }], 'Win32');
+  await page.done;
+  assert.equal(page.node('data-hero-download').href, windows.assets[0].browser_download_url);
+  assert.equal(page.node('data-preview-notice').hidden, false);
+});
+
+test('the newest published preview for each platform wins even when releases arrive out of order', async () => {
+  const intel = platformPreview('macos-x86_64', ['Mist-macos-x86_64.dmg']);
+  const old = platformPreview('windows-x86_64', ['Mist-windows-x86_64-setup.exe']);
+  const newer = platformPreview('windows-x86_64', ['Mist-windows-x86_64-setup.exe'], '2026-10-05T02:00:00Z', 2);
+  const page = browser([{ status: 404 }, { status: 200, body: [old, intel, newer, preview] }], 'Win32');
+  await page.done;
+  assert.equal(page.node('data-hero-download').href, newer.assets[0].browser_download_url);
+  page.choose('mac');
+  assert.match(page.node('data-package-area').textContent, /Intel Mac.*Download DMG/);
+});
+
+test('a platform preview cannot offer another platform installer or use an invalid publication date', async () => {
+  const misplaced = platformPreview('linux', ['Mist-windows-x86_64-setup.exe']);
+  const invalidDate = platformPreview('windows-x86_64', ['Mist-windows-x86_64-setup.exe'], 'invalid');
+  const page = browser([{ status: 404 }, { status: 200, body: [misplaced, invalidDate] }], 'Win32');
+  await page.done;
+  assert.equal(page.node('data-hero-download').textContent, 'Downloads coming soon');
+});
+
+test('preview discovery follows pagination to keep a less frequently released platform available', async () => {
+  const windows = platformPreview('windows-x86_64', ['Mist-windows-x86_64-setup.exe']);
+  const page = browser([{ status: 404 }, { status: 200, body: Array(100).fill(preview) },
+    { status: 200, body: [windows] }], 'Win32');
+  await page.done;
+  assert.equal(page.node('data-hero-download').href, windows.assets[0].browser_download_url);
+  assert.equal(page.requests.length, 3);
+  assert.match(page.requests[2], /[?&]page=2(?:&|$)/);
+});
+
+test('failed pagination does not present an incomplete release listing as authoritative', async () => {
+  const page = browser([{ status: 404 }, { status: 200, body: Array(100).fill(preview) }, { status: 403 }]);
   await page.done;
   assert.equal(page.node('data-hero-download').textContent, 'View download status');
 });

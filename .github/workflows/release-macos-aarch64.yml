@@ -1,0 +1,26 @@
+name: Release macOS Apple Silicon
+
+on:
+  push:
+    tags: ["v*-macos-aarch64-preview.*"]
+  workflow_dispatch:
+
+concurrency:
+  group: release-macos-aarch64-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    uses: ./.github/workflows/release-platform.yml
+    with:
+      platform: macos-aarch64
+    secrets: inherit
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write

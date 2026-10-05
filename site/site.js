@@ -20,6 +20,7 @@ const platforms = {
     packages: [
       {
         asset: "Mist-macos-aarch64.dmg",
+        previewChannel: "macos-aarch64",
         name: "Apple silicon Mac",
         detail: "M-series chip",
         action: "Download DMG",
@@ -27,6 +28,7 @@ const platforms = {
       },
       {
         asset: "Mist-macos-x86_64.dmg",
+        previewChannel: "macos-x86_64",
         name: "Intel Mac",
         detail: "Macs with an Intel processor",
         action: "Download DMG",
@@ -43,6 +45,7 @@ const platforms = {
     packages: [
       {
         asset: "Mist-windows-x86_64-setup.exe",
+        previewChannel: "windows-x86_64",
         name: "Windows 64-bit installer",
         detail: "For most Windows 10 and Windows 11 PCs",
         action: "Download installer",
@@ -60,6 +63,7 @@ const platforms = {
     packages: [
       {
         asset: "Mist-linux-x86_64.deb",
+        previewChannel: "linux",
         name: "Ubuntu 24.04+ / Mint 22+ (x86_64)",
         detail: "Debian package (.deb) · AVX2 processor required",
         action: "Download package",
@@ -67,6 +71,7 @@ const platforms = {
       },
       {
         asset: "Mist-linux-x86_64.AppImage",
+        previewChannel: "linux",
         name: "Compatible Linux desktops (x86_64)",
         detail: "AppImage · glibc 2.39+, GLIBCXX 3.4.32, AVX2",
         action: "Download AppImage",
@@ -177,11 +182,11 @@ function renderPackages() {
   previewNotice.hidden = !ready || !releaseState.prerelease;
   panelHeading.textContent = ready ? "Choose your platform" : "Release status";
   downloadHeading.textContent = ready
-    ? (releaseState.prerelease ? "Try the Linux preview" : "Download Mist")
+    ? (releaseState.prerelease ? "Try the Mist preview" : "Download Mist")
     : (releaseState.kind === "none" ? "Downloads coming soon" : "Download availability");
   downloadCopy.textContent = ready
     ? (releaseState.prerelease
-      ? "Linux is available first. Mac and Windows installers are coming soon."
+      ? "Platform previews arrive independently. Choose an available installer for your computer."
       : "Choose your computer, then pick the installer that matches it.")
     : "Only published installers appear here. You can follow progress on GitHub.";
   packageArea.replaceChildren();
@@ -230,7 +235,7 @@ function renderPackages() {
     packageArea.append(unavailableNotice(
       `${platforms[selectedPlatform].label} download coming soon.`,
       releaseState.prerelease
-        ? "Choose Linux above to try the available preview. Mac and Windows installers are still being prepared."
+        ? "Choose an available platform above to try a preview. Other installers are still being prepared."
         : "This release has no installer for this platform. Choose another platform above or check back later.",
       "View available releases",
     ));
@@ -287,11 +292,14 @@ for (const button of platformButtons) {
   });
 }
 
-function publishedAssets(release) {
+function publishedAssets(release, channel = null) {
   const assets = new Map();
-  if (!release || release.draft || !release.published_at || !Array.isArray(release.assets)) return assets;
+  if (!release || release.draft || typeof release.tag_name !== "string" ||
+      !release.published_at || !Number.isFinite(Date.parse(release.published_at)) ||
+      !Array.isArray(release.assets)) return assets;
   const supportedNames = new Set(Object.values(platforms).flatMap((platform) =>
-    platform.packages.map((packageInfo) => packageInfo.asset)));
+    platform.packages.filter((packageInfo) => !channel || packageInfo.previewChannel === channel)
+      .map((packageInfo) => packageInfo.asset)));
   for (const asset of release.assets) {
     if (!asset || !supportedNames.has(asset.name) || asset.state !== "uploaded" ||
         !Number.isSafeInteger(asset.size) || asset.size <= 0) continue;
@@ -311,22 +319,35 @@ async function loadLatestRelease() {
 
     if (response.status === 404) {
       // GitHub's "latest" endpoint excludes previews. Only use this explicitly
-      // named Linux preview channel when there is no stable desktop release.
-      const previewsResponse = await fetch(`https://api.github.com/repos/${repository}/releases?per_page=100`, {
-        headers: { Accept: "application/vnd.github+json" },
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (!previewsResponse.ok) throw new Error(`GitHub returned ${previewsResponse.status}`);
-      const releases = await previewsResponse.json();
-      if (!Array.isArray(releases)) throw new Error("Invalid release listing");
-      const preview = releases.filter((release) => release?.prerelease &&
-        /^v\d+\.\d+\.\d+-linux-preview\.[1-9]\d*$/.test(release.tag_name))
-        .sort((left, right) => Date.parse(right.published_at) - Date.parse(left.published_at))
-        .find((release) => platforms.linux.packages.some((packageInfo) =>
-          publishedAssets(release).has(packageInfo.asset)));
-      releaseState = preview
-        ? { kind: "ready", assets: publishedAssets(preview), prerelease: true }
-        : { kind: "none", assets: new Map() };
+      // named platform preview channels when there is no stable desktop release.
+      const releases = [];
+      for (let page = 1; ; page += 1) {
+        const previewsResponse = await fetch(`https://api.github.com/repos/${repository}/releases?per_page=100&page=${page}`, {
+          headers: { Accept: "application/vnd.github+json" },
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (!previewsResponse.ok) throw new Error(`GitHub returned ${previewsResponse.status}`);
+        const batch = await previewsResponse.json();
+        if (!Array.isArray(batch) || batch.length > 100) throw new Error("Invalid release listing");
+        releases.push(...batch);
+        if (batch.length < 100) break;
+      }
+      const previews = releases.filter((release) => release?.prerelease && !release.draft &&
+        Number.isFinite(Date.parse(release.published_at)) &&
+        /^v\d+\.\d+\.\d+-(linux|macos-aarch64|macos-x86_64|windows-x86_64)-preview\.[1-9]\d*$/.test(release.tag_name))
+        .sort((left, right) => Date.parse(right.published_at) - Date.parse(left.published_at));
+      const assets = new Map();
+      const selectedChannels = new Set();
+      for (const preview of previews) {
+        const channel = preview.tag_name.match(/-(linux|macos-aarch64|macos-x86_64|windows-x86_64)-preview\./)[1];
+        const available = publishedAssets(preview, channel);
+        if (selectedChannels.has(channel) || available.size === 0) continue;
+        selectedChannels.add(channel);
+        for (const [name, asset] of available) assets.set(name, asset);
+      }
+      releaseState = assets.size > 0
+        ? { kind: "ready", assets, prerelease: true }
+        : { kind: "none", assets };
     } else {
       if (!response.ok) throw new Error(`GitHub returned ${response.status}`);
       const release = await response.json();

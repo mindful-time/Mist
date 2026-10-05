@@ -132,3 +132,39 @@ work against `f8b796ec5cd4fb6d5ea53dd68770bb792872213c`.
   preview before the new workflow is merged and its main CI passes. Protected
   environment approval and draft review remain maintainer actions. Do not
   change credentials or server protection rules.
+
+## Independent platform releases and inclusive CRAP limits
+
+Requested on 2026-10-05. Review these changes against merged main,
+`8dd7108ace1b138a4155cf980bfa32263ae53d2d`. This supersedes the Linux-only
+preview discovery above, not the CI, signing, or owner-merge requirements.
+
+- Provide separate Linux, Apple Silicon macOS, Intel macOS, and Windows
+  workflows. Each platform builds and prepares its own protected draft preview
+  without waiting for another platform's release build/signing job.
+- Share native build/signing logic through a same-commit local reusable workflow.
+  Manual candidates run from main and upload Actions artifacts only. Protected
+  platform tags use the synchronized stable base version and positive preview
+  numbers. Require all exact-commit main CI checks before any release build;
+  audio, quality, and security tests remain in CI and hooks, not Release.
+- Match tags to the selected platform, preserve Apple notarization/stapling and
+  Windows publisher verification, and publish only that platform's artifacts,
+  matching bootstrap, icon, and checksums. Reject missing/empty/extra/symlink
+  artifacts or missing required bootstrap identities. Linux needs no signing
+  credentials. Keep attestations and protected draft-only publication.
+- The optional complete desktop release still builds all five platform assets
+  and generates the existing Homebrew/Chocolatey recipes; it must not run for
+  platform preview tags or duplicate their publication.
+- Before a stable desktop release exists, the website aggregates the newest
+  valid published preview per platform channel. Stable releases take precedence.
+  Ignore drafts, invalid publication dates, unfinished/empty uploads, wrong-
+  channel assets, and external URLs. Keep unavailable downloads and install
+  instructions disabled and retain an early-access label.
+- Warn at CRAP >=5, fail new/regressed scores >=10, and reject a crossing from
+  below 10 even within analyzer epsilon. Preserve the existing-debt baseline;
+  unchanged/improving debt remains visible. Fail closed on incomplete analyzer
+  evidence. Do not regenerate the baseline or suppress Smells findings.
+- Test the actual workflow graph, CLI tag/assets/CRAP boundaries, and actual
+  website script/markup with only external boundaries substituted. Commit/push
+  a new PR for the owner to merge. Do not merge, tag, publish, change credentials
+  or protection rules, or claim clean-machine/native release acceptance.

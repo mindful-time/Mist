@@ -28,7 +28,7 @@ sh scripts/build-site.sh
 node --check site/mist.js
 node --check site/site.js
 
-printf '%s\n' 'Mist quality gate: CRAP with real coverage (warn >5, block new/regressed >10)'
+printf '%s\n' 'Mist quality gate: CRAP with real coverage (warn >=5, block new/regressed >=10)'
 sh scripts/crap-gate.sh
 printf '%s\n' 'Mist quality gate: Smells 0.5.0 (exit 2 also blocks)'
 if [ "$mode" = index ]; then
