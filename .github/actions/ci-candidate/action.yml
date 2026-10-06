@@ -1,0 +1,27 @@
+name: Download verified CI candidate
+description: Retrieve the preflight-verified archive and fail closed if its bytes changed in transit.
+inputs:
+  digest:
+    description: SHA-256 of the original immutable CI artifact archive
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      with:
+        node-version: '24'
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        name: verified-ci-candidate
+        path: ci-candidate
+    - name: Verify the original CI archive before extraction or signing
+      shell: bash
+      env:
+        CI_ARTIFACT_DIGEST: ${{ inputs.digest }}
+      run: |
+        node --input-type=module -e '
+          import { createHash } from "node:crypto";
+          import { readFileSync } from "node:fs";
+          const actual = "sha256:" + createHash("sha256").update(readFileSync("ci-candidate/ci-candidate.zip")).digest("hex");
+          if (actual !== process.env.CI_ARTIFACT_DIGEST) throw new Error("CI artifact checksum mismatch");
+        '

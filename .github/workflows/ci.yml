@@ -56,6 +56,7 @@ jobs:
         run: sh scripts/test-distribution.sh
 
   check:
+    name: check (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -83,13 +84,19 @@ jobs:
       - run: cargo build --locked --all-targets
       - run: cargo test --locked --all-targets
       - run: cargo clippy --locked --all-targets -- -D warnings
-      - name: Validate the Intel app bundle without signing credentials
-        if: matrix.os == 'macos-15-intel'
+      - name: Build the unsigned macOS release candidate
+        if: runner.os == 'macOS'
         shell: bash
+        env:
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.os == 'macos-15-intel' && '13.3' || '13.0' }}
         run: |
           cargo install cargo-packager --version 0.11.8 --locked
           cargo build --release --locked
           cargo packager --release --formats app
+      - name: Validate the Intel app bundle without signing credentials
+        if: matrix.os == 'macos-15-intel'
+        shell: bash
+        run: |
           sh scripts/prepare-intel-app.sh dist/packages/Mist.app
       - name: Test real Intel speech generation
         if: matrix.os == 'macos-15-intel'
@@ -99,13 +106,27 @@ jobs:
         run: |
           dist/packages/Mist.app/Contents/MacOS/mist --install-model
           cargo test --release --locked --test kokoro_smoke -- --ignored --nocapture
-          ditto -c -k --keepParent dist/packages/Mist.app dist/packages/Mist-intel-ci.zip
-      - name: Retain the unsigned Intel candidate and runtime provenance
-        if: matrix.os == 'macos-15-intel'
+      - name: Archive the unsigned macOS candidate with permissions and provenance
+        if: runner.os == 'macOS'
+        run: tar -cf dist/packages/Mist.app.tar -C dist/packages Mist.app
+      - name: Retain the unsigned macOS candidate
+        if: runner.os == 'macOS'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: mist-intel-ci-${{ github.sha }}
-          path: dist/packages/Mist-intel-ci.zip
+          name: mist-ci-${{ matrix.os == 'macos-latest' && 'macos-aarch64' || 'macos-x86_64' }}-${{ github.sha }}-attempt-${{ github.run_attempt }}
+          path: dist/packages/Mist.app.tar
+          retention-days: 90
+          if-no-files-found: error
+      - name: Build the unsigned Windows release candidate
+        if: runner.os == 'Windows'
+        run: cargo build --release --locked
+      - name: Retain the unsigned Windows candidate
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mist-ci-windows-x86_64-${{ github.sha }}-attempt-${{ github.run_attempt }}
+          path: target/release/mist.exe
+          retention-days: 90
           if-no-files-found: error
       - name: Validate POSIX release installer
         if: runner.os != 'Windows'
@@ -138,7 +159,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/linux-packages
         with:
-          artifact-name: mist-linux-validation-${{ github.sha }}
+          artifact-name: mist-ci-linux-${{ github.sha }}-attempt-${{ github.run_attempt }}
 
   quality:
     name: Quality and security gates
