@@ -225,9 +225,11 @@ make smells
 make security
 ```
 
-Mist is preparing release candidate `0.1.0-rc.1`, not a stable release. `VERSION`,
+Mist is preparing release candidate `0.1.0-rc.2`, not a stable release. `VERSION`,
 `Cargo.toml`, `Cargo.lock`, and the full `MistReleaseVersion` bundle field must
-move together. Apple's numeric bundle version remains `0.1.0`.
+move together. Apple's numeric bundle version remains `0.1.0`; its bundle build
+number is `2`. Published RC.1 releases remain immutable. RC.2 needs fresh CI
+candidates from its own merged source commit; RC.1 artifacts are not reused.
 
 Only `mindful-time` may merge to `main`. Everyone, including the owner, must use
 a pull request with passing required checks. Direct and force pushes are blocked;
