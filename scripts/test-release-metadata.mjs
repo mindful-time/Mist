@@ -42,6 +42,15 @@ test('a final stable release keeps the same numeric bundle-version contract', t 
   assert.equal(result.status, 0, result.stderr);
 });
 
+test('RC.2 requires bundle build 2 and rejects the previous candidate build number', t => {
+  const f = fixture(t, '0.1.0-rc.2');
+  assert.notEqual(f.run().status, 0);
+  writeFileSync(f.file, f.plist.replace('<string>1</string>', '<string>2</string>'));
+  const result = f.run();
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /0\.1\.0-rc\.2 is synchronized/);
+});
+
 test('mismatched Cargo, bundle, or RC identity blocks the release', t => {
   const f = fixture(t);
   for (const content of [

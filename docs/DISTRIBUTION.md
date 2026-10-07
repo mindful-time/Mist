@@ -104,15 +104,22 @@ release asset host must be public for anonymous users.
 
 ### Independent platform previews
 
-The shared application and package version is **`0.1.0-rc.1`**. Each candidate
+The shared application and package version in source is **`0.1.0-rc.2`**. Each candidate
 is a prerelease, not a stable release. Platform suffixes identify independent
 GitHub release channels without changing the version compiled into the app.
 The full version is synchronized in `VERSION`, Cargo metadata/lockfile, and
 `MistReleaseVersion` in the Mac plist. `CFBundleShortVersionString` stays numeric
 (`0.1.0`) as required by Apple; `CFBundleVersion` is the numeric build number.
-It must match the RC number (`1` for this candidate). The Linux DEB encodes
-the version as `0.1.0~rc.1`, so Debian's version ordering upgrades correctly to
-stable `0.1.0`; the compiled app still identifies as `0.1.0-rc.1`.
+It must match the RC number (`2` for this candidate). The Linux DEB encodes
+the version as `0.1.0~rc.2`, so Debian's version ordering upgrades correctly to
+stable `0.1.0`; the compiled app still identifies as `0.1.0-rc.2`.
+
+Published RC.1 releases, tags, and assets remain immutable. RC.2 requires new
+CI candidates from its own merged source commit; never promote or relabel an
+RC.1 candidate. Until an RC.2 channel is reviewed and published, the website
+continues to offer that platform's existing published preview. A version bump
+is not evidence that a reported visual problem is fixed: compare the packaged
+application with the reported appearance before claiming that acceptance.
 
 Each platform can be distributed for early testing as soon as its own build and
 signing succeed. These independent pipelines share `release-platform.yml`; they
@@ -134,14 +141,14 @@ it does not recompile the app or the Intel inference runtime.
 
 | Actions workflow | Example protected tag | Installer assets |
 | --- | --- | --- |
-| Release Linux | `v0.1.0-rc.1-linux` | DEB and AppImage |
-| Release macOS Apple Silicon | `v0.1.0-rc.1-macos-aarch64` | Apple Silicon DMG |
-| Release macOS Intel | `v0.1.0-rc.1-macos-x86_64` | Intel DMG |
-| Release Windows | `v0.1.0-rc.1-windows-x86_64` | Signed x64 setup EXE |
+| Release Linux | `v0.1.0-rc.2-linux` | DEB and AppImage |
+| Release macOS Apple Silicon | `v0.1.0-rc.2-macos-aarch64` | Apple Silicon DMG |
+| Release macOS Intel | `v0.1.0-rc.2-macos-x86_64` | Intel DMG |
+| Release Windows | `v0.1.0-rc.2-windows-x86_64` | Signed x64 setup EXE |
 
 Run the matching workflow manually from `main` to build an Actions candidate
 without creating a release. Publishing starts only when the matching protected
-platform tag is pushed. A common tag such as `v0.1.0-rc.1` starts no release.
+platform tag is pushed. A common tag such as `v0.1.0-rc.2` starts no release.
 Changing `VERSION` alone also starts no release: preflight validates the tag
 against synchronized Cargo and macOS version metadata and successful exact-commit
 shared/platform main CI. Homebrew and Chocolatey recipe/feed publication remains separate work;
