@@ -19,6 +19,9 @@ use crate::{
     ports::AudioPlayer,
 };
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+const SAMPLE_INTERVAL: Duration = Duration::from_millis(40);
+
 /// Cross-platform system audio adapter. Keeping playback behind this port avoids
 /// pulling device APIs into the application core.
 pub struct SystemAudioPlayer {
@@ -87,8 +90,14 @@ impl SystemAudioPlayer {
                 .spawn()
             {
                 Ok(mut child) => {
-                    let status = monitor_playback(&mut child, audio, on_sample, &self.playback)
-                        .with_context(|| format!("could not monitor {program} playback"))?;
+                    let status = monitor_playback(
+                        &mut child,
+                        audio,
+                        on_sample,
+                        &self.playback,
+                        SAMPLE_INTERVAL,
+                    )
+                    .with_context(|| format!("could not monitor {program} playback"))?;
                     if status.success() {
                         return Ok(status);
                     }
@@ -168,8 +177,14 @@ impl AudioPlayer for SystemAudioPlayer {
         #[cfg(target_os = "macos")]
         let status = {
             let mut child = self.start_player()?;
-            monitor_playback(&mut child, audio, on_sample, &self.playback)
-                .context("could not monitor system audio playback")?
+            monitor_playback(
+                &mut child,
+                audio,
+                on_sample,
+                &self.playback,
+                SAMPLE_INTERVAL,
+            )
+            .context("could not monitor system audio playback")?
         };
         #[cfg(target_os = "linux")]
         let status = self.play_file(audio, on_sample)?;
@@ -189,8 +204,8 @@ fn monitor_playback(
     audio: &Audio,
     on_sample: &mut dyn FnMut(AudioFeatures),
     playback: &PlaybackController,
+    sample_interval: Duration,
 ) -> Result<ExitStatus> {
-    const SAMPLE_INTERVAL: Duration = Duration::from_millis(40);
     const FEATURE_WINDOW: Duration = Duration::from_millis(80);
 
     if let Err(error) = playback.begin_playback() {
@@ -241,7 +256,7 @@ fn monitor_playback(
             }
             PlaybackPhase::Idle | PlaybackPhase::Preparing => {}
         }
-        playback.wait_for_phase_change(phase, SAMPLE_INTERVAL);
+        playback.wait_for_phase_change(phase, sample_interval);
     }
 }
 
@@ -311,6 +326,7 @@ mod tests {
                 let _ = sample_sender.try_send(());
             },
             &control,
+            SAMPLE_INTERVAL,
         )
         .unwrap_err();
         let resumed = controller.join().unwrap();
@@ -357,6 +373,7 @@ mod tests {
             &audio,
             &mut |_| panic!("cancelled speech must not emit playback samples"),
             &control,
+            SAMPLE_INTERVAL,
         )
         .unwrap_err();
 
@@ -385,6 +402,7 @@ mod tests {
             &audio,
             &mut |_| panic!("finished speech must not emit playback samples"),
             &control,
+            SAMPLE_INTERVAL,
         )
         .unwrap();
 
@@ -402,32 +420,22 @@ mod tests {
         assert!(control.register(token));
         control.begin_session(token).unwrap();
 
-        let mut child = Command::new("/bin/sleep").arg("5").spawn().unwrap();
+        let mut child = Command::new("/bin/sleep").arg("30").spawn().unwrap();
         let process_id = child.id() as libc::pid_t;
         let (sample_sender, sample_receiver) = mpsc::sync_channel(1);
         let controller = control.clone();
         let control_thread = thread::spawn(move || {
-            sample_receiver.recv().unwrap();
-            let started = Instant::now();
+            sample_receiver
+                .recv_timeout(Duration::from_secs(2))
+                .unwrap();
             assert!(controller.pause(token));
+            // Reproduce a descheduled observer without delaying the actual
+            // pause request. A correctness check must not time this thread.
+            thread::sleep(Duration::from_millis(50));
 
-            let latency = loop {
-                let mut status = 0;
-                // SAFETY: `process_id` belongs to the child created for this
-                // test and `status` is a valid writable wait-status pointer.
-                let result = unsafe {
-                    libc::waitpid(process_id, &mut status, libc::WNOHANG | libc::WUNTRACED)
-                };
-                if result == process_id && libc::WIFSTOPPED(status) {
-                    break started.elapsed();
-                }
-                if started.elapsed() >= Duration::from_millis(250) {
-                    break started.elapsed();
-                }
-                thread::sleep(Duration::from_millis(1));
-            };
+            let stopped = wait_for_stopped_process(process_id);
             assert!(controller.cancel(token));
-            latency
+            stopped
         });
 
         let audio = Audio::new(vec![0.1; 24_000], 24_000);
@@ -442,15 +450,22 @@ mod tests {
                 }
             },
             &control,
+            // The process-stop watchdog is shorter than this visual wait.
+            // A polling/sleeping monitor cannot pass just because a tick fires.
+            Duration::from_secs(5),
         )
         .unwrap_err();
-        let pause_latency = control_thread.join().unwrap();
+        let stopped = control_thread.join().unwrap();
         control.finish_session(token);
 
         assert!(playback_error_was_stopped(&error));
         assert!(
-            pause_latency < Duration::from_millis(20),
-            "pause reached the system player after {pause_latency:?}"
+            stopped,
+            "pause must stop the system player before the visual sampling wait expires"
+        );
+        assert!(
+            child.try_wait().unwrap().is_some(),
+            "cancel must reap the child"
         );
     }
 

@@ -14,6 +14,7 @@ pub(super) const PANEL_SURFACE: Color32 = Color32::from_rgba_premultiplied(7, 7,
 pub(super) const TEXT_PRIMARY: Color32 = Color32::from_rgb(245, 246, 250);
 pub(super) const TEXT_SECONDARY: Color32 = Color32::from_rgb(169, 175, 193);
 pub(super) const TEXT_MUTED: Color32 = Color32::from_rgb(119, 126, 146);
+pub(super) const CONTEXT_MENU_GAP: f32 = 12.0;
 
 pub(super) fn with_alpha(color: Color32, alpha: u8) -> Color32 {
     Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), alpha)
@@ -38,6 +39,21 @@ pub(super) fn configure_interface(context: &egui::Context) {
     style.spacing.button_padding = Vec2::new(12.0, 7.0);
     style.animation_time = 0.16;
     context.set_style_of(egui::Theme::Dark, style);
+}
+
+pub(super) fn context_menu_popup(response: &egui::Response) -> egui::Popup<'_> {
+    egui::Popup::context_menu(response)
+        .anchor(response.rect)
+        .align(egui::RectAlign::LEFT)
+        .align_alternatives(&[])
+        .gap(CONTEXT_MENU_GAP)
+        .style(|style: &mut egui::Style| {
+            egui::containers::menu::menu_style(style);
+            style.spacing.button_padding = Vec2::new(12.0, 8.0);
+            style.spacing.interact_size.y = 32.0;
+            style.spacing.item_spacing.y = 6.0;
+            style.spacing.menu_margin = egui::Margin::same(10);
+        })
 }
 
 fn install_system_font(context: &egui::Context) {
@@ -125,6 +141,114 @@ mod tests {
         FontRef::from_index(data.font.as_ref(), data.index)
             .ok()
             .is_some_and(|font| font.charmap().map(character).is_some())
+    }
+
+    #[test]
+    fn right_click_menu_has_roomy_rows_without_clipping() {
+        let context = egui::Context::default();
+        configure_interface(&context);
+        let mode = super::super::ViewportMode::ContextMenu;
+        let viewport = egui::Rect::from_min_size(egui::Pos2::ZERO, mode.size());
+        let mist_rect =
+            egui::Rect::from_center_size(mode.mist_center().to_pos2(), super::super::MIST_WINDOW);
+        let input = RawInput {
+            screen_rect: Some(viewport),
+            ..Default::default()
+        };
+        let mut rows = Vec::new();
+        let mut menu_rect = egui::Rect::NOTHING;
+
+        // Let the popup complete its initial sizing pass before measuring.
+        for _ in 0..2 {
+            let mut output = context.run_ui(input.clone(), |ui| {
+                egui::CentralPanel::default().show(ui, |ui| {
+                    let anchor = ui.interact(mist_rect, ui.id().with("mist"), egui::Sense::click());
+                    let popup = context_menu_popup(&anchor)
+                        .open(true)
+                        .show(|ui| {
+                            ui.set_min_width(238.0);
+                            ui.strong("Aoede mist");
+                            ui.label(
+                                egui::RichText::new("Select text, then press Ctrl+Space")
+                                    .size(11.0),
+                            );
+                            ui.separator();
+                            rows.clear();
+                            for label in [
+                                "Settings…",
+                                "Speak copied text",
+                                "Accessibility settings…",
+                                "Quit Mist",
+                            ] {
+                                if label == "Quit Mist" {
+                                    ui.separator();
+                                }
+                                rows.push(ui.button(label).rect);
+                            }
+                        })
+                        .expect("the menu is open");
+                    menu_rect = popup.response.rect;
+                });
+            });
+            output.textures_delta.clear();
+        }
+
+        assert_eq!(rows.len(), 4);
+        for row in &rows {
+            assert!(row.height() >= 32.0, "cramped menu row: {row:?}");
+            assert!(row.left() - menu_rect.left() >= 10.0);
+            assert!(menu_rect.right() - row.right() >= 10.0);
+            assert!(menu_rect.contains_rect(*row), "menu clips a row");
+        }
+        for pair in rows.windows(2) {
+            assert!(pair[1].top() - pair[0].bottom() >= 6.0);
+        }
+        assert!(
+            viewport.contains_rect(menu_rect),
+            "menu exceeds its viewport"
+        );
+    }
+
+    #[test]
+    fn right_click_menu_stays_to_the_left_of_the_mist() {
+        for mist_size in [
+            super::super::MIST_WINDOW,
+            super::super::SPEAKING_MIST_WINDOW,
+        ] {
+            let context = egui::Context::default();
+            configure_interface(&context);
+            let mode = super::super::ViewportMode::ContextMenu;
+            let viewport = egui::Rect::from_min_size(egui::Pos2::ZERO, mode.size());
+            let mist_rect = egui::Rect::from_center_size(mode.mist_center().to_pos2(), mist_size);
+            let input = RawInput {
+                screen_rect: Some(viewport),
+                events: vec![egui::Event::PointerMoved(mist_rect.center())],
+                ..Default::default()
+            };
+            let mut menu_rect = egui::Rect::NOTHING;
+            for _ in 0..2 {
+                let mut output = context.run_ui(input.clone(), |ui| {
+                    let response =
+                        ui.interact(mist_rect, ui.id().with("mist"), egui::Sense::click());
+                    let popup = context_menu_popup(&response)
+                        .open_memory(Some(egui::SetOpenCommand::Bool(true)))
+                        .show(|ui| {
+                            ui.set_min_width(238.0);
+                            let _ = ui.button("Settings…");
+                        })
+                        .expect("the right-click menu is open");
+                    menu_rect = popup.response.rect;
+                });
+                output.textures_delta.clear();
+            }
+
+            assert!(
+                menu_rect.right() + 12.0 <= mist_rect.left(),
+                "menu covers the Mist instead of sitting to its left: {menu_rect:?}, {mist_rect:?}"
+            );
+            assert!(viewport.contains_rect(menu_rect), "menu is clipped");
+            assert!(viewport.contains_rect(mist_rect), "Mist is clipped");
+        }
     }
 
     #[test]
