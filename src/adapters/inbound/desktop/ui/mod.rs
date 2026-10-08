@@ -51,7 +51,10 @@ use self::{
 pub const MIST_WINDOW: Vec2 = Vec2::splat(164.0);
 const SPEAKING_MIST_WINDOW: Vec2 = Vec2::splat(212.0);
 const QUEUE_WINDOW_WIDTH: f32 = 282.0;
-const CONTEXT_MENU_WINDOW: Vec2 = Vec2::new(280.0, 420.0);
+const CONTEXT_MENU_WINDOW: Vec2 = Vec2::new(
+    280.0 + theme::CONTEXT_MENU_GAP + SPEAKING_MIST_WINDOW.x,
+    420.0,
+);
 const PANEL_WINDOW: Vec2 = Vec2::new(860.0, 760.0);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -73,7 +76,13 @@ impl ViewportMode {
     }
 
     fn mist_center(self) -> Vec2 {
-        self.size() * 0.5
+        match self {
+            Self::ContextMenu => Vec2::new(
+                CONTEXT_MENU_WINDOW.x - SPEAKING_MIST_WINDOW.x * 0.5,
+                CONTEXT_MENU_WINDOW.y * 0.5,
+            ),
+            _ => self.size() * 0.5,
+        }
     }
 }
 
@@ -646,7 +655,7 @@ impl PetApp {
         if response.drag_started() {
             context.send_viewport_cmd(egui::ViewportCommand::StartDrag);
         }
-        response.context_menu(|ui| self.context_menu(ui, &context));
+        theme::context_menu_popup(&response).show(|ui| self.context_menu(ui, &context));
         response.context_menu_opened()
     }
 
@@ -1417,7 +1426,11 @@ mod tests {
         assert_eq!(MIST_WINDOW.x, MIST_WINDOW.y);
         assert_eq!(SPEAKING_MIST_WINDOW.x, SPEAKING_MIST_WINDOW.y);
         let center = Pos2::new(-300.0, -200.0);
-        for mode in [ViewportMode::Mist, ViewportMode::Speaking] {
+        for mode in [
+            ViewportMode::Mist,
+            ViewportMode::Speaking,
+            ViewportMode::ContextMenu,
+        ] {
             assert_eq!(
                 viewport_origin_for_mist_center(center, mode) + mode.mist_center(),
                 center,
@@ -1454,7 +1467,7 @@ mod tests {
     fn expanded_viewport_preserves_center_on_secondary_monitors() {
         assert_eq!(
             viewport_origin_for_mist_center(Pos2::new(-300.0, -200.0), ViewportMode::ContextMenu),
-            Pos2::new(-440.0, -410.0)
+            Pos2::new(-698.0, -410.0)
         );
     }
 }
