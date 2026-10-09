@@ -1,242 +1,212 @@
 # Mist
 
-**Select text anywhere. Press Ctrl+Space. Hear it locally.**
+[![Website: Download Mist](https://img.shields.io/badge/Website-Download_Mist-2563eb)](https://mindful-time.github.io/Mist/)
+[![Releases: Early access](https://img.shields.io/badge/Releases-Early_access-f59e0b)](https://github.com/mindful-time/Mist/releases)
+[![GitHub release downloads](https://img.shields.io/github/downloads/mindful-time/Mist/total?label=Release%20downloads)](https://github.com/mindful-time/Mist/releases)
 
-Mist is a small cross-platform desktop companion powered by
-[Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M). It reads selected text without sending it to a server.
+**Select text. Press Ctrl+Space. Listen to it.**
 
-1. Select text in an application.
+Mist reads selected text aloud on your computer. Use it to listen to articles,
+documents, and notes from other applications.
+
+Speech stays on your device. After the first model download, Mist can generate
+speech without an internet connection.
+
+A small animated orb stays on your desktop. It moves with the sound and becomes
+smaller when speech stops.
+
+[Download Mist](https://mindful-time.github.io/Mist/) ·
+[Start using Mist](#start-using-mist) ·
+[Report a problem](https://github.com/mindful-time/Mist/issues)
+
+## What you can do
+
+- Read selected text in supported applications.
+- Choose from 54 voices.
+- Set the speech speed from 0.5× to 3×.
+- Pause or resume speech from the queue.
+- Delete the active queue item to stop its speech.
+- Move the orb and the queue to another position on your desktop.
+
+## Download and install
+
+Mist is an early-access release candidate. It is not a stable release.
+
+Use the [download page](https://mindful-time.github.io/Mist/) to choose an
+available installer for your computer.
+
+The website shows available downloads for your operating system. On a Mac,
+choose the processor type before you download.
+
+| Computer | System requirements | Public download |
+| --- | --- | --- |
+| Apple Silicon Mac | macOS 13.0 or newer | [RC.2 DMG](https://github.com/mindful-time/Mist/releases/download/v0.1.0-rc.2-macos-aarch64/Mist-macos-aarch64.dmg) |
+| Linux x86_64 | Ubuntu 24.04-compatible desktop and an AVX2-capable CPU | [RC.2 AppImage](https://github.com/mindful-time/Mist/releases/download/v0.1.0-rc.2-linux/Mist-linux-x86_64.AppImage) or [RC.2 DEB](https://github.com/mindful-time/Mist/releases/download/v0.1.0-rc.2-linux/Mist-linux-x86_64.deb) |
+| Intel Mac | See the [source build requirements](docs/DISTRIBUTION.md#intel-macos-runtime) | No public installer |
+| Windows | See [Build from source](#build-from-source) | No public installer |
+
+The Apple Silicon installer is signed and notarized. Linux requires glibc 2.39+
+and GLIBCXX_3.4.32. AppImage does not remove these requirements.
+
+Read the [release notes](https://github.com/mindful-time/Mist/releases) before
+installation. The published RC.2 downloads do not include later changes on
+`main`.
+
+These previews still need full installation and speech tests on clean computers.
+See the [installation and checksum instructions](docs/DISTRIBUTION.md#user-installation).
+
+## Start using Mist
+
+1. Install the package for your computer.
+2. Open Mist.
+3. On macOS, enable Mist in **System Settings → Privacy & Security → Accessibility**.
+4. Select **Download voices** in Mist.
+5. Wait for the download to finish.
+6. Open a language group on the **Voices** page.
+7. Select a voice.
+
+The first download is approximately 338 MiB. Mist stores the model and voice
+files on your computer. Mist verifies their SHA-256 checksums.
+
+Mist plays a sample when you select a voice. Choose a voice that matches the
+language of your text.
+
+## Read selected text
+
+1. Select text in a supported application.
 2. Press **Ctrl+Space**.
-3. Mist adds the text to the queue and starts speaking.
 
-The normal desktop surface is only a soft, animated mist. It stays small and translucent while idle, grows with speech, and reacts to the generated audio.
+Mist adds the text to the speech queue. It starts speech automatically unless
+you disable automatic playback in **Settings → Playback**.
 
-## What Mist does
+Use the pause control to pause speech. Use the resume control to continue
+speech. Use the delete control to remove an item. If you delete the active item,
+Mist stops its speech.
 
-- Reads selected text across macOS, Windows, and Linux.
-- Speaks locally with 54 Kokoro voices across nine language families.
-- Starts long passages sentence by sentence in **Real-time** mode.
-- Offers **Complete audio** mode for whole-selection buffering.
-- Supports playback speeds from 0.5× to 3×.
-- Replaces a playing voice preview as soon as another voice is selected.
-- Keeps a separate draggable queue with play, pause, resume, select, and delete.
-- Removes completed items and immediately stops audio when an active item is deleted.
+Right-click the orb to open its menu. Select **Settings** to change the voice,
+speed, or playback mode.
 
-## Selection and privacy
+### If Mist cannot read the selection
 
-Mist first asks the operating system for the selected text. If an application does not expose it, Mist can send the platform Copy shortcut and read the result.
+1. Copy the text in the application.
+2. Right-click the Mist orb.
+3. Select **Speak copied text**.
 
-Automatic Copy is enabled by default and can be disabled in **Settings → Playback**. **Speak copied text** is also available from the menu.
+On macOS, you can also use **Services → Speak Selection with Mist** in
+applications that support Services.
 
-When Mist used automatic Copy, it clears that temporary value after playback only when the clipboard still matches. This cleanup is best effort because operating systems do not provide one portable atomic operation.
+On Wayland, your desktop must approve the shortcut. Use the shortcut that your
+desktop grants. Some desktops cannot provide selected text to Mist.
 
-Mist does not request screen-recording permission. Speech synthesis and playback stay on the device.
+On Windows and Linux, **Speak typed text** also accepts text that you enter.
 
-## Voices and languages
+## Voices and playback
 
-The first launch shows voices grouped by language:
+Mist uses the [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) speech model.
+Its 54 voices have nine language groups:
 
-- American English
-- British English
+- English (US)
+- English (UK)
 - Spanish
 - French
 - Hindi
 - Italian
 - Japanese
-- Brazilian Portuguese
-- Mandarin Chinese
+- Portuguese (BR)
+- Mandarin
 
-Selecting a voice changes the language and starts its preview immediately. The previous preview is cancelled instead of playing to completion.
+Select another voice to replace the current voice sample. The new voice applies
+to subsequent speech.
 
-**Download voices** installs the pinned multilingual Kokoro model and voice pack in the user application-data directory. Both downloads are SHA-256 verified.
+Open **Settings → Playback** to choose when speech starts:
 
-## Platform support
+- **Real-time** starts speech after the first sentence is ready. This is the
+  default mode.
+- **Complete audio** prepares all selected text before speech starts.
 
-| Platform | Selected-text adapter | Automatic fallback | Preferred inference |
-| --- | --- | --- | --- |
-| macOS | Accessibility API and native Service | Command-C | Core ML on Apple Silicon, then CPU |
-| Windows | Microsoft UI Automation | Ctrl-C | CUDA, then DirectML, then CPU |
-| Linux | X11 PRIMARY or Wayland portals | Ctrl-C | CUDA, then CPU |
+Turn off **Automatically play new queue items** to start each item yourself.
 
-The CPU path is always available. Choosing **Standard** in model settings forces CPU. Unsupported options such as WebGPU and MLX remain disabled rather than appearing usable.
+## Privacy and permissions
 
-Core ML was validated locally with the production multilingual model and finite, non-silent 24 kHz output in English, Spanish, Japanese, and Mandarin.
+Mist generates and plays speech on your computer. It does not send selected text
+to a speech service. It uses the internet to download model and voice files.
 
-Windows and Linux builds, tests, and CPU fallbacks run in CI. CUDA and DirectML still require acceptance testing on matching physical GPU hardware.
+Mist first asks the operating system for selected text. If direct access fails,
+Mist can use the Copy shortcut. This option is on by default.
 
-See [inference backend research](docs/INFERENCE_BACKEND_RESEARCH.md) for provider details and validation gates.
+Automatic Copy can replace text that you previously copied. Open **Settings →
+Privacy**. Turn off **Use Copy when selection access fails** to disable this
+option.
 
-## Install
+After speech, Mist clears its temporary clipboard text only if the clipboard
+still matches. Clipboard cleanup cannot fully protect text copied at the same
+time.
 
-For the simplest path, use the
-[Mist download page](https://mindful-time.github.io/Mist/). It chooses your
-operating system and shows the matching verified download when a public release
-is available. macOS and Windows installers are also platform-signed.
+Mist does not request permission to record the screen.
 
-The download website and installers are not published yet. These commands
-will work after the first tested release is published. Linux binaries currently
-target x86_64 Ubuntu 24.04-compatible desktops with AVX2; see the
-[runtime requirements](docs/DISTRIBUTION.md#user-installation) before downloading.
+## Current limits
 
-macOS and Linux:
+- Some applications restrict access to selected text.
+- Wayland selection and shortcuts depend on desktop support.
+- Mist does not start automatically when you log in.
+- GPU acceleration on Windows and Linux still needs tests on supported physical
+  hardware.
 
-```sh
-(
-  set -eu
-  installer=$(mktemp "${TMPDIR:-/tmp}/mist-bootstrap.XXXXXX")
-  trap 'rm -f "$installer"' 0
-  curl --proto '=https' --tlsv1.2 -LsSf \
-    https://github.com/mindful-time/Mist/releases/latest/download/mist-installer.sh \
-    --output "$installer"
-  sh "$installer"
-)
-```
+See the [platform and runtime details](docs/INFERENCE_BACKEND_RESEARCH.md) for
+tested capabilities and remaining limits.
 
-Windows PowerShell:
+## Build from source
 
-```powershell
-& ([scriptblock]::Create((irm -ErrorAction Stop https://github.com/mindful-time/Mist/releases/latest/download/mist-installer.ps1)))
-```
+Use Rust 1.95 or newer. The first build and model download require internet
+access.
 
-The installers verify release checksums before installing. Direct DMG, EXE,
-AppImage, and DEB downloads are also available on the release page. See the
-[distribution guide](docs/DISTRIBUTION.md) for exact artifact names, version
-pinning, download-only mode, and release requirements.
+- On macOS, install the Xcode Command Line Tools. Intel Mac also needs the
+  [pinned runtime preparation](docs/DISTRIBUTION.md#intel-macos-runtime).
+- On Windows, use Rust's `stable-msvc` toolchain.
+- On Linux, install the [desktop build libraries](.github/workflows/ci.yml).
+  Install DejaVu Sans, Noto Core, and Noto CJK fonts. Install `pw-play`, `paplay`,
+  `aplay`, or `ffplay` for audio output.
 
-## Build and run from source
-
-Requirements: Rust 1.95+ and internet access for the first build and model download.
+Run the tests:
 
 ```sh
 make test
+```
+
+Start Mist on macOS or Linux:
+
+```sh
 make run
 ```
 
-Choose a voice, select **Download voices**, then select text in another application and press **Ctrl+Space**.
-
-### macOS
-
-Mist requires the Xcode Command Line Tools. Apple Silicon uses the existing
-Core ML build; the Intel CPU candidate targets macOS 13.3+ and requires the
-[pinned runtime preparation](docs/DISTRIBUTION.md#intel-macos-runtime) before
-the commands below. Signed, clean-machine acceptance is still required before
-the first public release.
-
-```sh
-MIST_SIGNING_IDENTITY="Apple Development: Your Name (TEAMID)" make install
-open "/Applications/Mist.app"
-```
-
-Install to `/Applications` with a stable Apple certificate so the Accessibility identity survives rebuilds. Avoid keeping production and development copies installed together.
-
-Open Mist once, then enable it in **System Settings → Privacy & Security → Accessibility**. Mist consumes only Control-Space and does not inspect typed text.
-
-The native Service is available under **Services → Speak Selection with Mist**. If hidden, enable it in **Keyboard → Keyboard Shortcuts → Services → Text**.
-
-For a temporary development install:
-
-```sh
-MIST_SIGNING_IDENTITY=- MIST_INSTALL_DIR="$HOME/Applications" make install
-```
-
-macOS treats each ad-hoc rebuild as a new Accessibility identity, so permission must be granted again.
-
-### Windows
-
-Use Rust's `stable-msvc` toolchain.
+Build and start Mist in Windows PowerShell:
 
 ```powershell
-rustup default stable-msvc
-cargo build --release
+cargo build --release --locked
 .\target\release\mist.exe
 ```
 
-### Linux
+For a macOS development install, use a stable Apple certificate. Repeated ad-hoc
+builds can require new Accessibility permission. Avoid simultaneous development
+and release installations.
 
-Mist supports X11 and Wayland. Install desktop build libraries, DejaVu Sans, Noto Core, Noto CJK, and one audio command: `pw-play`, `paplay`, `aplay`, or `ffplay`.
+See the [distribution guide](docs/DISTRIBUTION.md) for source installation,
+runtime requirements, and command-line options.
 
-```sh
-make install-linux
-"$HOME/.local/bin/mist"
-```
+## Contribute
 
-Wayland requests Ctrl+Space through the XDG GlobalShortcuts portal. The desktop may show a confirmation or assign another gesture.
-
-Direct Wayland selection needs ext-data-control or wlr-data-control primary-selection support. If unavailable, use automatic Copy, **Speak copied text**, or manual text entry.
-
-For a terminal smoke test:
-
-```sh
-mist --install-model
-mist --speak "Hello from Kokoro."
-```
-
-Set `MIST_MODEL_DIR` to use another model directory. `SELECT_TO_SPEAK_MODEL_DIR` remains accepted for existing installations.
-
-## Architecture
-
-Mist uses hexagonal architecture so the speech model, operating-system adapters, audio output, persistence, and provisioning can change independently.
-
-```text
-macOS Accessibility / Windows UIA / Linux selection
-                         |
-              desktop input adapter
-                         |
-               application use cases
-                 /              \
-        speech ports          audio port
-             |                    |
-      Kokoro adapter       platform playback
-```
-
-- `core/domain`: model-neutral values and queue state.
-- `core/application`: speech, playback, and model-installation use cases.
-- `core/ports`: interfaces owned by the core.
-- `adapters/inbound`: desktop UI, shortcuts, selection, and OS integration.
-- `adapters/outbound`: speech engines, audio, persistence, and provisioning.
-- `runtime`: long-lived desktop orchestration.
-- `main.rs`: composition root.
-
-Replacing Kokoro requires another voice catalog, speech-engine factory, and model provisioner. Selection, queue, UI, and playback use cases stay unchanged.
-
-See the complete [architecture guide](docs/ARCHITECTURE.md) and [product specification](docs/SPEC.md).
-
-## Development
-
-Install repository-owned Git hooks once per clone:
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before you change the code. Install the
+repository hooks:
 
 ```sh
 make hooks
 ```
 
-Both hooks run formatting, checks, strict Clippy, builds, tests, coverage-backed
-CRAP analysis, Smells v0.5.0, OSV, Gitleaks, and release-version checks.
-Pre-commit tests the staged snapshot; pre-push tests the pushed revisions.
-See [contributing](CONTRIBUTING.md) for tool setup and the enforced CI gates.
+All changes require a pull request with the required CI checks. Only
+`mindful-time` can merge changes to `main`.
 
-CRAP scores of 5 or higher warn. New, regressed, or newly boundary-crossing
-scores of 10 or higher block; unchanged/improving baseline debt remains visible.
-Run the gates directly when needed:
+For technical details, read the [architecture guide](docs/ARCHITECTURE.md) and
+[product specification](docs/SPEC.md).
 
-```sh
-make quality
-make crap
-make smells
-make security
-```
-
-Mist is preparing release candidate `0.1.0-rc.2`, not a stable release. `VERSION`,
-`Cargo.toml`, `Cargo.lock`, and the full `MistReleaseVersion` bundle field must
-move together. Apple's numeric bundle version remains `0.1.0`; its bundle build
-number is `2`. Published RC.1 releases remain immutable. RC.2 needs fresh CI
-candidates from its own merged source commit; RC.1 artifacts are not reused.
-
-Only `mindful-time` may merge to `main`. Everyone, including the owner, must use
-a pull request with passing required checks. Direct and force pushes are blocked;
-pull requests are squash-merged.
-
-Launch at login remains outside the current scope. Tagged releases build draft,
-signed installers for macOS and Windows plus AppImage and DEB packages for
-Linux. Native selection, GPU acceleration, installation, and uninstall behavior
-still require release acceptance testing on every supported operating system
-before a draft is published.
+Mist uses the [MIT license](LICENSE). The speech engine, models, and bundled
+fonts have separate license terms. See the [license details](docs/LICENSING_RESEARCH.md).
