@@ -1,3 +1,7 @@
+// Modified by Mist contributors: add Core ML and DirectML execution providers
+// and their session settings. See MIST_PATCH.md for patch provenance.
+// SPDX-License-Identifier: Apache-2.0
+
 //! Where the model runs: the CPU, or a GPU execution provider of ONNX Runtime.
 //!
 //! GPU support is optional and compiled in with a platform execution-provider

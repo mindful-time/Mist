@@ -14,6 +14,13 @@ cp "$project_root/target/release/mist" "$contents/MacOS/mist"
 cp "$project_root/macos/Info.plist" "$contents/Info.plist"
 "$project_root/scripts/build-macos-icon.sh" "$contents/Resources/Mist.icns" >/dev/null
 /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string Mist.icns" "$contents/Info.plist"
+licenses="$contents/Resources/licenses"
+mkdir -p "$licenses"
+cp "$project_root/LICENSE" "$licenses/Mist-LICENSE"
+cp "$project_root/third_party/kokoro-micro/LICENSE" "$licenses/kokoro-micro-LICENSE"
+cp "$project_root/third_party/kokoro-micro/NOTICE" "$licenses/kokoro-micro-NOTICE"
+cp "$project_root/third_party/kokoro-micro/THIRD_PARTY_LICENSES" "$licenses/kokoro-micro-THIRD_PARTY_LICENSES"
+cp "$project_root/assets/fonts/OFL-NotoSansDevanagariUI.txt" "$licenses/NotoSansDevanagariUI-OFL"
 if [[ "$(uname -m)" == x86_64 ]]; then
     sh "$project_root/scripts/prepare-intel-app.sh" "$app_bundle"
 fi
