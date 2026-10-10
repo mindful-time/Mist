@@ -66,3 +66,18 @@ become relicensed by changing Mist's root license.
   `licenses/kokoro-micro-THIRD_PARTY_LICENSES`, alongside Mist's license,
   Kokoro Micro's Apache license/NOTICE, and the Noto OFL. This verifies the
   resource configuration, not every built installer or all transitive notices.
+
+## Notice corrections checked 2026-10-10
+
+The patched `kokoro-micro/Cargo.toml` and `src/device.rs` now carry prominent
+Mist modification notices inside each changed file. The upstream Apache
+`LICENSE` and `NOTICE` remain unchanged; the detailed patch provenance remains
+in `MIST_PATCH.md`.
+
+The local macOS preview build copies the same five license/notice resources
+listed in Cargo's release-packager configuration before signing the app.
+`scripts/test-build-app.mjs` exercises the actual bundle assembly with a small
+native fixture executable, checks byte-identical notices, and verifies that
+changing a bundled notice invalidates the native signature. It uses ad-hoc
+signing, not Developer ID signing or notarization, and does not install the app.
+This focused correction is not a complete transitive licensing audit.

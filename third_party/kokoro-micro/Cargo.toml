@@ -1,3 +1,7 @@
+# Modified by Mist contributors: add Core ML/DirectML features and pin the
+# existing ONNX Runtime dependency. See MIST_PATCH.md for patch provenance.
+# SPDX-License-Identifier: Apache-2.0
+
 [package]
 name = "kokoro-micro"
 version = "1.3.0"
